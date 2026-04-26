@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+
+{% block title %}Customers — Logistic Manager{% endblock %}
+{% block nav_customers %}active{% endblock %}
+{% block page_title %}Customers{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
+    <i class="bi bi-person-plus"></i> Add Customer
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Search Bar -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="search-bar">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control" id="customerSearch" placeholder="Search customers..." style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <span class="badge-glass badge-info" style="font-size:14px;padding:8px 16px;">
+            <i class="bi bi-people"></i> {{ customers|length }} Customer{{ customers|length|pluralize }}
+        </span>
+    </div>
+</div>
+
+<!-- Customers Table -->
+<div class="glass-card">
+    <table class="table-glass" id="customersTable">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Phone</th>
+                <th>Address</th>
+                <th style="width:150px">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for customer in customers %}
+            <tr>
+                <td>{{ customer.id }}</td>
+                <td style="font-weight:600">{{ customer.name }}</td>
+                <td><i class="bi bi-telephone me-1" style="color:var(--accent-3);font-size:12px"></i>{{ customer.phone }}</td>
+                <td style="color:var(--text-secondary);font-size:13px">{{ customer.address|truncatechars:50 }}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn-ghost btn-sm" onclick="editCustomer({{ customer.id }},'{{ customer.name|escapejs }}','{{ customer.phone|escapejs }}','{{ customer.address|escapejs }}')">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/customers/delete/{{ customer.id }}/', '{{ customer.name|escapejs }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5">
+                    <div class="empty-state">
+                        <i class="bi bi-people"></i>
+                        <p>No customers yet. Add your first customer!</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Customer Modal -->
+<div class="modal fade" id="addCustomerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Customer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addCustomerForm" class="form-glass">
+          <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="name" class="form-control" placeholder="e.g. Ahmad Ali" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone Number</label>
+            <input type="text" name="phone" class="form-control" placeholder="+971 5x xxx xxxx" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Address</label>
+            <textarea name="address" class="form-control" rows="3" placeholder="Full delivery address" required></textarea>
+          </div>
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Add Customer</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Customer Modal -->
+<div class="modal fade" id="editCustomerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Customer</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editCustomerForm" class="form-glass">
+          <input type="hidden" name="customer_id" id="edit_customer_id">
+          <div class="mb-3">
+            <label class="form-label">Full Name</label>
+            <input type="text" name="name" id="edit_cust_name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Phone Number</label>
+            <input type="text" name="phone" id="edit_cust_phone" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Address</label>
+            <textarea name="address" id="edit_cust_address" class="form-control" rows="3" required></textarea>
+          </div>
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+setupTableSearch('customerSearch', 'customersTable');
+
+ajaxSubmit('addCustomerForm', '/customers/add/', function() {
+    bootstrap.Modal.getInstance(document.getElementById('addCustomerModal')).hide();
+    setTimeout(function() { location.reload(); }, 500);
+});
+
+function editCustomer(id, name, phone, address) {
+    document.getElementById('edit_customer_id').value = id;
+    document.getElementById('edit_cust_name').value = name;
+    document.getElementById('edit_cust_phone').value = phone;
+    document.getElementById('edit_cust_address').value = address;
+    new bootstrap.Modal(document.getElementById('editCustomerModal')).show();
+}
+
+ajaxSubmit('editCustomerForm', '/customers/edit/', function() {
+    bootstrap.Modal.getInstance(document.getElementById('editCustomerModal')).hide();
+    setTimeout(function() { location.reload(); }, 500);
+});
+</script>
+{% endblock %}

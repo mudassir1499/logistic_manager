@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+
+{% block title %}Orders — Logistic Manager{% endblock %}
+{% block nav_orders %}active{% endblock %}
+{% block page_title %}Orders{% endblock %}
+
+{% block topbar_actions %}
+<button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addOrderModal">
+    <i class="bi bi-cart-plus"></i> New Order
+</button>
+{% endblock %}
+
+{% block content %}
+<!-- Search Bar -->
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="search-bar">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control" id="orderSearch" placeholder="Search orders..." style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+        </div>
+    </div>
+    <div class="col-md-6 text-end">
+        <span class="badge-glass badge-warning" style="font-size:14px;padding:8px 16px;">
+            <i class="bi bi-cart"></i> {{ orders|length }} Order{{ orders|length|pluralize }}
+        </span>
+    </div>
+</div>
+
+<!-- Orders Table -->
+<div class="glass-card">
+    <table class="table-glass" id="ordersTable">
+        <thead>
+            <tr>
+                <th>Order #</th>
+                <th>Customer</th>
+                <th>Date</th>
+                <th>Items</th>
+                <th>Total (AED)</th>
+                <th style="width:150px">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr>
+                <td style="font-weight:700;color:var(--accent-3)">#{{ order.id }}</td>
+                <td style="font-weight:600">{{ order.customer.name }}</td>
+                <td style="color:var(--text-secondary)">{{ order.date|date:"M d, Y" }}</td>
+                <td>
+                    <span class="badge-glass badge-info">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
+                </td>
+                <td style="font-weight:700;font-size:16px">{{ order.total }}</td>
+                <td>
+                    <div class="action-btns">
+                        <button class="btn-ghost btn-sm" onclick="viewOrder({{ order.id }})">
+                            <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/orders/delete/{{ order.id }}/', 'Order #{{ order.id }}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        <i class="bi bi-cart-x"></i>
+                        <p>No orders yet. Create your first order!</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Add Order Modal -->
+<div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-cart-plus me-2"></i>New Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addOrderForm" class="form-glass">
+          <div class="mb-3">
+            <label class="form-label">Customer</label>
+            <select name="customer_id" class="form-select" required>
+              <option value="">Select a customer...</option>
+              {% for customer in customers %}
+              <option value="{{ customer.id }}">{{ customer.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <label class="form-label">Order Items</label>
+          <div id="orderItemsContainer">
+              <div class="order-item-row">
+                  <div class="form-group">
+                      <label class="form-label" style="font-size:11px">Product</label>
+                      <select name="product_id" class="form-select" required>
+                          <option value="">Select product...</option>
+                          {% for product in products %}
+                          <option value="{{ product.id }}" data-price="{{ product.price }}">{{ product.name }} — AED {{ product.price }}</option>
+                          {% endfor %}
+                      </select>
+                  </div>
+                  <div class="form-group" style="max-width:120px">
+                      <label class="form-label" style="font-size:11px">Quantity</label>
+                      <input type="number" name="quantity" class="form-control" min="1" value="1" required>
+                  </div>
+                  <button type="button" class="remove-item-btn" onclick="this.closest('.order-item-row').remove()" title="Remove">
+                      <i class="bi bi-x-circle"></i>
+                  </button>
+              </div>
+          </div>
+
+          <button type="button" class="btn-ghost btn-sm mt-2 mb-3" onclick="addOrderItemRow()">
+              <i class="bi bi-plus"></i> Add Item
+          </button>
+
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Create Order</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- View Order Modal -->
+<div class="modal fade" id="viewOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-receipt me-2"></i>Order Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body" id="orderDetailBody">
+          <div class="text-center py-4"><span class="spinner-border"></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+setupTableSearch('orderSearch', 'ordersTable');
+
+function addOrderItemRow() {
+    var container = document.getElementById('orderItemsContainer');
+    var row = container.querySelector('.order-item-row').cloneNode(true);
+    row.querySelector('select').value = '';
+    row.querySelector('input').value = '1';
+    container.appendChild(row);
+}
+
+ajaxSubmit('addOrderForm', '/orders/add/', function() {
+    bootstrap.Modal.getInstance(document.getElementById('addOrderModal')).hide();
+    setTimeout(function() { location.reload(); }, 500);
+});
+
+function viewOrder(orderId) {
+    var modal = new bootstrap.Modal(document.getElementById('viewOrderModal'));
+    modal.show();
+    fetch('/orders/detail/' + orderId + '/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            var html = '<div class="mb-3"><strong>Customer:</strong> ' + data.customer + '</div>';
+            html += '<div class="mb-3"><strong>Date:</strong> ' + data.date + '</div>';
+            html += '<table class="table-glass"><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>';
+            data.items.forEach(function(item) {
+                html += '<tr><td>' + item.product + '</td><td>' + item.quantity + '</td><td>' + item.price + '</td><td style="font-weight:700">' + item.subtotal + '</td></tr>';
+            });
+            html += '</tbody></table>';
+            html += '<div class="text-end mt-3" style="font-size:20px;font-weight:800;color:var(--accent-3)">Total: AED ' + data.total + '</div>';
+            document.getElementById('orderDetailBody').innerHTML = html;
+        });
+}
+</script>
+{% endblock %}

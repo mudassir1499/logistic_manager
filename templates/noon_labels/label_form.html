@@ -1,0 +1,376 @@
+{% extends 'base.html' %}
+
+{% block title %}Noon Labels — Logistic Manager{% endblock %}
+{% block nav_noon %}active{% endblock %}
+{% block page_title %}Noon Label Printer{% endblock %}
+
+{% block content %}
+<div class="row g-4">
+    <!-- Form Column -->
+    <div class="col-lg-5">
+        <div class="glass-card" style="border-color:var(--noon-yellow);border-width:2px;">
+            <div class="d-flex align-items-center gap-3 mb-4">
+                <div style="background:var(--noon-yellow);color:var(--noon-dark);width:48px;height:48px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">
+                    noon
+                </div>
+                <div>
+                    <h5 class="mb-0" style="font-weight:700">Label Generator</h5>
+                    <small style="color:var(--text-muted)">Generate product &amp; carton labels as separate PDFs</small>
+                </div>
+            </div>
+
+            <!-- Shared form fields -->
+            <div class="form-glass">
+                <div class="mb-3">
+                    <label class="form-label">Product Quantity (Total Units)</label>
+                    <input type="number" id="labelQty" class="form-control" min="1" value="1" placeholder="Total number of products" required>
+                    <small style="color:var(--text-muted)">Total number of product labels to generate</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Carton Quantity</label>
+                    <input type="number" id="cartonQty" class="form-control" min="1" value="1" placeholder="Number of cartons" required>
+                    <small style="color:var(--text-muted)">Number of carton labels to generate</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Label Mark</label>
+                    <input type="text" id="labelMark" class="form-control" placeholder="e.g. LM-2024-001" required>
+                    <small style="color:var(--text-muted)">Unique identifier for the product label</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Label Mark 2 (Optional)</label>
+                    <input type="text" id="labelMark2" class="form-control" placeholder="e.g. LM-2024-002">
+                    <small style="color:var(--text-muted)">Optional second label mark to print in the same batch</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Label Mark 3 (Optional)</label>
+                    <input type="text" id="labelMark3" class="form-control" placeholder="e.g. LM-2024-003">
+                    <small style="color:var(--text-muted)">Optional third label mark to print in the same batch</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Carton Mark</label>
+                    <input type="text" id="cartonMark" class="form-control" placeholder="e.g. CTN-A-001" required>
+                    <small style="color:var(--text-muted)">Carton identification mark</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Carton ASN</label>
+                    <input type="text" id="cartonAsn" class="form-control" placeholder="e.g. ASN-001">
+                    <small style="color:var(--text-muted)">Advance Shipping Note for the carton</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Paper Format</label>
+                    <select id="paperFormat" class="form-select">
+                        <option value="a4">A4 Sheet (Multiple smaller labels per page)</option>
+                        <option value="thermal">Thermal Printer (One large label per page)</option>
+                    </select>
+                    <small style="color:var(--text-muted)">Choose how you want the PDF to be laid out</small>
+                </div>
+            </div>
+
+            <!-- Two separate buttons -->
+            <div class="d-flex gap-3 mt-3">
+                <form id="labelPdfForm" method="POST" action="/noon-labels/generate/" target="_blank" class="flex-fill">
+                    {% csrf_token %}
+                    <input type="hidden" name="quantity" id="form1_qty">
+                    <input type="hidden" name="carton_quantity" id="form1_cartonQty">
+                    <input type="hidden" name="label_mark" id="form1_label">
+                    <input type="hidden" name="label_mark_2" id="form1_label2">
+                    <input type="hidden" name="label_mark_3" id="form1_label3">
+                    <input type="hidden" name="carton_mark" id="form1_carton">
+                    <input type="hidden" name="carton_asn" id="form1_cartonAsn">
+                    <input type="hidden" name="paper_format" id="form1_paper">
+                    <button type="submit" class="btn-glow w-100" style="background:linear-gradient(135deg,#feee00,#d4c800);color:var(--noon-dark);font-weight:800" onclick="syncForms()">
+                        <i class="bi bi-tag-fill"></i> Product Label PDF
+                    </button>
+                </form>
+                <form id="cartonPdfForm" method="POST" action="/noon-labels/generate-carton/" target="_blank" class="flex-fill">
+                    {% csrf_token %}
+                    <input type="hidden" name="quantity" id="form2_qty">
+                    <input type="hidden" name="carton_quantity" id="form2_cartonQty">
+                    <input type="hidden" name="label_mark" id="form2_label">
+                    <input type="hidden" name="label_mark_2" id="form2_label2">
+                    <input type="hidden" name="label_mark_3" id="form2_label3">
+                    <input type="hidden" name="carton_mark" id="form2_carton">
+                    <input type="hidden" name="carton_asn" id="form2_cartonAsn">
+                    <input type="hidden" name="paper_format" id="form2_paper">
+                    <button type="submit" class="btn-glow w-100" style="background:linear-gradient(135deg,#2d2d2d,#444);color:#feee00;font-weight:800;border:2px solid #feee00" onclick="syncForms()">
+                        <i class="bi bi-box-seam-fill"></i> Carton Label PDF
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Label History -->
+        {% if batches %}
+        <div class="glass-card mt-4">
+            <h6 style="font-weight:700" class="mb-3"><i class="bi bi-clock-history me-2"></i>Recent Batches</h6>
+            <table class="table-glass">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Label Marks</th>
+                        <th>Carton &amp; ASN</th>
+                        <th>Prod. Qty</th>
+                        <th>Ctn. Qty</th>
+                        <th>Print</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for batch in batches %}
+                    <tr>
+                        <td style="color:var(--text-secondary);font-size:12px">{{ batch.created_at|date:"M d, H:i" }}</td>
+                        <td style="font-weight:600;font-size:13px">
+                            {{ batch.label_mark }}
+                            {% if batch.label_mark_2 %}
+                            <br><span style="color:#aaa;font-size:11px">{{ batch.label_mark_2 }}</span>
+                            {% endif %}
+                            {% if batch.label_mark_3 %}
+                            <br><span style="color:#aaa;font-size:11px">{{ batch.label_mark_3 }}</span>
+                            {% endif %}
+                        </td>
+                        <td style="font-size:13px;color:var(--text-secondary)">
+                            {{ batch.carton_mark }}
+                            {% if batch.carton_asn %}
+                            <br><span style="color:#aaa;font-size:11px">ASN: {{ batch.carton_asn }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ batch.quantity }}</td>
+                        <td>{{ batch.carton_quantity|default:"1" }}</td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <form method="POST" action="/noon-labels/generate/" target="_blank" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="quantity" value="{{ batch.quantity }}">
+                                    <input type="hidden" name="carton_quantity" value="{{ batch.carton_quantity|default:'1' }}">
+                                    <input type="hidden" name="label_mark" value="{{ batch.label_mark }}">
+                                    {% if batch.label_mark_2 %}<input type="hidden" name="label_mark_2" value="{{ batch.label_mark_2 }}">{% endif %}
+                                    {% if batch.label_mark_3 %}<input type="hidden" name="label_mark_3" value="{{ batch.label_mark_3 }}">{% endif %}
+                                    <input type="hidden" name="carton_mark" value="{{ batch.carton_mark }}">
+                                    {% if batch.carton_asn %}<input type="hidden" name="carton_asn" value="{{ batch.carton_asn }}">{% endif %}
+                                    <input type="hidden" name="paper_format" value="a4">
+                                    <button type="submit" class="btn-ghost btn-sm" style="padding:4px 8px" title="Product Label PDF"><i class="bi bi-tag"></i></button>
+                                </form>
+                                <form method="POST" action="/noon-labels/generate-carton/" target="_blank" style="display:inline">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="quantity" value="{{ batch.quantity }}">
+                                    <input type="hidden" name="carton_quantity" value="{{ batch.carton_quantity|default:'1' }}">
+                                    <input type="hidden" name="label_mark" value="{{ batch.label_mark }}">
+                                    {% if batch.label_mark_2 %}<input type="hidden" name="label_mark_2" value="{{ batch.label_mark_2 }}">{% endif %}
+                                    {% if batch.label_mark_3 %}<input type="hidden" name="label_mark_3" value="{{ batch.label_mark_3 }}">{% endif %}
+                                    <input type="hidden" name="carton_mark" value="{{ batch.carton_mark }}">
+                                    {% if batch.carton_asn %}<input type="hidden" name="carton_asn" value="{{ batch.carton_asn }}">{% endif %}
+                                    <input type="hidden" name="paper_format" value="a4">
+                                    <button type="submit" class="btn-ghost btn-sm" style="padding:4px 8px" title="Carton Label PDF"><i class="bi bi-box-seam"></i></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Preview Column -->
+    <div class="col-lg-7">
+        <!-- Tab switch for previews -->
+        <ul class="nav nav-pills mb-3" style="gap:8px">
+            <li class="nav-item">
+                <button class="btn-glow btn-sm active" id="tabProductLabel" onclick="switchPreview('product')" style="background:linear-gradient(135deg,#feee00,#d4c800);color:#2d2d2d">
+                    <i class="bi bi-tag-fill me-1"></i> Product Label
+                </button>
+            </li>
+            <li class="nav-item">
+                <button class="btn-ghost btn-sm" id="tabCartonLabel" onclick="switchPreview('carton')">
+                    <i class="bi bi-box-seam-fill me-1"></i> Carton Label
+                </button>
+            </li>
+        </ul>
+
+        <!-- Product Label Preview -->
+        <div class="glass-card" id="previewProduct">
+            <h6 class="mb-3" style="font-weight:700"><i class="bi bi-eye me-2"></i>Product Label Preview</h6>
+            <div class="label-preview">
+                <div class="noon-logo">noon</div>
+                <div style="text-align:center;font-weight:800;font-size:11px;letter-spacing:2px;color:#888;margin-bottom:12px">PRODUCT LABEL</div>
+
+                <div class="label-field">
+                    <strong>Label Mark</strong>
+                    <span id="previewLabelMark">LM-XXXX-XXX</span>
+                </div>
+
+                <div style="border-top:2px dashed #ddd;margin:10px 0"></div>
+
+                <div class="label-field">
+                    <strong>Product Quantity</strong>
+                    <span id="previewQty" style="font-size:24px">1</span>
+                </div>
+
+                <div class="barcode-area" id="previewBarcode">
+                    ||||| |||| ||||| |||| |||||
+                    <div style="font-size:10px;letter-spacing:2px;margin-top:4px;color:#666" id="previewBarcodeText">LM-XXXX-XXX</div>
+                </div>
+
+                <div style="text-align:center;margin-top:12px;font-size:10px;color:#aaa">
+                    noon Seller Product Label — 100mm × 150mm
+                </div>
+            </div>
+        </div>
+
+        <!-- Carton Label Preview -->
+        <div class="glass-card" id="previewCarton" style="display:none">
+            <h6 class="mb-3" style="font-weight:700"><i class="bi bi-eye me-2"></i>Carton Label Preview</h6>
+            <div class="label-preview" style="border:3px solid #2d2d2d">
+                <div style="background:#2d2d2d;color:#feee00;text-align:center;padding:10px 16px;border-radius:4px;margin-bottom:12px">
+                    <span style="font-family:'Inter',sans-serif;font-weight:900;font-size:26px">noon</span>
+                </div>
+                <div style="text-align:center;font-weight:800;font-size:11px;letter-spacing:2px;color:#888;margin-bottom:12px">CARTON LABEL</div>
+
+                <div class="label-field">
+                    <strong>Carton Mark</strong>
+                    <span id="previewCartonMark" style="font-size:22px">CTN-X-XXX</span>
+                </div>
+
+                <div style="border-top:2px dashed #ddd;margin:10px 0"></div>
+                
+                <div class="label-field">
+                    <strong>Carton ASN</strong>
+                    <span id="previewCartonAsn" style="font-size:16px;color:#333">ASN-XXX</span>
+                </div>
+
+                <div class="label-field">
+                    <strong>Product Quantity</strong>
+                    <span id="previewCartonQty">1</span>
+                </div>
+
+                <div class="barcode-area">
+                    ||||| |||| ||||| |||| |||||
+                    <div style="font-size:10px;letter-spacing:2px;margin-top:4px;color:#666" id="previewCartonBarcodeText">CTN-X-XXX</div>
+                </div>
+
+                <div style="text-align:center;margin-top:12px;font-size:10px;color:#aaa">
+                    noon Seller Carton Label — 100mm × 150mm
+                </div>
+            </div>
+        </div>
+
+                    <strong style="color:#3b82f6">Fulfilled by Noon (FBN) Packing Guidelines</strong>
+                    <ul style="color:var(--text-secondary);font-size:13px;margin-bottom:0;padding-left:16px;margin-top:6px">
+                        <li style="margin-bottom:4px"><strong>Individual Units:</strong> Every unit must have a scannable barcode. High-value items (e.g., electronics) must be shrink-wrapped.</li>
+                        <li style="margin-bottom:4px"><strong>Packaging:</strong> Ensure secure individual packaging (no loose items). Do not use noon-branded boxes for transport to the warehouse.</li>
+                        <li style="margin-bottom:4px"><strong>Cartons:</strong> Segregate by Partner SKU (PSKU). Do not mix ASNs in the same carton. Use gap filling materials like bubble wrap.</li>
+                        <li style="margin-bottom:4px"><strong>Labeling:</strong> Every carton must visibly display its number (e.g., CARTON 1), ASN, PSKU, and total product quantity.</li>
+                        <li><strong>Documentation:</strong> Bring two printed copies of your ASN (Advanced Shipment Notice) when delivering to the warehouse.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Sync visible inputs to hidden form fields before submit
+function syncForms() {
+    var qty = document.getElementById('labelQty').value;
+    var cqty = document.getElementById('cartonQty').value;
+    var lm = document.getElementById('labelMark').value;
+    var lm2 = document.getElementById('labelMark2').value;
+    var lm3 = document.getElementById('labelMark3').value;
+    var cm = document.getElementById('cartonMark').value;
+    var ca = document.getElementById('cartonAsn').value;
+
+    document.getElementById('form1_qty').value = qty;
+    document.getElementById('form1_cartonQty').value = cqty;
+    document.getElementById('form1_label').value = lm;
+    document.getElementById('form1_label2').value = lm2;
+    document.getElementById('form1_label3').value = lm3;
+    document.getElementById('form1_carton').value = cm;
+    document.getElementById('form1_cartonAsn').value = ca;
+
+    document.getElementById('form2_qty').value = qty;
+    document.getElementById('form2_cartonQty').value = cqty;
+    document.getElementById('form2_label').value = lm;
+    document.getElementById('form2_label2').value = lm2;
+    document.getElementById('form2_label3').value = lm3;
+    document.getElementById('form2_carton').value = cm;
+    document.getElementById('form2_cartonAsn').value = ca;
+}
+
+// Preview tab switching
+function switchPreview(tab) {
+    var productEl = document.getElementById('previewProduct');
+    var cartonEl = document.getElementById('previewCarton');
+    var tabProduct = document.getElementById('tabProductLabel');
+    var tabCarton = document.getElementById('tabCartonLabel');
+
+    if (tab === 'product') {
+        productEl.style.display = '';
+        cartonEl.style.display = 'none';
+        tabProduct.className = 'btn-glow btn-sm active';
+        tabProduct.style.background = 'linear-gradient(135deg,#feee00,#d4c800)';
+        tabProduct.style.color = '#2d2d2d';
+        tabCarton.className = 'btn-ghost btn-sm';
+        tabCarton.style.background = '';
+        tabCarton.style.color = '';
+    } else {
+        productEl.style.display = 'none';
+        cartonEl.style.display = '';
+        tabCarton.className = 'btn-glow btn-sm active';
+        tabCarton.style.background = 'linear-gradient(135deg,#2d2d2d,#444)';
+        tabCarton.style.color = '#feee00';
+        tabProduct.className = 'btn-ghost btn-sm';
+        tabProduct.style.background = '';
+        tabProduct.style.color = '';
+    }
+}
+
+// Live preview updates
+var qtyInput = document.getElementById('labelQty');
+var markInput = document.getElementById('labelMark');
+var mark2Input = document.getElementById('labelMark2');
+var mark3Input = document.getElementById('labelMark3');
+var cartonInput = document.getElementById('cartonMark');
+var cartonAsnInput = document.getElementById('cartonAsn');
+
+function updatePreview() {
+    var qty = qtyInput.value || '1';
+    var lm = markInput.value || 'LM-XXXX-XXX';
+    var lm2 = mark2Input.value;
+    var lm3 = mark3Input.value;
+    var cm = cartonInput.value || 'CTN-X-XXX';
+    var ca = cartonAsnInput.value || 'ASN-XXX';
+    
+    var extras = '';
+    if (lm2) extras += '<br><span style="font-size:12px;color:#aaa">' + lm2 + '</span>';
+    if (lm3) extras += '<br><span style="font-size:12px;color:#aaa">' + lm3 + '</span>';
+
+    // Product preview
+    document.getElementById('previewQty').textContent = qty;
+    document.getElementById('previewLabelMark').innerHTML = lm + extras;
+    document.getElementById('previewBarcodeText').textContent = lm;
+
+    // Carton preview
+    document.getElementById('previewCartonQty').textContent = qty;
+    document.getElementById('previewCartonMark').textContent = cm;
+    document.getElementById('previewCartonAsn').textContent = ca;
+    document.getElementById('previewCartonLabelMark').innerHTML = lm + extras;
+    document.getElementById('previewCartonBarcodeText').textContent = cm;
+}
+
+qtyInput.addEventListener('input', updatePreview);
+markInput.addEventListener('input', updatePreview);
+mark2Input.addEventListener('input', updatePreview);
+mark3Input.addEventListener('input', updatePreview);
+cartonInput.addEventListener('input', updatePreview);
+cartonAsnInput.addEventListener('input', updatePreview);
+</script>
+{% endblock %}

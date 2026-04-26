@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Products</h2>
+<button class="btn btn-primary mb-3" onclick="showAddProductModal()">Add Product</button>
+<div id="product-list">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Price</th>
+                <th>MOQ</th>
+                <th>Images</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for product in products %}
+            <tr>
+                <td>{{ product.name }}</td>
+                <td>{{ product.price }}</td>
+                <td>{{ product.moq }}</td>
+                <td>
+                    {% for img in product.images.all %}
+                        <img src="{{ img.image.url }}" width="50" height="50" class="me-1 mb-1"/>
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addProductForm" enctype="multipart/form-data">
+          <div class="mb-3">
+            <label>Name</label>
+            <input type="text" name="name" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label>Price</label>
+            <input type="number" name="price" class="form-control" step="0.01" required>
+          </div>
+          <div class="mb-3">
+            <label>MOQ</label>
+            <input type="number" name="moq" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label>Images (up to 3)</label>
+            <input type="file" name="images" class="form-control" multiple accept="image/*">
+          </div>
+          <button type="submit" class="btn btn-success">Add</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function showAddProductModal() {
+    var modal = new bootstrap.Modal(document.getElementById('addProductModal'));
+    modal.show();
+}
+
+document.getElementById('addProductForm').onsubmit = function(e) {
+    e.preventDefault();
+    var form = e.target;
+    var data = new FormData(form);
+    fetch("/products/add/", {
+        method: "POST",
+        body: data
+    })
+    .then(response => response.json())
+    .then(data => {
+        if(data.success) {
+            var modal = bootstrap.Modal.getInstance(document.getElementById('addProductModal'));
+            modal.hide();
+            // Show action modal
+            document.getElementById('actionModalBody').innerText = data.message;
+            var actionModal = new bootstrap.Modal(document.getElementById('actionModal'));
+            actionModal.show();
+            setTimeout(() => { location.reload(); }, 1000);
+        }
+    });
+}
+</script>
+{% endblock %}
