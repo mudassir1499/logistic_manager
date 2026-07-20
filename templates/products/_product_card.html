@@ -1,0 +1,90 @@
+
+
+<div class="col-6 col-sm-4 col-md-3 col-lg-2 product-card-col"
+     data-product-id="{{ product.id }}"
+     data-is-private="{% if is_private %}1{% else %}0{% endif %}"
+     data-source="{{ product.source }}"
+     data-complete="{% if product.weight and product.carton_length and product.carton_width and product.carton_height and product.carton_qty %}1{% else %}0{% endif %}">
+    <div class="product-list-card glass-card h-100">
+        
+        <div class="product-card-check" onclick="event.stopPropagation();">
+            <input type="checkbox" class="product-row-check" value="{{ product.id }}" onchange="updateProductBulkBar()"
+                   title="Select {{ product.name }}" aria-label="Select {{ product.name }}">
+        </div>
+
+        <div class="product-card-media" onclick="showProductDetail({{ product.id }})" title="View details">
+
+            {% with product.images.first as img %}
+            {% if img %}
+
+            <img src="{{ img.image.url }}" alt="" class="product-card-img"
+                 loading="lazy"
+                 onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+            <div class="product-card-img-placeholder" style="display:none;"><i class="bi bi-box-seam"></i></div>
+            {% else %}
+            <div class="product-card-img-placeholder"><i class="bi bi-box-seam"></i></div>
+            {% endif %}
+            {% endwith %}
+
+            <div class="product-card-view-hint"><i class="bi bi-eye me-1"></i>View</div>
+        </div>
+        <div class="product-card-body">
+
+            <div class="product-card-title" onclick="showProductDetail({{ product.id }})" title="{{ product.name }}">{{ product.name }}</div>
+            <div class="product-card-meta">
+                <span class="product-card-price">{{ product.price }}</span>
+                <span class="product-card-moq">MOQ {{ product.moq }}</span>
+            </div>
+            
+            <div class="product-card-badges">
+                {% if product.is_draft %}<span class="product-badge draft">D</span>{% endif %}
+                {% if is_private %}<span class="product-badge private">P</span>{% endif %}
+                {% if product.source == 'amazon' %}<span class="product-badge amazon">Amazon</span>{% endif %}
+                {% if product.source == 'noon' %}<span class="product-badge noon">Noon</span>{% endif %}
+                {% if product.ready_to_ship %}<span class="product-badge complete" title="Ready to ship"><i class="bi bi-truck"></i></span>{% endif %}
+                
+                {% if product.weight and product.carton_length and product.carton_width and product.carton_height and product.carton_qty %}
+                <span class="product-badge complete" title="Complete"><i class="bi bi-check-circle"></i></span>
+                {% else %}
+                <span class="product-badge incomplete" title="Missing details"><i class="bi bi-exclamation-circle"></i></span>
+                {% endif %}
+            </div>
+            
+            <div class="product-card-shipping">
+                <div class="shipping-chip" id="card-air-{{ product.id }}"></div>
+                <div class="shipping-chip" id="card-sea-{{ product.id }}"></div>
+            </div>
+            
+            <div class="product-card-actions">
+                <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); editProduct({{ product.id }})"
+                        data-bs-toggle="tooltip" title="Edit product" aria-label="Edit {{ product.name }}">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <a href="/products/supplier-quote/{{ product.id }}/" class="btn-ghost btn-sm" onclick="event.stopPropagation();" style="color:var(--info);"
+                   data-bs-toggle="tooltip" title="Supplier quote" aria-label="Supplier quote for {{ product.name }}">
+                    <i class="bi bi-send"></i>
+                </a>
+
+                <button id="save-btn-{{ product.id }}" class="btn-ghost btn-sm" onclick="event.stopPropagation(); saveProductPrices({{ product.id }})" disabled
+                        data-bs-toggle="tooltip" title="Save calculated prices" aria-label="Save calculated prices for {{ product.name }}">
+                    <i class="bi bi-floppy"></i>
+                </button>
+                {% if is_private %}
+                <button class="btn-ghost btn-sm" style="color:var(--accent-3)" onclick="event.stopPropagation(); togglePrivate({{ product.id }}, this)"
+                        data-bs-toggle="tooltip" title="Restore to public" aria-label="Restore {{ product.name }} to public">
+                    <i class="bi bi-unlock"></i>
+                </button>
+                {% else %}
+                <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); togglePrivate({{ product.id }}, this)"
+                        data-bs-toggle="tooltip" title="Move to private" aria-label="Move {{ product.name }} to private">
+                    <i class="bi bi-lock"></i>
+                </button>
+                {% endif %}
+                <button class="btn-danger btn-sm" onclick="event.stopPropagation(); confirmDelete('/products/delete/{{ product.id }}/', '{{ product.name|escapejs }}')"
+                        data-bs-toggle="tooltip" title="Delete product" aria-label="Delete {{ product.name }}">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

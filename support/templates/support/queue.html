@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Support Queue{% endblock %}
+{% block page_title %}Support Queue{% endblock %}
+{% block nav_support %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+  <h1 class="page-title"><i class="bi bi-life-preserver me-2"></i>Support Queue</h1>
+  <p class="text-secondary mb-0">Respond to customer tickets and manage their status</p>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3"><div class="stat-card stat-blue"><div class="stat-value">{{ counts.open }}</div><div class="stat-label">Open</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card stat-orange"><div class="stat-value">{{ counts.pending }}</div><div class="stat-label">Pending Customer</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card stat-green"><div class="stat-value">{{ counts.resolved }}</div><div class="stat-label">Resolved</div></div></div>
+  <div class="col-6 col-md-3"><div class="stat-card stat-gray"><div class="stat-value">{{ counts.closed }}</div><div class="stat-label">Closed</div></div></div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-center">
+      <div class="col-auto">
+        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-auto">
+        <select name="assignment" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All tickets</option>
+          <option value="mine" {% if assignment == 'mine' %}selected{% endif %}>Assigned to me</option>
+          <option value="unassigned" {% if assignment == 'unassigned' %}selected{% endif %}>Unassigned</option>
+        </select>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead><tr><th>#</th><th>Subject</th><th>Customer</th><th>Priority</th><th>Status</th><th>Assigned</th><th>Updated</th></tr></thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr style="cursor:pointer" onclick="window.location='{% url 'support_ticket_detail' ticket.id %}'">
+          <td class="fw-semibold">#{{ ticket.id }}</td>
+          <td>{{ ticket.subject }}</td>
+          <td class="small">{{ ticket.customer.name|default:ticket.created_by.username }}</td>
+          <td><span class="badge bg-secondary text-uppercase">{{ ticket.get_priority_display }}</span></td>
+          <td><span class="badge bg-info text-dark">{{ ticket.get_status_display }}</span></td>
+          <td class="small">{{ ticket.assigned_to.username|default:"—" }}</td>
+          <td class="small text-secondary">{{ ticket.updated_at|date:"M d, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-secondary py-5">No tickets match this filter.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

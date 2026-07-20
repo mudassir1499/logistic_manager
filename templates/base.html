@@ -1,97 +1,311 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Logistic Manager{% endblock %}</title>
-    <meta name="description" content="Logistic Manager — Products, Orders, Customers, Khata & Noon Label Printing">
 
-    <!-- Google Fonts -->
+
+{% load static %}
+
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    
+    <meta charset="UTF-8">
+    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    
+    <title>{% block title %}Logistic Manager{% endblock %}</title>
+    
+    <meta name="description" content="Logistic Manager — China Sourcing, Products, Orders, Customers, Khata & Noon Label Printing">
+
+    
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="keywords" content="China sourcing, product sourcing, supplier management, admin, dashboard, orders, products, customers">
+
+    
+    <meta property="og:title" content="{% block og_title %}LogiManager Admin{% endblock %}">
+    <meta property="og:description" content="Internal China sourcing management dashboard for products, orders, customers, and suppliers.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://mudassirllc.com{{ request.path }}">
+    <meta property="og:image" content="https://mudassirllc.com/static/images/og-default.png">
+    <meta property="og:site_name" content="LogiManager">
+
+    
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="{% block twitter_title %}LogiManager Admin{% endblock %}">
+    <meta name="twitter:description" content="Internal China sourcing management dashboard for products, orders, customers, and suppliers.">
+    <meta name="twitter:image" content="https://mudassirllc.com/static/images/og-default.png">
+
+    
+    <link rel="canonical" href="https://mudassirllc.com{{ request.path }}">
+
+    
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
-    <!-- Bootstrap 5.3 CSS -->
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- Bootstrap Icons -->
+    
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
-    <!-- Custom Theme -->
-    <link rel="stylesheet" href="{% static 'style.css' %}">
+    
+    <link rel="stylesheet" href="{% static 'style.css' %}?v=warm">
 </head>
 <body>
+    
+    <a href="#mainContent" class="skip-link">Skip to main content</a>
 
-    <!-- ===== Sidebar ===== -->
+    
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    
     <aside class="sidebar" id="sidebar">
+        
         <div class="sidebar-brand">
-            <div class="brand-icon">📦</div>
-            <span class="brand-text">LogiManager</span>
+            <div class="brand-icon">📦</div>  
+            <span class="brand-text">LogiManager</span>  
         </div>
-        <nav class="sidebar-nav">
+        
+        
+        
+        
+        <div class="sidebar-search" id="sidebarSearchWrap">
+            <div class="search-bar">
+                <i class="bi bi-search"></i>
+                <input type="text" id="sidebarSearchInput" class="form-control" placeholder="Search sections..." autocomplete="off">
+            </div>
+            <div class="sidebar-search-results" id="sidebarSearchResults"></div>
+        </div>
+        
+        <nav class="sidebar-nav" id="sidebarNav">
+            
             <div class="nav-section-title">Main</div>
-            <a href="/" class="sidebar-link {% block nav_dashboard %}{% endblock %}" id="nav-dashboard">
-                <i class="bi bi-grid-1x2-fill"></i>
+            <a href="/dashboard/" class="sidebar-link {% block nav_dashboard %}{% endblock %}" id="nav-dashboard">
+                <i class="bi bi-grid-1x2-fill"></i>  
                 <span class="link-text">Dashboard</span>
             </a>
 
+
+            {# Each management group is shown only if the logged-in user's role
+               grants the matching module (see accounts.context_processors). #}
+            {% if nav_perms.products or nav_perms.customers or nav_perms.orders or nav_perms.khata %}
             <div class="nav-section-title">Management</div>
+            {% endif %}
+
+            {% if nav_perms.products %}
             <a href="/products/" class="sidebar-link {% block nav_products %}{% endblock %}" id="nav-products">
                 <i class="bi bi-box-seam-fill"></i>
                 <span class="link-text">Products</span>
             </a>
+            {% endif %}
+
+            {% if nav_perms.customers %}
             <a href="/customers/" class="sidebar-link {% block nav_customers %}{% endblock %}" id="nav-customers">
                 <i class="bi bi-people-fill"></i>
                 <span class="link-text">Customers</span>
             </a>
+            <a href="/portal/admin/customers/" class="sidebar-link {% block nav_customer_mgmt %}{% endblock %}" id="nav-customer-mgmt">
+                <i class="bi bi-person-gear"></i>
+                <span class="link-text">Customer Accounts</span>
+            </a>
+            <a href="/portal/admin/requests/" class="sidebar-link {% block nav_requests %}{% endblock %}" id="nav-requests">
+                <i class="bi bi-clipboard-check"></i>
+                <span class="link-text">Product Requests</span>
+            </a>
+            <a href="/portal/admin/portfolio/" class="sidebar-link {% block nav_portfolio %}{% endblock %}" id="nav-portfolio">
+                <i class="bi bi-collection-play"></i>
+                <span class="link-text">Portfolio</span>
+            </a>
+            {% endif %}
+
+            {% if nav_perms.orders %}
             <a href="/orders/" class="sidebar-link {% block nav_orders %}{% endblock %}" id="nav-orders">
                 <i class="bi bi-cart-check-fill"></i>
                 <span class="link-text">Orders</span>
             </a>
+            <a href="/orders/amazon/" class="sidebar-link {% block nav_amazon_orders %}{% endblock %}" id="nav-amazon-orders">
+                <i class="bi bi-shop"></i>
+                <span class="link-text">Amazon Orders</span>
+            </a>
+            <a href="/orders/reports/" class="sidebar-link {% block nav_reports %}{% endblock %}" id="nav-reports">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span class="link-text">Reports</span>
+            </a>
+            <a href="/orders/packing-list/" class="sidebar-link {% block nav_packing %}{% endblock %}" id="nav-packing">
+                <i class="bi bi-clipboard2-check-fill"></i>
+                <span class="link-text">Packing List</span>
+            </a>
+            {% endif %}
+
+            {% if nav_perms.khata %}
             <a href="/khata/" class="sidebar-link {% block nav_khata %}{% endblock %}" id="nav-khata">
                 <i class="bi bi-journal-text"></i>
                 <span class="link-text">Khata (Ledger)</span>
             </a>
+            {% endif %}
 
+            {% if nav_perms.support %}
+            <a href="/support/" class="sidebar-link {% block nav_support %}{% endblock %}" id="nav-support">
+                <i class="bi bi-life-preserver"></i>
+                <span class="link-text">Support Tickets</span>
+                {% if open_ticket_count %}<span class="badge bg-danger ms-auto">{{ open_ticket_count }}</span>{% endif %}
+            </a>
+            {% endif %}
+
+
+            {% if nav_perms.noon_labels or nav_perms.settings %}
             <div class="nav-section-title">Tools</div>
+            {% endif %}
+
+            {% if nav_perms.noon_labels %}
             <a href="/noon-labels/" class="sidebar-link {% block nav_noon %}{% endblock %}" id="nav-noon">
                 <i class="bi bi-printer-fill"></i>
                 <span class="link-text">Noon Labels</span>
             </a>
+            {% endif %}
+
+            {% if nav_perms.settings %}
+            <a href="/settings/" class="sidebar-link {% block nav_settings %}{% endblock %}" id="nav-settings">
+                <i class="bi bi-gear-fill"></i>
+                <span class="link-text">Settings</span>
+            </a>
+            <a href="/settings/shipping-calculator/" class="sidebar-link {% block nav_shipping %}{% endblock %}" id="nav-shipping">
+                <i class="bi bi-truck"></i>
+                <span class="link-text">Shipping Calculator</span>
+            </a>
+            {% endif %}
+
+            {% if portal_role == 'admin' %}
+            <div class="nav-section-title">Administration</div>
+            <a href="{% url 'user_list' %}" class="sidebar-link {% block nav_users %}{% endblock %}" id="nav-users">
+                <i class="bi bi-person-badge"></i>
+                <span class="link-text">Team &amp; Roles</span>
+            </a>
+            {% endif %}
+
+
+            <div class="nav-section-title">Account</div>
+            
+            {% if user.is_authenticated %}
+            
+            <div class="sidebar-link" style="cursor: default;">
+                <i class="bi bi-person-circle"></i>
+                <span class="link-text">{{ user.username }}{% if portal_role %} <small class="text-secondary">({{ current_profile.get_role_display }})</small>{% endif %}</span>
+            </div>
+            
+            <form action="{% url 'admin_logout' %}" method="post" class="m-0 p-0">
+                {% csrf_token %}
+                <button type="submit" class="sidebar-link border-0 bg-transparent w-100 text-start" id="nav-logout" style="cursor: pointer;" aria-label="Log out">
+                    <i class="bi bi-box-arrow-right"></i>
+                    <span class="link-text">Log Out</span>
+                </button>
+            </form>
+            
+            {% else %}
+            <a href="{% url 'admin_login' %}?next={{ request.path }}" class="sidebar-link" id="nav-login" aria-label="Log in">
+                <i class="bi bi-box-arrow-in-right"></i>
+                <span class="link-text">Log In</span>
+            </a>
+            {% endif %}  
         </nav>
     </aside>
 
-    <!-- ===== Main Content ===== -->
+    
     <div class="main-content" id="mainContent">
-        <!-- Top Bar -->
+        
         <header class="topbar">
             <div class="topbar-left">
+                
                 <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle Sidebar">
-                    <i class="bi bi-list"></i>
+                    <i class="bi bi-list"></i>  
                 </button>
+                
                 <h1 class="page-title mb-0">{% block page_title %}Dashboard{% endblock %}</h1>
             </div>
+            
             <div class="topbar-right">
+                
+                <div class="notification-bell" id="notificationBell" title="Notifications">
+                    <button class="notification-bell-btn" id="notificationBellBtn" onclick="toggleNotificationDropdown()">
+                        <i class="bi bi-bell-fill"></i>
+                        <span class="notification-badge" id="notificationBadge" style="display:none;">0</span>
+                    </button>
+                    <div class="notification-dropdown" id="notificationDropdown">
+                        <div class="notification-header">
+                            <span>Notifications</span>
+                            <span class="notification-count" id="notificationCount">0 unread</span>
+                        </div>
+                        <div class="notification-list" id="notificationList">
+                            <div class="notification-empty">Loading...</div>
+                        </div>
+                        <div class="notification-footer">
+                            <a href="/portal/admin/requests/">View Product Requests</a>
+                            <a href="/orders/">View Orders</a>
+                        </div>
+                    </div>
+                </div>
                 {% block topbar_actions %}{% endblock %}
             </div>
         </header>
 
-        <!-- Page Content -->
+        
+        <div class="admin-stats-bar" id="adminStatsBar">
+            <div class="admin-stats-inner" id="adminStatsInner">
+                
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+                <div class="admin-stat-skeleton"><span></span><span></span></div>
+            </div>
+        </div>
+
+        
         <main class="content-area fade-in">
             {% block content %}{% endblock %}
         </main>
     </div>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite" aria-label="Notification area"></div>
 
-    <!-- Bootstrap 5.3 JS Bundle -->
+    
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
-    <!-- Custom JS -->
+    
     <script src="{% static 'main.js' %}"></script>
 
+    
     {% block extra_js %}{% endblock %}
+
+    
+    {% comment %} Google Analytics removed: the tracking ID here was never replaced with a real
+       one, so it collected nothing while adding a request to every page load. These
+       admin pages are noindex/internal anyway. Add a real measurement ID here (or in
+       the portal base) if you ever want admin usage tracked. {% endcomment %}
+
+    <!-- The Tawk.to chat widget is intentionally NOT loaded here. It is a
+         customer-facing support widget and belongs only on the public portal
+         (portal/templates/portal/base.html), where visitors can use it. On admin
+         pages it floated over the dashboard charts and product cards. -->
+
+    <script>
+    // Enable Bootstrap tooltips for every element carrying data-bs-toggle="tooltip".
+    // The admin UI leans heavily on icon-only buttons, so these labels are what
+    // make the actions discoverable.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof bootstrap === 'undefined' || !bootstrap.Tooltip) return;
+        document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+            new bootstrap.Tooltip(el, { delay: { show: 400, hide: 0 }, trigger: 'hover' });
+        });
+    });
+    </script>
+
+
+    <button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">
+        <i class="bi bi-arrow-up"></i>
+    </button>
+
 </body>
 </html>

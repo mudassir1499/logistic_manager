@@ -1,66 +1,153 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}Dashboard — Logistic Manager{% endblock %}
+
 {% block nav_dashboard %}active{% endblock %}
+
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
-<!-- Stats Row -->
+
+{% comment %} The Products / Customers / Orders / Ledger counters used to be repeated here as
+   four large cards. They are already shown in the compact stats bar at the top of
+   every admin page (base.html), so this page now starts with content unique to it. {% endcomment %}
+
+<div class="glass-card mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        
+        <h5 class="mb-0" style="font-weight:700"><i class="bi bi-bar-chart-fill me-2" style="color:var(--accent-3)"></i>{{ current_month }} — Monthly Analytics</h5>
+    </div>
+    
+    {% if has_monthly_activity %}
+    {% comment %} Five tiles in one row so revenue sits alongside the other metrics rather
+       than on an almost-empty second row. {% endcomment %}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg">
+            <div class="metric-tile emerald">
+                <div class="metric-label">Revenue</div>
+                <div class="metric-value">{{ currency }} {{ monthly_revenue|floatformat:0|intcomma }}</div>
+                <div class="metric-compare">vs {{ currency }} {{ prev_revenue|floatformat:0|intcomma }} in {{ prev_month_label }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="metric-tile indigo">
+                <div class="metric-label">Orders</div>
+                <div class="metric-value">{{ monthly_orders }}</div>
+                <div class="metric-compare">vs {{ prev_orders }} in {{ prev_month_label }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="metric-tile indigo">
+                <div class="metric-label">Shipment Blocks</div>
+                <div class="metric-value">{{ monthly_shipments }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="metric-tile amber">
+                <div class="metric-label">Total CBM</div>
+                <div class="metric-value">{{ monthly_cbm|floatformat:2 }}</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg">
+            <div class="metric-tile blue">
+                <div class="metric-label">Weight (KG)</div>
+                <div class="metric-value">{{ monthly_weight|floatformat:1 }}</div>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    {% comment %} Showing five prominent zeros for a month that simply hasn't started yet reads
+       as though something is broken. One quiet line is more honest. {% endcomment %}
+    <div class="metric-empty mb-4">
+        <i class="bi bi-calendar3"></i>
+        <div>
+            <strong>No activity recorded yet in {{ current_month }}.</strong>
+            <div class="u-muted-sm">{{ prev_month_label }} closed with {{ prev_orders }} order{{ prev_orders|pluralize }}
+                and {{ currency }} {{ prev_revenue|floatformat:0|intcomma }} in revenue.</div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div style="position:relative;height:240px;">
+        <canvas id="monthlyChart"></canvas>
+    </div>
+</div>
+
 <div class="row g-4 mb-4">
-    <div class="col-lg-3 col-md-6">
-        <div class="glass-card stat-card accent-indigo">
-            <div class="stat-icon"><i class="bi bi-box-seam-fill"></i></div>
-            <div class="stat-value">{{ product_count }}</div>
-            <div class="stat-label">Total Products</div>
+    <div class="col-lg-4">
+        <div class="glass-card">
+            <h5 class="mb-3" style="font-weight:700"><i class="bi bi-graph-up-arrow me-2" style="color:var(--accent-3)"></i>Revenue Trend</h5>
+            <div style="position:relative;height:220px;">
+                <canvas id="revenueTrendChart"></canvas>
+            </div>
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="glass-card stat-card accent-emerald">
-            <div class="stat-icon"><i class="bi bi-people-fill"></i></div>
-            <div class="stat-value">{{ customer_count }}</div>
-            <div class="stat-label">Customers</div>
+    <div class="col-lg-4">
+        <div class="glass-card">
+            <h5 class="mb-3" style="font-weight:700"><i class="bi bi-credit-card me-2" style="color:var(--accent-3)"></i>Payment Status</h5>
+            {% if payment_breakdown %}
+            <div class="pay-total">{{ payment_total }} order{{ payment_total|pluralize }} total</div>
+            <div class="pay-bar" role="img"
+                 aria-label="Payment status breakdown: {% for p in payment_breakdown %}{{ p.count }} {{ p.label }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+                {% for p in payment_breakdown %}
+                <span class="pay-seg {{ p.css }}" style="width:{{ p.pct }}%"
+                      data-bs-toggle="tooltip" title="{{ p.label }}: {{ p.count }} ({{ p.pct }}%)"></span>
+                {% endfor %}
+            </div>
+            <ul class="pay-legend">
+                {% for p in payment_breakdown %}
+                <li>
+                    <span class="pay-dot {{ p.css }}"></span>
+                    <span class="pay-legend-label">{{ p.label }}</span>
+                    <span class="pay-legend-value">{{ p.count }} <span class="u-muted-sm">({{ p.pct }}%)</span></span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <div class="empty-state"><i class="bi bi-credit-card"></i><p>No orders to summarise yet.</p></div>
+            {% endif %}
         </div>
     </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="glass-card stat-card accent-amber">
-            <div class="stat-icon"><i class="bi bi-cart-check-fill"></i></div>
-            <div class="stat-value">{{ order_count }}</div>
-            <div class="stat-label">Total Orders</div>
-        </div>
-    </div>
-    <div class="col-lg-3 col-md-6">
-        <div class="glass-card stat-card accent-blue">
-            <div class="stat-icon"><i class="bi bi-journal-text"></i></div>
-            <div class="stat-value">{{ ledger_count }}</div>
-            <div class="stat-label">Ledger Entries</div>
+    <div class="col-lg-4">
+        <div class="glass-card">
+            <h5 class="mb-3" style="font-weight:700"><i class="bi bi-truck me-2" style="color:var(--accent-3)"></i>Shipping Methods</h5>
+            <div style="position:relative;height:220px;">
+                <canvas id="shippingMethodChart"></canvas>
+            </div>
         </div>
     </div>
 </div>
 
-<!-- Quick Actions + Recent Orders -->
 <div class="row g-4">
+    
     <div class="col-lg-4">
         <div class="glass-card">
             <h5 class="mb-3" style="font-weight:700">Quick Actions</h5>
+            {% comment %} One primary action carries the accent gradient; the rest are quiet
+               outline buttons. Four competing gradients made every action look
+               equally urgent, and the yellow button failed contrast entirely. {% endcomment %}
             <div class="d-grid gap-2">
-                <a href="/products/" class="btn-glow text-center">
-                    <i class="bi bi-plus-circle"></i> Add Product
-                </a>
-                <a href="/customers/" class="btn-glow text-center" style="background:linear-gradient(135deg,#10b981,#059669)">
-                    <i class="bi bi-person-plus"></i> Add Customer
-                </a>
-                <a href="/orders/" class="btn-glow text-center" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
+                <a href="/orders/" class="btn-glow text-center">
                     <i class="bi bi-cart-plus"></i> New Order
                 </a>
-                <a href="/noon-labels/" class="btn-glow text-center" style="background:linear-gradient(135deg,#feee00,#d4c800);color:#2d2d2d">
+                <a href="/products/" class="btn-ghost text-center">
+                    <i class="bi bi-plus-circle"></i> Add Product
+                </a>
+                <a href="/customers/" class="btn-ghost text-center">
+                    <i class="bi bi-person-plus"></i> Add Customer
+                </a>
+                <a href="/noon-labels/" class="btn-ghost text-center">
                     <i class="bi bi-printer"></i> Print Noon Labels
                 </a>
             </div>
         </div>
     </div>
+    
     <div class="col-lg-8">
         <div class="glass-card">
             <h5 class="mb-3" style="font-weight:700">Recent Orders</h5>
+            
             {% if recent_orders %}
             <table class="table-glass">
                 <thead>
@@ -68,27 +155,323 @@
                         <th>Order #</th>
                         <th>Customer</th>
                         <th>Date</th>
-                        <th>Total</th>
+                        <th class="text-end">Total ({{ currency }})</th>
                     </tr>
                 </thead>
                 <tbody>
+
                     {% for order in recent_orders %}
                     <tr>
-                        <td>#{{ order.id }}</td>
-                        <td>{{ order.customer.name }}</td>
-                        <td>{{ order.date|date:"M d, Y" }}</td>
-                        <td style="font-weight:700;color:var(--accent-3)">{{ order.total }}</td>
+                        <td data-label="Order"><a href="/orders/invoice/{{ order.id }}/" class="order-link">#{{ order.id }}</a></td>
+                        <td data-label="Customer">{{ order.customer.name }}</td>
+                        <td data-label="Date">{{ order.date|date:"M d, Y" }}</td>
+                        <td data-label="Total" class="money text-end">{{ order.total|floatformat:2|intcomma }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
+            
             {% else %}
             <div class="empty-state">
                 <i class="bi bi-cart-x"></i>
                 <p>No orders yet. Create your first order!</p>
             </div>
-            {% endif %}
+            {% endif %}  
         </div>
     </div>
 </div>
-{% endblock %}
+
+<div class="row g-4 mt-1">
+    <div class="col-12">
+        <div class="glass-card">
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <h5 class="mb-0" style="font-weight:700"><i class="bi bi-clipboard-check-fill me-2" style="color:var(--accent-3)"></i>Order Placement Tracker</h5>
+                
+                <div class="d-flex gap-3" style="font-size:13px">
+                    <span style="color:var(--text-secondary)">Placed: <strong style="color:#4ade80">{{ placed_count }}</strong></span>
+                    <span style="color:var(--text-secondary)">Not Placed: <strong style="color:#f87171">{{ not_placed_count }}</strong></span>
+                </div>
+            </div>
+            {% if all_orders %}
+            
+            <div style="max-height:420px;overflow-y:auto;">
+                <table class="table-glass table-stack" id="dashboardOrdersTable">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th class="text-end">Total ({{ currency }})</th>
+                            <th>Placed with Supplier</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in all_orders %}
+                        <tr>
+                            <td data-label="Order"><a href="/orders/invoice/{{ order.id }}/" class="order-link">#{{ order.id }}</a></td>
+                            <td data-label="Customer" class="u-strong">{{ order.customer.name }}</td>
+                            <td data-label="Date" class="u-muted">{{ order.date|date:"M d, Y" }}</td>
+                            <td data-label="Status">
+                                {% if order.status == 'draft' %}
+                                <span class="badge-glass badge-warning" style="font-size:11px;"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                                {% else %}
+                                <span class="badge-glass badge-success" style="font-size:11px;"><i class="bi bi-check-circle me-1"></i>Confirmed</span>
+                                {% endif %}
+                                {% comment %} A draft that has already gone to the supplier is contradictory —
+                                   flag it so it gets reconciled rather than silently sitting there. {% endcomment %}
+                                {% if order.status == 'draft' and order.is_placed %}
+                                <span class="badge-glass badge-danger" style="font-size:11px;"
+                                      data-bs-toggle="tooltip"
+                                      title="This order is still a draft but is marked as placed with the supplier. Confirm it, or clear the placed flag.">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>Check
+                                </span>
+                                {% endif %}
+                            </td>
+                            <td data-label="Total" class="money text-end">{{ order.total|floatformat:2|intcomma }}</td>
+                            <td data-label="Placed">
+                                <button class="btn-payment-toggle placed-toggle" id="dash-placed-btn-{{ order.id }}"
+                                        onclick="dashboardTogglePlaced({{ order.id }})"
+                                        title="{% if order.is_placed %}Placed with supplier — click to undo{% else %}Not yet placed — click to mark as placed{% endif %}">
+                                    {% if order.is_placed %}
+                                    <span class="is-placed"><i class="bi bi-check-square-fill me-1"></i>Placed</span>
+                                    {% else %}
+                                    <span class="not-placed"><i class="bi bi-square me-1"></i>Not Placed</span>
+                                    {% endif %}
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="bi bi-cart-x"></i>
+                <p>No orders yet.</p>
+            </div>
+            {% endif %}  
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Helper function to get a cookie value by name.
+// Django stores the CSRF token in a cookie named 'csrftoken'.
+// We need this token to send authenticated POST requests via AJAX.
+function getCookie(name) {
+    var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : null;
+}
+
+// Toggle "placed with supplier" status for a specific order.
+// This is called when the user clicks the Placed/Not Placed button.
+// It sends an AJAX POST request to the server to flip the boolean field,
+// then updates the button text and color without reloading the page.
+function dashboardTogglePlaced(orderId) {
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+    fetch('/orders/toggle-placed/' + orderId + '/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;  // If the server says it failed, do nothing
+        var btn = document.getElementById('dash-placed-btn-' + orderId);
+        if (!btn) return;
+        // Update the button's HTML to reflect the new state from the server
+        if (data.is_placed) {
+            btn.innerHTML = '<span class="is-placed"><i class="bi bi-check-square-fill me-1"></i>Placed</span>';
+            btn.title = 'Placed with supplier — click to undo';
+        } else {
+            btn.innerHTML = '<span class="not-placed"><i class="bi bi-square me-1"></i>Not Placed</span>';
+            btn.title = 'Not yet placed — click to mark as placed';
+        }
+    });
+}
+</script>
+<script>
+// Immediately-Invoked Function Expression (IIFE): Runs once when the page loads.
+// This creates the Chart.js bar+line chart using data passed from Django.
+// The |safe filter is CRITICAL here — it tells Django "do NOT escape this
+// content as HTML". Without it, the JSON array would have &quot; entities instead
+// of real quotes, breaking the JavaScript.
+(function() {
+    var labels = {{ chart_labels|safe }};
+    var orders = {{ chart_orders|safe }};
+    var cbm    = {{ chart_cbm|safe }};
+    var ships  = {{ chart_shipments|safe }};
+    var ctx = document.getElementById('monthlyChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',  // Primary chart type: bars for orders and shipments
+        data: {
+            labels: labels,  // X-axis labels like ['Jan', 'Feb', 'Mar', ...]
+            datasets: [
+                {
+                    label: 'Shipment Blocks',
+                    data: ships,
+                    backgroundColor: 'rgba(22,163,74,0.7)',
+                    borderColor: '#16A34A',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'Orders',
+                    data: orders,
+                    backgroundColor: 'rgba(200,75,49,0.7)',
+                    borderColor: '#C84B31',
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    yAxisID: 'y',
+                },
+                {
+                    label: 'CBM',
+                    data: cbm,
+                    type: 'line',
+                    borderColor: '#D97706',
+                    backgroundColor: 'rgba(217,119,6,0.12)',
+                    borderWidth: 2,
+                    pointRadius: 4,
+                    pointBackgroundColor: '#D97706',
+                    fill: true,
+                    tension: 0.3,
+                    yAxisID: 'yCbm',
+                },
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { labels: { color: '#475569', font: { size: 12 } } },
+                tooltip: { backgroundColor: '#ffffff', borderColor: '#E2E8F0', borderWidth: 1, titleColor: '#0F172A', bodyColor: '#475569' },
+            },
+            scales: {
+                x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(15,23,42,0.05)' } },
+                y: {
+                    position: 'left',
+                    ticks: { color: '#64748B', stepSize: 1, precision: 0 },
+                    grid: { color: 'rgba(15,23,42,0.05)' },
+                    title: { display: true, text: 'Count', color: '#64748B', font: { size: 11 } },
+                },
+                yCbm: {
+                    position: 'right',
+                    ticks: { color: '#D97706' },
+                    grid: { drawOnChartArea: false },
+                    title: { display: true, text: 'CBM', color: '#D97706', font: { size: 11 } },
+                },
+            }
+        }
+    });
+})();
+</script>
+<script>
+// Dashboard Analytics Charts — Revenue Trend, Payment Status, Shipping Methods
+(function() {
+    var labels = {{ chart_labels|safe }};
+    var revenueData = {{ chart_revenue|safe }};
+    var shippingLabels = {{ chart_shipping_labels|safe }};
+    var shippingCounts = {{ chart_shipping_counts|safe }};
+    var CURRENCY = '{{ currency|escapejs }}';
+
+    // Thousands-separated money, matching the intcomma formatting used in the tables.
+    function fmtMoney(v) {
+        return Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+    // Short form for axis ticks so the labels don't crowd the plot area.
+    function fmtCompact(v) {
+        if (Math.abs(v) >= 1000000) return (v / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+        if (Math.abs(v) >= 1000) return (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+        return v;
+    }
+
+    // Common light theme options for all dashboard charts
+    var chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: { labels: { color: '#475569', font: { size: 12 } } },
+            tooltip: { backgroundColor: '#ffffff', borderColor: '#E2E8F0', borderWidth: 1, titleColor: '#0F172A', bodyColor: '#475569' },
+        },
+    };
+
+    // ---------------------------------------------------------------
+    // Revenue Trend Chart (Line with area fill)
+    // ---------------------------------------------------------------
+    var revCtx = document.getElementById('revenueTrendChart').getContext('2d');
+    new Chart(revCtx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Revenue',
+                data: revenueData,
+                borderColor: '#16A34A',
+                backgroundColor: 'rgba(22, 163, 74, 0.12)',
+                borderWidth: 2,
+                pointRadius: 4,
+                pointBackgroundColor: '#16A34A',
+                fill: true,
+                tension: 0.3,
+            }]
+        },
+        options: {
+            ...chartOptions,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                ...chartOptions.plugins,
+                legend: { display: false },
+                tooltip: {
+                    ...chartOptions.plugins.tooltip,
+                    callbacks: {
+                        // Always show the currency so the number is unambiguous.
+                        label: function (c) { return CURRENCY + ' ' + fmtMoney(c.parsed.y); }
+                    }
+                }
+            },
+            scales: {
+                x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(15,23,42,0.05)' } },
+                y: {
+                    ticks: { color: '#64748B', callback: function (v) { return fmtCompact(v); } },
+                    grid: { color: 'rgba(15,23,42,0.05)' },
+                },
+            }
+        }
+    });
+
+    // Payment status is now rendered as a proportional HTML bar in the template
+    // (see .pay-bar) rather than a doughnut, so no chart is built for it here.
+
+    // ---------------------------------------------------------------
+    // Shipping Method Doughnut Chart
+    // ---------------------------------------------------------------
+    var shipColors = ['#C84B31', '#2D5A27', '#F5A623', '#16A34A', '#D97706', '#DC2626'];
+    var shipCtx = document.getElementById('shippingMethodChart').getContext('2d');
+    new Chart(shipCtx, {
+        type: 'doughnut',
+        data: {
+            labels: shippingLabels,
+            datasets: [{
+                data: shippingCounts,
+                backgroundColor: shipColors,
+                borderColor: '#ffffff',
+                borderWidth: 2,
+            }]
+        },
+        options: {
+            ...chartOptions,
+            cutout: '60%',
+            plugins: {
+                ...chartOptions.plugins,
+                legend: { position: 'bottom', labels: { color: '#475569', font: { size: 11 }, padding: 16 } },
+            }
+        }
+    });
+})();
+</script>
+{% endblock %}  

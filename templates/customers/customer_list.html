@@ -5,63 +5,91 @@
 {% block page_title %}Customers{% endblock %}
 
 {% block topbar_actions %}
+
 <button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addCustomerModal">
     <i class="bi bi-person-plus"></i> Add Customer
 </button>
-{% endblock %}
+{% endblock %}  
 
 {% block content %}
-<!-- Search Bar -->
+
 <div class="row mb-4">
     <div class="col-md-6">
-        <div class="search-bar">
-            <i class="bi bi-search"></i>
-            <input type="text" class="form-control" id="customerSearch" placeholder="Search customers..." style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
-        </div>
+        {# Server-side search: covers every customer, not just the current page. #}
+        <form method="get" action="">
+            <div class="search-bar">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="customerSearch" name="q" value="{{ query }}"
+                       placeholder="Search name, phone, email or address..." aria-label="Search customers"
+                       style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+                {% if query %}
+                <a href="?" class="search-clear" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+        </form>
     </div>
     <div class="col-md-6 text-end">
         <span class="badge-glass badge-info" style="font-size:14px;padding:8px 16px;">
-            <i class="bi bi-people"></i> {{ customers|length }} Customer{{ customers|length|pluralize }}
+            <i class="bi bi-people"></i>
+            {% if query %}{{ total_count }} match{{ total_count|pluralize:"es" }}{% else %}{{ total_count }} Customer{{ total_count|pluralize }}{% endif %}
         </span>
     </div>
 </div>
 
-<!-- Customers Table -->
 <div class="glass-card">
-    <table class="table-glass" id="customersTable">
+    <table class="table-glass table-stack" id="customersTable">
         <thead>
             <tr>
-                <th>#</th>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Address</th>
-                <th style="width:150px">Actions</th>
+                <th>#</th>       
+                <th>Name</th>    
+                <th>Phone</th>   
+                <th>Address</th> 
+                <th style="width:150px">Actions</th> 
             </tr>
         </thead>
         <tbody>
-            {% for customer in customers %}
+            
+            {% for customer in page_obj %}
             <tr>
-                <td>{{ customer.id }}</td>
-                <td style="font-weight:600">{{ customer.name }}</td>
-                <td><i class="bi bi-telephone me-1" style="color:var(--accent-3);font-size:12px"></i>{{ customer.phone }}</td>
-                <td style="color:var(--text-secondary);font-size:13px">{{ customer.address|truncatechars:50 }}</td>
+                <td data-label="ID">{{ customer.id }}</td>
+                <td data-label="Name" class="u-strong">{{ customer.name }}</td>
+                <td data-label="Phone"><i class="bi bi-telephone me-1" style="color:var(--accent-3);font-size:12px"></i>{{ customer.phone }}</td>
+                <td data-label="Address" class="u-muted-sm">{{ customer.address|truncatechars:50 }}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-ghost btn-sm" onclick="editCustomer({{ customer.id }},'{{ customer.name|escapejs }}','{{ customer.phone|escapejs }}','{{ customer.address|escapejs }}')">
+                        <a href="/customers/{{ customer.id }}/products/" class="btn-ghost btn-sm" style="color:var(--accent-3);"
+                           data-bs-toggle="tooltip" title="Manage assigned products">
+                            <i class="bi bi-box-seam"></i> Products
+                        </a>
+
+                        <button class="btn-ghost btn-sm" onclick="copyCustomer('{{ customer.name|escapejs }}','{{ customer.phone|escapejs }}','{{ customer.address|escapejs }}')"
+                                data-bs-toggle="tooltip" title="Copy contact details" aria-label="Copy details for {{ customer.name }}">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+
+                        <button class="btn-ghost btn-sm" onclick="editCustomer({{ customer.id }},'{{ customer.name|escapejs }}','{{ customer.phone|escapejs }}','{{ customer.address|escapejs }}')"
+                                data-bs-toggle="tooltip" title="Edit customer" aria-label="Edit {{ customer.name }}">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/customers/delete/{{ customer.id }}/', '{{ customer.name|escapejs }}')">
+
+                        <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/customers/delete/{{ customer.id }}/', '{{ customer.name|escapejs }}')"
+                                data-bs-toggle="tooltip" title="Delete customer" aria-label="Delete {{ customer.name }}">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
                 </td>
             </tr>
+
             {% empty %}
             <tr>
                 <td colspan="5">
                     <div class="empty-state">
                         <i class="bi bi-people"></i>
+                        {% if query %}
+                        <p>No customers match “{{ query }}”. <a href="?">Clear the search</a> to see all customers.</p>
+                        {% else %}
                         <p>No customers yet. Add your first customer!</p>
+                        {% endif %}
                     </div>
                 </td>
             </tr>
@@ -70,15 +98,17 @@
     </table>
 </div>
 
-<!-- Add Customer Modal -->
 <div class="modal fade" id="addCustomerModal" tabindex="-1" aria-hidden="true">
+  
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-person-plus me-2"></i>Add Customer</h5>
+        
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
+        
         <form id="addCustomerForm" class="form-glass">
           <div class="mb-3">
             <label class="form-label">Full Name</label>
@@ -90,6 +120,7 @@
           </div>
           <div class="mb-3">
             <label class="form-label">Address</label>
+            
             <textarea name="address" class="form-control" rows="3" placeholder="Full delivery address" required></textarea>
           </div>
           <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Add Customer</button>
@@ -99,7 +130,6 @@
   </div>
 </div>
 
-<!-- Edit Customer Modal -->
 <div class="modal fade" id="editCustomerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -109,6 +139,7 @@
       </div>
       <div class="modal-body">
         <form id="editCustomerForm" class="form-glass">
+          
           <input type="hidden" name="customer_id" id="edit_customer_id">
           <div class="mb-3">
             <label class="form-label">Full Name</label>
@@ -129,17 +160,24 @@
   </div>
 </div>
 
-{% endblock %}
+{% endblock %}  
 
 {% block extra_js %}
 <script>
-setupTableSearch('customerSearch', 'customersTable');
+// Search is handled server-side (the input is inside a GET form), so no client-side
+// row filtering is wired up here — it would only have searched the current page.
 
+// Wire up AJAX form submission for the Add Customer modal.
+// When the form is submitted, it sends a POST request to '/customers/add/'
+// without reloading the page. On success, it hides the modal and refreshes
+// the page to show the newly added customer.
 ajaxSubmit('addCustomerForm', '/customers/add/', function() {
     bootstrap.Modal.getInstance(document.getElementById('addCustomerModal')).hide();
     setTimeout(function() { location.reload(); }, 500);
 });
 
+// Populates the Edit Customer modal with the selected customer's data
+// and then opens the modal. This is called when the edit button is clicked.
 function editCustomer(id, name, phone, address) {
     document.getElementById('edit_customer_id').value = id;
     document.getElementById('edit_cust_name').value = name;
@@ -148,9 +186,33 @@ function editCustomer(id, name, phone, address) {
     new bootstrap.Modal(document.getElementById('editCustomerModal')).show();
 }
 
+// Wire up AJAX form submission for the Edit Customer modal.
+// Same pattern as add: POST to '/customers/edit/' then reload.
 ajaxSubmit('editCustomerForm', '/customers/edit/', function() {
     bootstrap.Modal.getInstance(document.getElementById('editCustomerModal')).hide();
     setTimeout(function() { location.reload(); }, 500);
 });
+
+// Copy customer details to the system clipboard.
+// This combines name, phone, and address into a multi-line text string
+// and copies it, so the user can paste it into WhatsApp, email, or shipping documents.
+function copyCustomer(name, phone, address) {
+    var parts = [name];
+    if (phone) parts.push(phone);    // Only add phone if it exists
+    if (address) parts.push(address); // Only add address if it exists
+    var text = parts.join('\n');      // Join with newlines for clean formatting
+    if (navigator.clipboard) {
+        // Modern browsers: use the Clipboard API (clean and secure)
+        navigator.clipboard.writeText(text).then(function() { showToast('Customer details copied!'); });
+    } else {
+        // Fallback for older browsers: create a hidden textarea, select it, and copy
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        showToast('Customer details copied!');
+    }
+}
 </script>
-{% endblock %}
+
+{% include "includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}  

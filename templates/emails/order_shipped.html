@@ -1,0 +1,71 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Order Shipped — {{ order.id }}</title>
+    <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #f4f4f8; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #1a2744, #2a3f5f); padding: 32px 24px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 8px 0 0; font-size: 14px; opacity: 0.85; }
+        .body { padding: 32px 24px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #6366f1; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #6b7280; }
+        .info-value { font-weight: 600; color: #1f2937; }
+        .shipment-card { background: #f8f9fa; border-radius: 8px; padding: 16px; margin-bottom: 12px; border-left: 4px solid #3b82f6; }
+        .shipment-card h4 { margin: 0 0 8px; font-size: 15px; color: #1a2744; }
+        .shipment-card p { margin: 0 0 4px; font-size: 13px; color: #4b5563; }
+        .btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 16px; }
+        .footer { padding: 24px; text-align: center; font-size: 12px; color: #9ca3af; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="header">
+            <h1><i style="font-style:normal">&#128674;</i> Order Shipped</h1>
+            <p>Your order #{{ order.id }} is now on its way.</p>
+        </div>
+
+        <div class="body">
+            <div class="section">
+                <div class="section-title">Order Details</div>
+                <div class="info-row">
+                    <span class="info-label">Order Number</span>
+                    <span class="info-value">#{{ order.id }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Customer</span>
+                    <span class="info-value">{{ customer.name }}</span>
+                </div>
+            </div>
+
+            <div class="section">
+                <div class="section-title">Shipment Details</div>
+                {% for shipment in shipments %}
+                <div class="shipment-card">
+                    <h4>Shipment #{{ shipment.shipment_no }}{% if shipment.shipment_name %} — {{ shipment.shipment_name }}{% endif %}</h4>
+                    <p><strong>Method:</strong> {{ shipment.method|title }}</p>
+                    {% if shipment.shipment_company %}<p><strong>Company:</strong> {{ shipment.shipment_company.name }}</p>{% endif %}
+                    {% if shipment.tracking_number %}<p><strong>Tracking:</strong> {{ shipment.tracking_number }}</p>{% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <div style="text-align:center;">
+                <a href="{{ url }}" class="btn">Track Order in Portal</a>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p style="margin:0 0 4px;"><strong>{{ settings.company_name }}</strong></p>
+            {% if settings.company_phone %}<p style="margin:0 0 4px;">{{ settings.company_phone }}</p>{% endif %}
+            {% if settings.company_address %}<p style="margin:0;">{{ settings.company_address }}</p>{% endif %}
+        </div>
+    </div>
+</body>
+</html>

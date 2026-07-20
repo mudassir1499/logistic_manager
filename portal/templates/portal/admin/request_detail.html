@@ -1,0 +1,255 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Request #{{ pr.id }} — Admin{% endblock %}
+{% block nav_requests %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-clipboard-check me-2"></i>Request #{{ pr.id }}
+    </h1>
+    <p class="text-secondary">From {{ pr.customer.name }} — {{ pr.created_at|date:"F d, Y H:i" }}</p>
+</div>
+
+<div class="row g-4">
+    
+    <div class="col-lg-6">
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Request Details</h5>
+            </div>
+            <div class="card-body">
+                
+                <table class="table table-borderless mb-0">
+                    <tr><td class="text-secondary" style="width:140px">Customer</td><td class="fw-medium">{{ pr.customer.name }}</td></tr>
+                    <tr><td class="text-secondary">Email</td><td>{{ pr.customer.email|default:"—" }}</td></tr>
+                    <tr><td class="text-secondary">Phone</td><td>{{ pr.customer.phone }}</td></tr>
+                    <tr><td class="text-secondary">Product Name</td><td class="fw-medium">{{ pr.name }}</td></tr>
+                    <tr><td class="text-secondary">Description</td><td>{{ pr.description|default:"—"|linebreaksbr }}</td></tr>
+                    <tr><td class="text-secondary">Product Link</td><td>
+                        {% if pr.product_link %}
+                        <a href="{{ pr.product_link }}" target="_blank" class="text-break">{{ pr.product_link }}</a>
+                        {% else %}—{% endif %}
+                    </td></tr>
+                    <tr><td class="text-secondary">Quantity</td><td>{{ pr.requested_quantity }}</td></tr>
+                    <tr><td class="text-secondary">Status</td><td>
+                        <span class="badge bg-{{ pr.get_status_display_class }}">{{ pr.get_status_display }}</span>
+                    </td></tr>
+                    
+                    {% if pr.converted_product %}
+                    <tr><td class="text-secondary">Converted To</td><td>
+                        <a href="{% url 'product_catalogue' %}" class="fw-medium">{{ pr.converted_product.name }}</a>
+                    </td></tr>
+                    {% endif %}
+                </table>
+
+                
+                {% if pr.images.exists %}
+                <hr class="border-secondary">
+                <h6 class="fw-bold mb-2"><i class="bi bi-images me-2"></i>Customer Images</h6>
+                <div class="row g-2">
+                    {% for img in pr.images.all %}
+                    <div class="col-3">
+                        <a href="{{ img.image.url }}" target="_blank">
+                            <img src="{{ img.image.url }}" class="img-fluid rounded border" style="height:100px;object-fit:cover;width:100%;" alt="Request image">
+                        </a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        
+        {% if pr.status == 'pending' or pr.status == 'quoted' %}
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-cloud-upload me-2"></i>Upload Images</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary small">Add reference images, supplier photos, or catalog images to this request.</p>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="upload_images">
+                    <div class="mb-3">
+                        <input type="file" name="images" class="form-control" multiple accept="image/*" id="adminImageInput">
+                    </div>
+                    <div class="row g-2 mb-3" id="adminImagePreview"></div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-upload me-1"></i>Upload Images
+                    </button>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-chat-left-text me-2"></i>Admin Notes</h5>
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="update_notes">
+                    <div class="mb-3">
+                        <textarea name="admin_notes" class="form-control" rows="4">{{ pr.admin_notes }}</textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">Update Status</label>
+                        <select name="status" class="form-select">
+                            
+                            {% for value, label in pr.STATUS_CHOICES %}
+                            <option value="{{ value }}" {% if pr.status == value %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-save me-1"></i>Save Notes & Status
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    
+    <div class="col-lg-6">
+        
+        {% if pr.status == 'pending' or pr.status == 'quoted' %}
+        
+        <div class="card border-success">
+            <div class="card-header bg-success bg-opacity-10">
+                <h5 class="mb-0 text-success"><i class="bi bi-plus-circle me-2"></i>Convert to Product</h5>
+            </div>
+            <div class="card-body">
+                <p class="text-secondary small">Fill in the product details below. When you submit, the product will be created and automatically assigned to <strong>{{ pr.customer.name }}</strong>.</p>
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="convert">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Product Name</label>
+                            
+                            <input type="text" name="product_name" class="form-control" value="{{ pr.name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">SKU</label>
+                            <input type="text" name="sku" class="form-control" placeholder="Auto-generated if blank">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Price ({{ settings.currency }})</label>
+                            <input type="number" step="0.01" name="price" class="form-control" value="0" required>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Weight (KG)</label>
+                            <input type="number" step="0.01" name="weight" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">MOQ</label>
+                            <input type="number" name="moq" class="form-control" value="{{ pr.requested_quantity }}">
+                            
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Carton Qty</label>
+                            <input type="number" name="carton_qty" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Carton Length (cm)</label>
+                            <input type="number" step="0.1" name="carton_length" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Carton Width (cm)</label>
+                            <input type="number" step="0.1" name="carton_width" class="form-control">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">Carton Height (cm)</label>
+                            <input type="number" step="0.1" name="carton_height" class="form-control">
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            
+                            <textarea name="product_description" class="form-control" rows="3">{{ pr.description }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Product Images</label>
+                            <input type="file" name="admin_images" class="form-control" multiple accept="image/*" id="convertImageInput">
+                            <div class="form-text">Upload product images. These will be added to the new product along with customer images.</div>
+                            <div class="row g-2 mt-2" id="convertImagePreview"></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Internal Notes</label>
+                            <textarea name="admin_notes" class="form-control" rows="2">{{ pr.admin_notes }}</textarea>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>Create Product & Assign
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        
+        <div class="card mt-4 border-danger">
+            <div class="card-header bg-danger bg-opacity-10">
+                <h5 class="mb-0 text-danger"><i class="bi bi-x-circle me-2"></i>Reject Request</h5>
+            </div>
+            <div class="card-body">
+                <form method="post" onsubmit="return confirm('Reject this request?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="reject">
+                    <div class="mb-3">
+                        <label class="form-label">Reason / Notes</label>
+                        <textarea name="admin_notes" class="form-control" rows="2">{{ pr.admin_notes }}</textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-x-lg me-1"></i>Reject Request
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        {% else %}
+        <div class="card">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-check-circle fs-1 text-success"></i>
+                <h5 class="mt-3">This request has been {{ pr.get_status_display|lower }}.</h5>
+                {% if pr.converted_product %}
+                <p class="text-secondary">Converted to product: <a href="{% url 'product_catalogue' %}">{{ pr.converted_product.name }}</a></p>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Image preview function: Shows thumbnail previews when the user selects images.
+// Used for both the admin upload and the convert-to-product image inputs.
+function previewImages(inputId, previewId) {
+    document.getElementById(inputId).addEventListener('change', function(e) {
+        const preview = document.getElementById(previewId);
+        preview.innerHTML = '';
+        for (const file of e.target.files) {
+            if (!file.type.startsWith('image/')) continue;  // Skip non-image files
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const div = document.createElement('div');
+                div.className = 'col-3';
+                div.innerHTML = `<img src="${ev.target.result}" class="img-fluid rounded border" style="height:80px;object-fit:cover;width:100%;" alt="">`;
+                preview.appendChild(div);
+            };
+            reader.readAsDataURL(file);  // Convert image to base64 data URL for preview
+        }
+    });
+}
+// Wire up both image inputs on this page
+previewImages('adminImageInput', 'adminImagePreview');
+previewImages('convertImageInput', 'convertImagePreview');
+</script>
+{% endblock %}

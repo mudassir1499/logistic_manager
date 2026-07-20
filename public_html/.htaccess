@@ -1,0 +1,32 @@
+# cPanel .htaccess for Django deployment
+# Place this file inside public_html/ (or the domain's document root)
+# If your domain uses a subfolder, adjust the paths accordingly
+
+Options +ExecCGI
+AddHandler wsgi-script .py
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)$ /passenger_wsgi.py/$1 [L]
+
+# Static files - serve directly (don't go through Django)
+RewriteCond %{REQUEST_URI} ^/static/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^/static/(.*)$ /static/$1 [L]
+
+# Media files - serve directly
+RewriteCond %{REQUEST_URI} ^/media/
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^/media/(.*)$ /media/$1 [L]
+
+# Security headers
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "DENY"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# Compression
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css application/javascript
+</IfModule>

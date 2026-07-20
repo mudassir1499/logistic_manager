@@ -6,10 +6,12 @@
 
 {% block content %}
 <div class="row g-4">
-    <!-- Form Column -->
+    
     <div class="col-lg-5">
+        
         <div class="glass-card" style="border-color:var(--noon-yellow);border-width:2px;">
             <div class="d-flex align-items-center gap-3 mb-4">
+                
                 <div style="background:var(--noon-yellow);color:var(--noon-dark);width:48px;height:48px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px">
                     noon
                 </div>
@@ -19,7 +21,7 @@
                 </div>
             </div>
 
-            <!-- Shared form fields -->
+            
             <div class="form-glass">
                 <div class="mb-3">
                     <label class="form-label">Product Quantity (Total Units)</label>
@@ -73,7 +75,7 @@
                 </div>
             </div>
 
-            <!-- Two separate buttons -->
+            
             <div class="d-flex gap-3 mt-3">
                 <form id="labelPdfForm" method="POST" action="/noon-labels/generate/" target="_blank" class="flex-fill">
                     {% csrf_token %}
@@ -106,7 +108,7 @@
             </div>
         </div>
 
-        <!-- Label History -->
+        
         {% if batches %}
         <div class="glass-card mt-4">
             <h6 style="font-weight:700" class="mb-3"><i class="bi bi-clock-history me-2"></i>Recent Batches</h6>
@@ -144,6 +146,7 @@
                         <td>{{ batch.carton_quantity|default:"1" }}</td>
                         <td>
                             <div class="d-flex gap-1">
+                                
                                 <form method="POST" action="/noon-labels/generate/" target="_blank" style="display:inline">
                                     {% csrf_token %}
                                     <input type="hidden" name="quantity" value="{{ batch.quantity }}">
@@ -156,6 +159,7 @@
                                     <input type="hidden" name="paper_format" value="a4">
                                     <button type="submit" class="btn-ghost btn-sm" style="padding:4px 8px" title="Product Label PDF"><i class="bi bi-tag"></i></button>
                                 </form>
+                                
                                 <form method="POST" action="/noon-labels/generate-carton/" target="_blank" style="display:inline">
                                     {% csrf_token %}
                                     <input type="hidden" name="quantity" value="{{ batch.quantity }}">
@@ -171,16 +175,16 @@
                             </div>
                         </td>
                     </tr>
-                    {% endfor %}
+                    {% endfor %}  
                 </tbody>
             </table>
         </div>
-        {% endif %}
+        {% endif %}  
     </div>
 
-    <!-- Preview Column -->
+    
     <div class="col-lg-7">
-        <!-- Tab switch for previews -->
+        
         <ul class="nav nav-pills mb-3" style="gap:8px">
             <li class="nav-item">
                 <button class="btn-glow btn-sm active" id="tabProductLabel" onclick="switchPreview('product')" style="background:linear-gradient(135deg,#feee00,#d4c800);color:#2d2d2d">
@@ -194,7 +198,7 @@
             </li>
         </ul>
 
-        <!-- Product Label Preview -->
+        
         <div class="glass-card" id="previewProduct">
             <h6 class="mb-3" style="font-weight:700"><i class="bi bi-eye me-2"></i>Product Label Preview</h6>
             <div class="label-preview">
@@ -224,7 +228,7 @@
             </div>
         </div>
 
-        <!-- Carton Label Preview -->
+        
         <div class="glass-card" id="previewCarton" style="display:none">
             <h6 class="mb-3" style="font-weight:700"><i class="bi bi-eye me-2"></i>Carton Label Preview</h6>
             <div class="label-preview" style="border:3px solid #2d2d2d">
@@ -274,11 +278,13 @@
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock %}  
 
 {% block extra_js %}
 <script>
-// Sync visible inputs to hidden form fields before submit
+// Sync visible inputs to hidden form fields before submit.
+// This is needed because the two submit buttons are in separate forms,
+// but the input fields are shared outside the forms.
 function syncForms() {
     var qty = document.getElementById('labelQty').value;
     var cqty = document.getElementById('cartonQty').value;
@@ -288,6 +294,7 @@ function syncForms() {
     var cm = document.getElementById('cartonMark').value;
     var ca = document.getElementById('cartonAsn').value;
 
+    // Copy values into the Product Label PDF form
     document.getElementById('form1_qty').value = qty;
     document.getElementById('form1_cartonQty').value = cqty;
     document.getElementById('form1_label').value = lm;
@@ -296,6 +303,7 @@ function syncForms() {
     document.getElementById('form1_carton').value = cm;
     document.getElementById('form1_cartonAsn').value = ca;
 
+    // Copy values into the Carton Label PDF form
     document.getElementById('form2_qty').value = qty;
     document.getElementById('form2_cartonQty').value = cqty;
     document.getElementById('form2_label').value = lm;
@@ -305,7 +313,7 @@ function syncForms() {
     document.getElementById('form2_cartonAsn').value = ca;
 }
 
-// Preview tab switching
+// Preview tab switching: Shows either Product or Carton preview
 function switchPreview(tab) {
     var productEl = document.getElementById('previewProduct');
     var cartonEl = document.getElementById('previewCarton');
@@ -333,7 +341,7 @@ function switchPreview(tab) {
     }
 }
 
-// Live preview updates
+// Live preview updates: Every keystroke updates the preview to match input
 var qtyInput = document.getElementById('labelQty');
 var markInput = document.getElementById('labelMark');
 var mark2Input = document.getElementById('labelMark2');
@@ -349,6 +357,7 @@ function updatePreview() {
     var cm = cartonInput.value || 'CTN-X-XXX';
     var ca = cartonAsnInput.value || 'ASN-XXX';
     
+    // Build extra label marks HTML
     var extras = '';
     if (lm2) extras += '<br><span style="font-size:12px;color:#aaa">' + lm2 + '</span>';
     if (lm3) extras += '<br><span style="font-size:12px;color:#aaa">' + lm3 + '</span>';
@@ -366,6 +375,7 @@ function updatePreview() {
     document.getElementById('previewCartonBarcodeText').textContent = cm;
 }
 
+// Wire up live preview on all input fields
 qtyInput.addEventListener('input', updatePreview);
 markInput.addEventListener('input', updatePreview);
 mark2Input.addEventListener('input', updatePreview);
@@ -373,4 +383,4 @@ mark3Input.addEventListener('input', updatePreview);
 cartonInput.addEventListener('input', updatePreview);
 cartonAsnInput.addEventListener('input', updatePreview);
 </script>
-{% endblock %}
+{% endblock %}  

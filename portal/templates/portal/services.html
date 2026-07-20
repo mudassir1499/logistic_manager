@@ -1,0 +1,162 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Our Services — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block content %}
+
+<section class="service-hero">
+    <div class="container text-center">
+        <span class="section-label">What We Do</span>
+        <h1 class="hero-title">Our Services</h1>
+        <p class="hero-subtitle">Complete China sourcing solutions — from finding suppliers to delivering products to your door in the Middle East.</p>
+        <div class="hero-stats mt-4 d-flex justify-content-center gap-3 flex-wrap">
+            <span class="badge bg-white-10">Factory Visits</span>
+            <span class="badge bg-white-10">Quality Inspections</span>
+            <span class="badge bg-white-10">Shipping Coordination</span>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Solutions</span>
+            <h2 class="section-title">Core Services</h2>
+            <p class="section-subtitle mx-auto">Comprehensive sourcing support tailored for businesses importing from China</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80" alt="Product Sourcing" class="service-img">
+                    <div class="service-body">
+                        <h4 class="fw-bold mb-2">Product Sourcing</h4>
+                        <p class="text-secondary mb-3">We identify, vet, and connect you with the right Chinese manufacturers for your exact product needs — saving you time and eliminating risk.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> Supplier discovery & shortlisting</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Factory capability assessment</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Sample procurement & evaluation</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Product category expertise</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80" alt="Supplier Verification" class="service-img">
+                    <div class="service-body">
+                        <h4 class="fw-bold mb-2">Supplier Verification</h4>
+                        <p class="text-secondary mb-3">We physically visit factories, audit credentials, and verify production capabilities so you never deal with unreliable suppliers.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> On-site factory visits</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Business license & certification checks</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Production line inspection</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Supplier background reports</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=800&q=80" alt="Quality Inspection" class="service-img">
+                    <div class="service-body">
+                        <h4 class="fw-bold mb-2">Quality Inspection</h4>
+                        <p class="text-secondary mb-3">Pre-shipment inspections at the factory ensure your products meet specifications before they leave China.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> Pre-shipment product inspections</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Defect identification & reporting</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Packaging & labeling checks</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Photo & video documentation</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="https://images.unsplash.com/photo-1605745341112-85968b19335b?auto=format&fit=crop&w=800&q=80" alt="Order Management & Shipping" class="service-img">
+                    <div class="service-body">
+                        <h4 class="fw-bold mb-2">Order Management & Shipping</h4>
+                        <p class="text-secondary mb-3">We negotiate prices, manage purchase orders, and coordinate air or sea freight from China to your destination.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> Price negotiation with suppliers</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Purchase order management</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Air & sea freight coordination</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> Customs documentation support</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding feature-section">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">How It Works</span>
+            <h2 class="section-title">Our Process</h2>
+            <p class="section-subtitle mx-auto">A streamlined 4-step journey from product idea to delivery at your door</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-3 col-6">
+                <div class="process-step-v2">
+                    <div class="step-icon">
+                        <i class="bi bi-chat-left-text"></i>
+                    </div>
+                    <span class="step-number">1</span>
+                    <h5 class="fw-bold mb-2">Inquiry</h5>
+                    <p class="text-secondary small mb-0">Tell us what product you need, your target price, and quantity.</p>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="process-step-v2">
+                    <div class="step-icon">
+                        <i class="bi bi-search"></i>
+                    </div>
+                    <span class="step-number">2</span>
+                    <h5 class="fw-bold mb-2">Sourcing</h5>
+                    <p class="text-secondary small mb-0">We find and verify suppliers, negotiate pricing, and send you options.</p>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="process-step-v2">
+                    <div class="step-icon">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <span class="step-number">3</span>
+                    <h5 class="fw-bold mb-2">Inspection</h5>
+                    <p class="text-secondary small mb-0">We inspect production quality, approve samples, and prepare for shipping.</p>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="process-step-v2">
+                    <div class="step-icon">
+                        <i class="bi bi-truck"></i>
+                    </div>
+                    <span class="step-number">4</span>
+                    <h5 class="fw-bold mb-2">Delivery</h5>
+                    <p class="text-secondary small mb-0">We coordinate freight and customs so your products arrive on time.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Ready to Buy from China?</h2>
+        <p class="text-white-50 mb-4">Join hundreds of Middle East businesses trusting {{ settings.company_name|default:"LogiManager" }} for reliable China sourcing.</p>
+        <div class="d-flex justify-content-center gap-3 flex-wrap">
+            <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Contact Us</a>
+            <a href="{% url 'portal_register' %}" class="btn btn-outline-light btn-lg">Create an Account</a>
+        </div>
+        {% if settings.company_phone %}
+        <p class="text-white-50 small mt-4 mb-0">Or call us directly at <strong class="text-white">{{ settings.company_phone }}</strong></p>
+        {% endif %}
+        {% if settings.company_address %}
+        <p class="text-white-50 small mt-2 mb-0">{{ settings.company_address }}</p>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}

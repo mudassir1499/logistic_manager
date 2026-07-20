@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if item %}Edit{% else %}Add{% endif %} Portfolio Item — Admin{% endblock %}
+{% block nav_portfolio %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-{% if item %}pencil-square{% else %}plus-circle{% endif %} me-2"></i>
+        {% if item %}Edit {{ item.title }}{% else %}Add Portfolio Item{% endif %}
+    </h1>
+    <p class="text-secondary">{% if item %}Update the portfolio item{% else %}Upload an image or video to display on the website{% endif %}</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body p-4">
+                
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label">Title <span class="text-danger">*</span></label>
+                            <input type="text" name="title" class="form-control" value="{{ item.title|default:'' }}" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            <textarea name="description" class="form-control" rows="2">{{ item.description|default:'' }}</textarea>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Media Type</label>
+                            <select name="media_type" class="form-select" id="mediaTypeSelect">
+                                
+                                <option value="image" {% if item.is_image or not item %}selected{% endif %}>Image</option>
+                                <option value="video" {% if item.is_video %}selected{% endif %}>Video</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Display Order</label>
+                            <input type="number" name="display_order" class="form-control" value="{{ item.display_order|default:'0' }}" min="0">
+                            <div class="form-text">Lower number = shown first</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">File {% if item %}(leave blank to keep current){% endif %}</label>
+                            <input type="file" name="file" class="form-control" id="fileInput" accept="image/*,video/*">
+                            
+                            {% if item %}
+                            <div class="mt-2">
+                                <p class="text-secondary small mb-1">Current file:</p>
+                                {% if item.is_image %}
+                                <img src="{{ item.file.url }}" class="rounded border" style="max-width:300px;max-height:200px;object-fit:cover;" alt="">
+                                {% else %}
+                                <video controls class="rounded border" style="max-width:300px;max-height:200px;">
+                                    <source src="{{ item.file.url }}" type="video/{{ item.file_extension }}">
+                                </video>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            
+                            <div id="previewContainer" class="mt-2"></div>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if not item or item.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="isActive">Show on website</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>{% if item %}Save Changes{% else %}Add Item{% endif %}
+                        </button>
+                        <a href="{% url 'admin_portfolio_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// File input change handler: Shows a live preview of the selected file
+// before submission. This helps the admin verify they selected the right file.
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const container = document.getElementById('previewContainer');
+    container.innerHTML = '';  // Clear previous preview
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Auto-detect media type from the file's MIME type and update the select dropdown
+    const type = file.type.startsWith('video/') ? 'video' : 'image';
+    document.getElementById('mediaTypeSelect').value = type;
+    
+    if (type === 'video') {
+        // For video: create a video element with controls and a blob URL
+        const video = document.createElement('video');
+        video.controls = true;
+        video.className = 'rounded border';
+        video.style.maxWidth = '300px';
+        video.style.maxHeight = '200px';
+        const url = URL.createObjectURL(file);  // Create a temporary local URL
+        video.src = url;
+        container.appendChild(video);
+    } else {
+        // For image: use FileReader to create a base64 data URL preview
+        const img = document.createElement('img');
+        img.className = 'rounded border';
+        img.style.maxWidth = '300px';
+        img.style.maxHeight = '200px';
+        img.style.objectFit = 'cover';
+        const reader = new FileReader();
+        reader.onload = function(ev) { img.src = ev.target.result; };
+        reader.readAsDataURL(file);
+        container.appendChild(img);
+    }
+});
+</script>
+{% endblock %}

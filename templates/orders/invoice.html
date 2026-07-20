@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice #{{ order.id }} — {{ order.customer.name }} — {{ order.date|date:"d M Y" }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f6fa;  /* Light gray for screen preview */
+            color: #222;
+            padding: 32px 16px;
+        }
+        .invoice-wrapper {
+            max-width: 760px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.1);
+            padding: 40px 48px;
+        }
+        /* Invoice header: Company info on left, invoice badge on right */
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            border-bottom: 2px solid #e8eaf0;
+            padding-bottom: 24px;
+        }
+        .company-name {
+            font-size: 26px;
+            font-weight: 800;
+            color: #1a1a2e;
+            letter-spacing: -0.5px;
+        }
+        .company-info {
+            font-size: 13px;
+            color: #666;
+            margin-top: 6px;
+            line-height: 1.6;
+            white-space: pre-line;
+        }
+        .invoice-badge {
+            text-align: right;
+        }
+        .invoice-badge .invoice-title {
+            font-size: 32px;
+            font-weight: 900;
+            color: #C84B31;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+        .invoice-badge .invoice-num {
+            font-size: 15px;
+            color: #888;
+            margin-top: 4px;
+        }
+        .invoice-badge .invoice-date {
+            font-size: 13px;
+            color: #aaa;
+            margin-top: 2px;
+        }
+
+        .bill-to {
+            background: #f8f9ff;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 28px;
+        }
+        .bill-to-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #888;
+            margin-bottom: 6px;
+        }
+        .bill-to-name {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        /* Product tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 0;
+        }
+        thead tr {
+            background: #1a1a2e;
+            color: #fff;
+        }
+        thead th {
+            padding: 12px 14px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            text-align: left;
+        }
+        thead th:last-child { text-align: right; }
+        thead th:nth-child(2) { width: 64px; }  /* Photo column width */
+        tbody tr {
+            border-bottom: 1px solid #eef0f5;
+        }
+        tbody tr:hover { background: #fafbff; }
+        tbody td {
+            padding: 12px 14px;
+            font-size: 14px;
+            color: #333;
+        }
+        tbody td:last-child { text-align: right; font-weight: 600; }
+
+        /* Shipment sections */
+        .shipment-section {
+            margin-bottom: 28px;
+            border: 1px solid #e8eaf0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        .shipment-header {
+            background: #FDF2F0;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e8eaf0;
+        }
+        .shipment-header-title {
+            font-weight: 700;
+            font-size: 14px;
+            color: #1a1a2e;
+        }
+        .shipment-calc-bar {
+            background: #fff;
+            border-top: 1px solid #e8eaf0;
+            padding: 10px 16px;
+            display: flex;
+            gap: 24px;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .shipment-stat {
+            font-size: 12px;
+            color: #666;
+        }
+        .shipment-stat strong {
+            color: #1a1a2e;
+        }
+        .shipment-cost {
+            font-size: 15px;
+            font-weight: 700;
+            color: #C84B31;
+        }
+
+        /* Totals section */
+        .totals-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 8px;
+        }
+        .totals-box {
+            width: 340px;
+        }
+        .totals-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 14px;
+            color: #555;
+            border-bottom: 1px solid #eef0f5;
+        }
+        .totals-row:last-child { border-bottom: none; }
+        .totals-row.grand-total {
+            font-size: 20px;
+            font-weight: 800;
+            color: #1a1a2e;
+            padding-top: 12px;
+            margin-top: 4px;
+        }
+        .totals-row.commission-row {
+            color: #C84B31;
+        }
+
+        .invoice-footer {
+            margin-top: 40px;
+            border-top: 1px solid #e8eaf0;
+            padding-top: 20px;
+            text-align: center;
+            font-size: 13px;
+            color: #aaa;
+        }
+
+        /* Print buttons */
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #C84B31;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 22px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 16px rgba(200,75,49,0.3);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .print-btn:hover { background: #A33D28; }
+
+        .invoice-prefix-bar {
+            background: #FDF2F0;
+            border-radius: 6px;
+            padding: 8px 16px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 13px;
+            color: #444;
+            font-weight: 500;
+        }
+        .prefix-sep { color: #bbb; margin: 0 4px; }
+        .prefix-tag {
+            background: #C84B31;
+            color: #fff;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+        }
+
+        /* Print optimizations and toggle classes */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .print-btn { display: none; }
+            .no-print { display: none !important; }
+            .invoice-wrapper { box-shadow: none; border-radius: 0; padding: 24px; }
+        }
+        body.hide-fx .fx-line { display: none !important; }
+        body.hide-shipping .shipping-line { display: none !important; }
+        body.hide-shipping table th.col-weight,
+        body.hide-shipping table td.col-weight,
+        body.hide-shipping table th.col-landed,
+        body.hide-shipping table td.col-landed { display: none !important; }
+        body.hide-commission .commission-line { display: none !important; }
+    </style>
+</head>
+<body>
+
+<button class="print-btn" onclick="window.print()">
+    🖨️ Print / Save PDF
+</button>
+
+{% if fx_enabled %}
+<button class="print-btn no-print" id="fxToggleBtn" onclick="toggleFx()" style="right:180px;background:#6c63c4;">
+    👁 Hide {{ fx_from }} prices
+</button>
+{% endif %}
+<button class="print-btn no-print" id="shipToggleBtn" onclick="toggleShipping()" style="right:340px;background:#0891b2;">
+    📦 Hide Shipping
+</button>
+<button class="print-btn no-print" id="invoiceTypeBtn" onclick="toggleInvoiceType()" style="right:500px;background:#d97706;">
+    📄 Pre-Invoice
+</button>
+<button class="print-btn no-print" id="commToggleBtn" onclick="toggleCommission()" style="right:670px;background:#16a34a;">
+    💰 Hide Commission
+</button>
+
+<script>
+{% if fx_enabled %}
+function toggleFx() {
+    var body = document.body;
+    var btn = document.getElementById('fxToggleBtn');
+    var hidden = body.classList.toggle('hide-fx');
+    btn.textContent = hidden ? '👁 Show {{ fx_from }} prices' : '👁 Hide {{ fx_from }} prices';
+    localStorage.setItem('invoice_hide_fx', hidden ? '1' : '0');
+}
+{% endif %}
+function toggleShipping() {
+    var body = document.body;
+    var btn = document.getElementById('shipToggleBtn');
+    var hidden = body.classList.toggle('hide-shipping');
+    btn.textContent = hidden ? '📦 Show Shipping' : '📦 Hide Shipping';
+    localStorage.setItem('invoice_hide_shipping', hidden ? '1' : '0');
+    recalcGrandTotal();  // Recalculate the grand total when shipping is hidden
+}
+// Global variables passed from Django for the recalculation function
+var GRAND_TOTAL = {{ grand_total }};
+var SHIPPING_COST = {{ shipping_total|default:"0" }};
+var COMMISSION_AMOUNT = {{ order.commission_amount|default:"0" }};
+var CURRENCY_LABEL = '{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %}';
+{% if fx_enabled and grand_total_converted %}
+var FX_RATE = {{ fx_rate }};
+var FX_FROM = '{{ fx_from }}';
+{% endif %}
+function recalcGrandTotal() {
+    var hideShip = document.body.classList.contains('hide-shipping');
+    // If shipping is hidden, subtract it from the grand total
+    var effective = hideShip ? (GRAND_TOTAL - SHIPPING_COST) : GRAND_TOTAL;
+    var el = document.getElementById('grandTotalDisplay');
+    if (el) el.textContent = CURRENCY_LABEL + ' ' + effective.toFixed(2);
+    var elComm = document.getElementById('grandTotalCommDisplay');
+    if (elComm) elComm.textContent = CURRENCY_LABEL + ' ' + (effective + COMMISSION_AMOUNT).toFixed(2);
+    {% if fx_enabled and grand_total_converted %}
+    var fxEl = document.getElementById('grandTotalFxDisplay');
+    if (fxEl) fxEl.textContent = FX_FROM + ' ' + (effective / FX_RATE).toFixed(2);
+    var fxCommEl = document.getElementById('grandTotalCommFxDisplay');
+    if (fxCommEl) fxCommEl.textContent = FX_FROM + ' ' + ((effective + COMMISSION_AMOUNT) / FX_RATE).toFixed(2);
+    {% endif %}
+}
+function toggleCommission() {
+    var body = document.body;
+    var btn = document.getElementById('commToggleBtn');
+    var hidden = body.classList.toggle('hide-commission');
+    btn.textContent = hidden ? '💰 Show Commission' : '💰 Hide Commission';
+    localStorage.setItem('invoice_hide_commission', hidden ? '1' : '0');
+}
+function toggleInvoiceType() {
+    var btn = document.getElementById('invoiceTypeBtn');
+    var titleEl = document.getElementById('invoiceTitleText');
+    var isPreNow = titleEl.textContent.trim() === 'Invoice';
+    if (isPreNow) {
+        titleEl.textContent = 'Pro Forma Invoice';  // Quotation-style invoice
+        btn.textContent = '📄 Final Invoice';
+        localStorage.setItem('invoice_type', 'proforma');
+    } else {
+        titleEl.textContent = 'Invoice';
+        btn.textContent = '📄 Pre-Invoice';
+        localStorage.setItem('invoice_type', 'final');
+    }
+}
+// Restore toggle states from localStorage on page load
+(function(){
+    {% if fx_enabled %}
+    if (localStorage.getItem('invoice_hide_fx') === '1') {
+        document.body.classList.add('hide-fx');
+        var fxBtn = document.getElementById('fxToggleBtn');
+        if (fxBtn) fxBtn.textContent = '👁 Show {{ fx_from }} prices';
+    }
+    {% endif %}
+    if (localStorage.getItem('invoice_hide_shipping') === '1') {
+        document.body.classList.add('hide-shipping');
+        var sBtn = document.getElementById('shipToggleBtn');
+        if (sBtn) sBtn.textContent = '📦 Show Shipping';
+        recalcGrandTotal();
+    }
+    if (localStorage.getItem('invoice_type') === 'proforma') {
+        var titleEl = document.getElementById('invoiceTitleText');
+        if (titleEl) titleEl.textContent = 'Pro Forma Invoice';
+        var tBtn = document.getElementById('invoiceTypeBtn');
+        if (tBtn) tBtn.textContent = '📄 Final Invoice';
+    }
+    if (localStorage.getItem('invoice_hide_commission') === '1') {
+        document.body.classList.add('hide-commission');
+        var cBtn = document.getElementById('commToggleBtn');
+        if (cBtn) cBtn.textContent = '💰 Show Commission';
+    }
+})();
+</script>
+
+<div class="invoice-wrapper">
+
+    
+    
+    <div class="invoice-header">
+        <div>
+            <div class="company-name">{{ settings.company_name }}</div>
+            <div class="company-info">{% if settings.company_phone %}📞 {{ settings.company_phone }}{% endif %}
+{% if settings.company_address %}{{ settings.company_address }}{% endif %}</div>
+        </div>
+        <div class="invoice-badge">
+            <div class="invoice-title" id="invoiceTitleText">Invoice</div>
+            <div class="invoice-num"># {{ order.id }}</div>
+            <div class="invoice-date">{{ order.date|date:"d M Y" }}</div>
+        </div>
+    </div>
+
+    
+    
+    {% with method=order.shipping_method %}
+    {% if order.customer.phone or method and method != 'manual' %}
+    <div class="invoice-prefix-bar">
+        {% if order.customer.phone %}
+        <span>{{ order.customer.phone }}</span>
+        {% endif %}
+        {% if order.customer.phone and method and method != 'manual' %}<span class="prefix-sep">&bull;</span>{% endif %}
+        <span>{{ order.date|date:"d M Y" }}</span>
+        {% if method and method != 'manual' %}
+        <span class="prefix-sep">&bull;</span>
+        <span class="prefix-tag">{% if method == 'air' %}Air{% elif method == 'sea' %}Sea{% elif method == 'ksa_air' %}KSA Air{% elif method == 'ksa_sea' %}KSA Sea{% elif method == 'ksa' %}KSA{% endif %}</span>
+        {% endif %}
+    </div>
+    {% endif %}
+    {% endwith %}
+
+    
+    
+    <div class="bill-to" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;">
+        <div>
+            <div class="bill-to-label">Bill To</div>
+            <div class="bill-to-name">{{ order.customer.name }}</div>
+            {% if order.customer.phone %}<div style="color:#666;font-size:13px;margin-top:4px;">{{ order.customer.phone }}</div>{% endif %}
+            {% if order.customer.address %}<div style="color:#888;font-size:12px;margin-top:3px;white-space:pre-line;">{{ order.customer.address }}</div>{% endif %}
+            <button class="no-print" onclick="copyCustomerDetails()" style="margin-top:8px;background:none;border:1px solid #aaa;color:#666;border-radius:5px;padding:3px 10px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                &#128203; Copy Customer Details
+            </button>
+        </div>
+        
+        {% if shipping_companies %}
+        <div style="text-align:right;">
+            <div style="font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Shipping Via</div>
+            {% for sc in shipping_companies %}
+            <div style="margin-bottom:4px;">
+                <span style="font-size:15px;font-weight:700;color:#1a1a2e;">{{ sc.name }}</span>
+                {% if sc.website %}
+                <div style="margin-top:1px;">
+                    <a href="{{ sc.website }}" class="sc-website-link" style="font-size:12px;color:#C84B31;text-decoration:none;" target="_blank" rel="noopener noreferrer">{{ sc.website }}</a>
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+            <button class="copy-links-btn no-print" onclick="copyInvoiceLinks()" style="margin-top:6px;background:none;border:1px solid #C84B31;color:#C84B31;border-radius:5px;padding:3px 10px;font-size:12px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;">
+                &#128203; Copy Website Links
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    
+    
+    {% for shipment in invoice_shipments %}
+    <div class="shipment-section">
+        <div class="shipment-header">
+            <div class="shipment-header-title">
+                {% if shipment.shipment_name %}{{ shipment.shipment_name }}{% elif multi_shipment %}Shipment #{{ shipment.shipment_no }}{% else %}Products{% endif %}
+                {% if shipment.shipment_company %}<span style="font-size:12px;font-weight:400;color:#888;margin-left:8px;">via {{ shipment.shipment_company.name }}</span>{% endif %}
+            </div>
+            
+            <div style="font-size:12px;color:#666;" class="shipping-line">
+                {% if shipment.weight > 0 or shipment.volumetric_weight > 0 %}
+                    {% if shipment.weight > 0 %}Weight: <strong>{{ shipment.weight }} KG</strong>{% endif %}
+                    {% if shipment.volumetric_weight > 0 %}
+                        {% if shipment.weight > 0 %}&nbsp;·&nbsp;{% endif %}
+                        Vol: <strong>{{ shipment.volumetric_weight }} KG</strong>
+                    {% endif %}
+                    {% if shipment.chargeable_weight > 0 %}
+                        &nbsp;·&nbsp;
+                        Chargeable: <strong>{{ shipment.chargeable_weight }} KG</strong>
+                    {% endif %}
+                    {% if shipment.cbm > 0 %}&nbsp;·&nbsp;{% endif %}
+                {% endif %}
+                {% if shipment.cbm > 0 %}CBM: <strong>{{ shipment.cbm }}</strong>{% endif %}
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Photo</th>
+                    <th>Product</th>
+                    <th class="col-weight shipping-line">Weight (KG)</th>
+                    <th>Qty</th>
+                    <th>Unit Price ({% if fx_enabled %}{{ fx_to }} / {{ fx_from }}{% else %}{{ settings.currency }}{% endif %})</th>
+                    <th>Subtotal ({% if fx_enabled %}{{ fx_to }} / {{ fx_from }}{% else %}{{ settings.currency }}{% endif %})</th>
+                    <th class="col-landed shipping-line">Landed/pc ({% if fx_enabled %}{{ fx_to }} / {{ fx_from }}{% else %}{{ settings.currency }}{% endif %})</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in shipment.items %}
+                <tr>
+                    <td style="color:#aaa;">{{ forloop.counter }}</td>
+                    <td style="padding:8px 14px;">
+                        {% if item.image_url %}
+                        <img src="{{ item.image_url }}" alt="{{ item.name }}" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #e8eaf0;">
+                        {% else %}
+                        <div style="width:48px;height:48px;border-radius:6px;background:#f0f1f5;border:1px solid #e8eaf0;display:flex;align-items:center;justify-content:center;color:#bbb;font-size:18px;">📦</div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ item.name }}
+                        {% if item.is_checked %}<span style="color:#22c55e;margin-left:6px;font-size:16px;" title="Checked">✅</span>{% endif %}
+                    </td>
+                    <td class="col-weight shipping-line">
+                        {{ item.weight|default:"—" }}
+                        {% if item.item_weight %}<div style="font-size:11px;color:#aaa;">Total: {{ item.item_weight }} KG</div>{% endif %}
+                    </td>
+                    <td>{{ item.quantity }}</td>
+                    <td>{{ item.price }}
+                        {% if fx_enabled and item.price_converted %}<div class="fx-line" style="font-size:11px;color:#888;margin-top:2px;">≈ {{ fx_from }} {{ item.price_converted }}</div>{% endif %}
+                    </td>
+                    <td>{{ item.subtotal }}
+                        {% if fx_enabled and item.subtotal_converted %}<div class="fx-line" style="font-size:11px;color:#888;margin-top:2px;">≈ {{ fx_from }} {{ item.subtotal_converted }}</div>{% endif %}
+                    </td>
+                    <td class="col-landed shipping-line" style="color:#C84B31;">{{ item.landed_cost }}
+                        {% if fx_enabled and item.landed_cost_converted %}<div class="fx-line" style="font-size:11px;color:#6c63c4;margin-top:2px;">≈ {{ fx_from }} {{ item.landed_cost_converted }}</div>{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="shipment-calc-bar{% if not shipment.est_shipping_cost %} shipping-line{% endif %}">
+            <div style="display:flex;gap:20px;flex-wrap:wrap;">
+                {% if shipment.rate_per_cbm %}
+                <div class="shipment-stat shipping-line">
+                    Rate: <strong>{{ settings.currency }} {{ shipment.rate_per_cbm }}/CBM</strong>
+                </div>
+                <div class="shipment-stat shipping-line">
+                    CBM: <strong>{{ shipment.cbm }}</strong>
+                </div>
+                {% elif shipment.rate_per_kg %}
+                <div class="shipment-stat shipping-line">
+                    Rate: <strong>{{ settings.currency }} {{ shipment.rate_per_kg }}/KG</strong>
+                </div>
+                <div class="shipment-stat shipping-line">
+                    Chargeable: <strong>{{ shipment.chargeable_weight }} KG</strong>
+                </div>
+                {% endif %}
+                <div class="shipment-stat">
+                    Units: <strong>{{ shipment.total_qty }}</strong>
+                </div>
+                {% if shipment.est_shipping_cost %}
+                <div class="shipment-stat shipping-line">
+                    Ship/pc: <strong>{{ settings.currency }} {{ shipment.shipping_per_unit }}</strong>
+                </div>
+                {% endif %}
+            </div>
+            {% if shipment.est_shipping_cost %}
+            <div class="shipment-cost shipping-line">
+                Shipping: {{ settings.currency }} {{ shipment.est_shipping_cost }}
+                {% if fx_enabled and shipment.est_shipping_cost_converted %}<span class="fx-line" style="font-size:12px;font-weight:400;color:#888;margin-left:6px;">≈ {{ fx_from }} {{ shipment.est_shipping_cost_converted }}</span>{% endif %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endfor %}
+
+    
+    
+    <div class="totals-section">
+        <div class="totals-box">
+            <div class="totals-row">
+                <span>Total Product Cost</span>
+                <span>{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ order.total }}</span>
+            </div>
+            {% if order.commission_amount and order.commission_amount != "0.00" %}
+            <div class="totals-row commission-line">
+                <span>Commission{% if order.commission_percentage and order.commission_percentage != "0.00" %} ({{ order.commission_percentage }}% of product cost){% endif %}</span>
+                <span>
+                    {% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ order.commission_amount }}
+                    {% if fx_enabled and commission_amount_converted %}
+                    <div class="fx-line" style="font-size:12px;color:#888;margin-top:2px;">≈ {{ fx_from }} {{ commission_amount_converted }}</div>
+                    {% endif %}
+                </span>
+            </div>
+            {% endif %}
+            {% if shipping_total and shipping_total != "0.00" %}
+            <div class="totals-row shipping-line">
+                <span>Total Shipping Cost
+                    {% if effective_rate_cbm %}
+                    <span style="font-weight:400;color:#888;font-size:11px;display:block;">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ effective_rate_cbm }}/CBM &nbsp;·&nbsp; {{ order.total_cbm }} CBM{% if shipping_per_unit %} &nbsp;·&nbsp; {% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ shipping_per_unit }}/pc{% endif %}</span>
+                    {% elif effective_rate_weight %}
+                    <span style="font-weight:400;color:#888;font-size:11px;display:block;">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ effective_rate_weight }}/KG &nbsp;·&nbsp; {{ order.total_weight }} KG{% if shipping_per_unit %} &nbsp;·&nbsp; {% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ shipping_per_unit }}/pc{% endif %}</span>
+                    {% elif shipping_per_unit %}
+                    <span style="font-weight:400;color:#888;font-size:11px;display:block;">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ shipping_per_unit }}/pc</span>
+                    {% endif %}
+                </span>
+                <span>{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ shipping_total }}
+            </div>
+            {% endif %}
+            {% if extra_costs %}
+                {% for ec in extra_costs %}
+                <div class="totals-row">
+                    <span>{{ ec.reason|default:"Other Cost" }}</span>
+                    <span>{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ ec.amount }}</span>
+                </div>
+                {% endfor %}
+            {% elif order.other_cost and order.other_cost != "0.00" %}
+            <div class="totals-row">
+                <span>Other Costs{% if order.other_cost_reason %} <span style="font-weight:400;color:#888;">({{ order.other_cost_reason }})</span>{% endif %}</span>
+                <span>{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ order.other_cost }}</span>
+            </div>
+            {% endif %}
+            {% if order.total_weight and order.total_weight != "0.000" %}
+            <div class="totals-row shipping-line">
+                <span>Total Weight</span>
+                <span>{{ order.total_weight }} KG</span>
+            </div>
+            {% endif %}
+            {% if order.total_cbm and order.total_cbm != "0.000" %}
+            <div class="totals-row shipping-line">
+                <span>Total CBM</span>
+                <span>{{ order.total_cbm }}</span>
+            </div>
+            {% endif %}
+            <div class="totals-row grand-total">
+                <span>Grand Total</span>
+                <span id="grandTotalDisplay">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ grand_total }}</span>
+            </div>
+            {% if fx_enabled and grand_total_converted %}
+            <div class="totals-row fx-line" style="background:#f5f4ff;border-radius:6px;padding:8px 12px;margin-top:4px;">
+                <span style="color:#C84B31;font-weight:600;">
+                    <i>≈ Grand Total in {{ fx_from }}</i>
+                    <span style="font-size:11px;font-weight:400;color:#888;display:block;">Rate: 1 {{ fx_from }} = {{ fx_rate }} {{ fx_to }}</span>
+                </span>
+                <span id="grandTotalFxDisplay" style="color:#C84B31;font-weight:700;">{{ fx_from }} {{ grand_total_converted }}</span>
+            </div>
+            {% endif %}
+            {% if order.commission_amount and order.commission_amount != "0.00" %}
+            <div class="totals-row grand-total commission-line" style="font-size:16px;background:#f0fdf4;border-radius:6px;padding:10px 12px;margin-top:8px;border-top:2px solid #bbf7d0;">
+                <span style="color:#16a34a;">Final Grand Total <span style="font-weight:400;font-size:13px;">incl. commission</span></span>
+                <span id="grandTotalCommDisplay" style="color:#16a34a;">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %} {{ grand_total_with_commission }}</span>
+            </div>
+            {% if fx_enabled and grand_total_with_commission_converted %}
+            <div class="totals-row fx-line commission-line" style="background:#f0fdf4;border-radius:6px;padding:6px 12px;margin-top:2px;">
+                <span style="color:#16a34a;font-weight:600;font-size:13px;"><i>≈ incl. commission in {{ fx_from }}</i></span>
+                <span id="grandTotalCommFxDisplay" style="color:#16a34a;font-weight:700;">{{ fx_from }} {{ grand_total_with_commission_converted }}</span>
+            </div>
+            {% endif %}
+            {% endif %}
+        </div>
+    </div>
+
+    
+    <div class="invoice-footer">
+        Thank you for your business! &nbsp;·&nbsp; {{ settings.company_name }}
+        {% if settings.company_phone %} &nbsp;·&nbsp; {{ settings.company_phone }}{% endif %}
+    </div>
+
+</div>
+<script>
+function copyCustomerDetails() {
+    var parts = [];
+    parts.push('{{ order.customer.name|escapejs }}');
+    {% if order.customer.phone %}parts.push('{{ order.customer.phone|escapejs }}');{% endif %}
+    {% if order.customer.address %}parts.push('{{ order.customer.address|escapejs }}');{% endif %}
+    var text = parts.join('\n');
+    var btn = event.currentTarget;
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+            btn.textContent = '✓ Copied!';
+            setTimeout(function() { btn.innerHTML = '&#128203; Copy Customer Details'; }, 2000);
+        });
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        btn.textContent = '✓ Copied!';
+        setTimeout(function() { btn.innerHTML = '&#128203; Copy Customer Details'; }, 2000);
+    }
+}
+function copyInvoiceLinks() {
+    var links = Array.from(document.querySelectorAll('.sc-website-link')).map(function(a) { return a.href; });
+    if (!links.length) return;
+    var text = links.join('\n');
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function() {
+            var btn = document.querySelector('.copy-links-btn');
+            if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function() { btn.innerHTML = '&#128203; Copy Website Links'; }, 2000); }
+        });
+    } else {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
+        var btn = document.querySelector('.copy-links-btn');
+        if (btn) { btn.textContent = '✓ Copied!'; setTimeout(function() { btn.innerHTML = '&#128203; Copy Website Links'; }, 2000); }
+    }
+}
+</script>
+</body>
+</html>

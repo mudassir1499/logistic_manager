@@ -1,0 +1,139 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Request a Quote — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">Request a Product Quote</h4>
+                <p class="text-secondary mb-0 small">Submit a product request and our team will get back to you with pricing.</p>
+            </div>
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-6">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <form id="quoteForm" method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Product Name <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-box"></i></span>
+                                    <input type="text" name="name" class="form-control" placeholder="What product are you looking for?" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Description</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-card-text"></i></span>
+                                    <textarea name="description" class="form-control" rows="3" placeholder="Color, size, material, specifications..."></textarea>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Product Link</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-link-45deg"></i></span>
+                                    <input type="url" name="product_link" class="form-control" placeholder="https://alibaba.com/... (optional)">
+                                </div>
+                                <div class="form-text">Paste a link from Alibaba, 1688, or any other source.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Estimated Quantity</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-123"></i></span>
+                                    <input type="number" name="requested_quantity" class="form-control" value="1" min="1">
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">Product Images</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-images"></i></span>
+                                    <input type="file" name="images" class="form-control" id="imageInput" multiple accept="image/*">
+                                </div>
+                                <div class="form-text">Upload reference images or screenshots of the product. You can select multiple files.</div>
+                                <div class="row g-2 mt-2" id="imagePreview"></div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                    <span class="btn-text"><i class="bi bi-send me-2"></i>Submit Request</span>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="alert d-none mt-3 alert-permanent" id="quoteAlert" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('imageInput').addEventListener('change', function(e) {
+    const preview = document.getElementById('imagePreview');
+    preview.innerHTML = '';
+    for (const file of e.target.files) {
+        if (!file.type.startsWith('image/')) continue;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+            const div = document.createElement('div');
+            div.className = 'col-3';
+            div.innerHTML = `<img src="${ev.target.result}" class="img-fluid rounded border" style="height:80px;object-fit:cover;width:100%;" alt="">`;
+            preview.appendChild(div);
+        };
+        reader.readAsDataURL(file);
+    }
+});
+
+document.getElementById('quoteForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('submitBtn');
+    const alertDiv = document.getElementById('quoteAlert');
+    btn.disabled = true;
+    btn.querySelector('.btn-text').classList.add('d-none');
+    btn.querySelector('.spinner-border').classList.remove('d-none');
+    alertDiv.classList.add('d-none');
+    try {
+        const formData = new FormData(this);
+        const response = await fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        });
+        const data = await response.json();
+        if (data.success) {
+            if (typeof fbq === 'function') fbq('track', 'Contact');
+            alertDiv.textContent = data.message;
+            alertDiv.classList.remove('d-none', 'alert-danger');
+            alertDiv.classList.add('alert-success');
+            this.reset();
+            document.getElementById('imagePreview').innerHTML = '';
+        } else {
+            alertDiv.textContent = data.message || 'Failed to submit request.';
+            alertDiv.classList.remove('d-none', 'alert-success');
+            alertDiv.classList.add('alert-danger');
+        }
+    } catch (err) {
+        alertDiv.textContent = 'An error occurred. Please try again.';
+        alertDiv.classList.remove('d-none', 'alert-success');
+        alertDiv.classList.add('alert-danger');
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').classList.remove('d-none');
+        btn.querySelector('.spinner-border').classList.add('d-none');
+    }
+});
+</script>
+{% endblock %}

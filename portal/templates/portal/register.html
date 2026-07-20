@@ -1,0 +1,198 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Register — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block content %}
+
+<section class="auth-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-5">
+                <div class="auth-card">
+                    <div class="text-center mb-4">
+                        <div class="auth-icon">
+                            <i class="bi bi-person-plus"></i>
+                        </div>
+                        <h3 class="fw-bold mb-1">Create Account</h3>
+                        <p class="text-secondary small mb-0">Join our customer portal to browse products and place orders.</p>
+                    </div>
+
+                    <form id="registerForm" method="post">
+                        {% csrf_token %}
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <div class="auth-input-group">
+                                    <label>Full Name <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                        <input type="text" name="name" class="form-control" placeholder="John Doe" required autofocus>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="auth-input-group">
+                                    <label>Phone <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                        <input type="text" name="phone" class="form-control" placeholder="+971 5x xxx xxxx" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="auth-input-group">
+                                    <label>Email <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                        <input type="email" name="email" class="form-control" placeholder="your@email.com" required>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="auth-input-group">
+                                    <label>Password <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                        <input type="password" name="password" class="form-control" placeholder="Min 8 characters, 1 uppercase, 1 lowercase, 1 digit" required minlength="8" id="passwordInput">
+                                        <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
+                                            <i class="bi bi-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="mt-2" id="passwordStrength" style="display:none;">
+                                    <div class="d-flex gap-1 mb-1">
+                                        <div class="flex-fill rounded" style="height:4px;background:#e5e7eb;" id="strengthBar1"></div>
+                                        <div class="flex-fill rounded" style="height:4px;background:#e5e7eb;" id="strengthBar2"></div>
+                                        <div class="flex-fill rounded" style="height:4px;background:#e5e7eb;" id="strengthBar3"></div>
+                                        <div class="flex-fill rounded" style="height:4px;background:#e5e7eb;" id="strengthBar4"></div>
+                                    </div>
+                                    <small class="text-secondary" id="strengthText">Enter a password</small>
+                                </div>
+                                <small class="text-secondary d-block mt-1">Must be at least 8 characters with 1 uppercase, 1 lowercase, and 1 digit.</small>
+                            </div>
+                            <div class="col-12">
+                                <div class="auth-input-group">
+                                    <label>Address</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                        <textarea name="address" class="form-control" rows="2" placeholder="Your business address"></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg" id="registerBtn">
+                                <span class="btn-text"><i class="bi bi-person-plus me-2"></i>Create Account</span>
+                                <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                            </button>
+                        </div>
+                    </form>
+
+                    <div class="alert d-none mt-3 alert-permanent" id="registerAlert" role="alert"></div>
+
+                    <div class="text-center mt-4">
+                        <p class="text-secondary small mb-0">Already have an account? <a href="{% url 'portal_login' %}">Log in</a></p>
+                    </div>
+                    <div class="text-center mt-2">
+                        <a href="/" class="text-decoration-none small"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('registerForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('registerBtn');
+    const alertDiv = document.getElementById('registerAlert');
+    btn.disabled = true;
+    btn.querySelector('.btn-text').classList.add('d-none');
+    btn.querySelector('.spinner-border').classList.remove('d-none');
+    alertDiv.classList.add('d-none');
+    try {
+        const formData = new FormData(this);
+        const response = await fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        });
+        const data = await response.json();
+        if (data.success) {
+            if (typeof fbq === 'function') fbq('track', 'Lead');
+            alertDiv.textContent = data.message || 'Registration successful!';
+            alertDiv.classList.remove('d-none', 'alert-danger');
+            alertDiv.classList.add('alert-success');
+            setTimeout(() => { window.location.href = data.redirect; }, 1000);
+        } else {
+            alertDiv.textContent = data.message || 'Registration failed.';
+            alertDiv.classList.remove('d-none', 'alert-success');
+            alertDiv.classList.add('alert-danger');
+        }
+    } catch (err) {
+        alertDiv.textContent = 'An error occurred. Please try again.';
+        alertDiv.classList.remove('d-none', 'alert-success');
+        alertDiv.classList.add('alert-danger');
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').classList.remove('d-none');
+        btn.querySelector('.spinner-border').classList.add('d-none');
+    }
+});
+
+(function() {
+    const passwordInput = document.getElementById('passwordInput');
+    const strengthContainer = document.getElementById('passwordStrength');
+    const strengthText = document.getElementById('strengthText');
+    const bars = [
+        document.getElementById('strengthBar1'),
+        document.getElementById('strengthBar2'),
+        document.getElementById('strengthBar3'),
+        document.getElementById('strengthBar4'),
+    ];
+    if (!passwordInput) return;
+    passwordInput.addEventListener('input', function() {
+        const val = this.value;
+        strengthContainer.style.display = val.length > 0 ? 'block' : 'none';
+        let score = 0;
+        if (val.length >= 8) score++;
+        if (/[a-z]/.test(val)) score++;
+        if (/[A-Z]/.test(val)) score++;
+        if (/\d/.test(val)) score++;
+        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+        const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+        bars.forEach((bar, index) => {
+            if (index < score) {
+                bar.style.background = colors[score - 1];
+            } else {
+                bar.style.background = '#e5e7eb';
+            }
+        });
+        if (val.length === 0) {
+            strengthText.textContent = 'Enter a password';
+        } else if (score === 0) {
+            strengthText.textContent = 'Too short';
+        } else {
+            strengthText.textContent = labels[score - 1];
+            strengthText.style.color = colors[score - 1];
+        }
+    });
+})();
+
+document.querySelector('.toggle-password').addEventListener('click', function() {
+    const input = document.querySelector('input[name="password"]');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+</script>
+{% endblock %}

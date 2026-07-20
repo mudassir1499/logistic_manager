@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Catalogue — {{ settings.company_name }}</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: #f5f6fa;  /* Light gray for screen preview */
+            color: #222;
+            padding: 24px 16px;
+        }
+        .catalogue-wrapper {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 4px 32px rgba(0,0,0,0.10);
+            padding: 40px 48px;
+        }
+        .catalogue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            border-bottom: 2px solid #e8eaf0;
+            padding-bottom: 22px;
+        }
+        .company-name { font-size: 26px; font-weight: 800; color: #1a1a2e; letter-spacing: -0.5px; }
+        .company-info { font-size: 13px; color: #666; margin-top: 6px; line-height: 1.6; }
+        .catalogue-badge { text-align: right; }
+        .catalogue-title { font-size: 30px; font-weight: 900; color: #C84B31; letter-spacing: 2px; text-transform: uppercase; }
+        .catalogue-date { font-size: 12px; color: #aaa; margin-top: 6px; }
+
+        /* Product Grid: 3-column grid for screen, 3-column for print */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        .product-card {
+            border: 1px solid #e8eaf0;
+            border-radius: 10px;
+            overflow: hidden;
+            page-break-inside: avoid;  /* Don't split a product card across pages */
+        }
+        .product-img {
+            width: 100%;
+            height: 160px;
+            object-fit: cover;
+            display: block;
+            background: #f0f1f5;
+        }
+        .product-img-placeholder {
+            width: 100%;
+            height: 160px;
+            background: #f0f1f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 40px;
+        }
+        .product-body { padding: 12px 14px 14px; }
+        .product-name { font-size: 14px; font-weight: 700; color: #1a1a2e; margin-bottom: 8px; line-height: 1.3; }
+        .product-meta { font-size: 12px; color: #555; line-height: 1.8; }
+        .product-price { font-size: 18px; font-weight: 800; color: #C84B31; margin-top: 8px; }
+        .product-currency { font-size: 12px; font-weight: 400; color: #888; }
+
+        .catalogue-footer {
+            margin-top: 36px;
+            padding-top: 16px;
+            border-top: 1px solid #e8eaf0;
+            text-align: center;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .print-bar {
+            position: fixed;
+            top: 16px;
+            right: 24px;
+            display: flex;
+            gap: 10px;
+            z-index: 999;
+        }
+        .print-btn {
+            background: #C84B31;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 2px 12px rgba(200,75,49,0.3);
+        }
+        .print-btn:hover { background: #A33D28; }
+        .back-btn {
+            background: #f5f6fa;
+            color: #444;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        /* Currency toggle bar (screen only) */
+        .fx-bar {
+            background: #f5f4ff;
+            border: 1px solid #d4d0ff;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        .fx-bar label { font-size: 13px; font-weight: 600; color: #C84B31; margin: 0; }
+        .fx-toggle-group { display: flex; gap: 0; border-radius: 6px; overflow: hidden; border: 1px solid #d4d0ff; }
+        .fx-toggle-group button {
+            border: none; padding: 6px 16px; font-size: 13px; font-weight: 600;
+            cursor: pointer; background: #fff; color: #555; transition: background 0.15s;
+        }
+        .fx-toggle-group button.active { background: #C84B31; color: #fff; }
+        .fx-rate-note { font-size: 11px; color: #888; margin-left: auto; }
+        .price-converted { font-size: 13px; color: #888; margin-top: 2px; font-weight: 500; }
+
+        /* Markup bar: Add a percentage margin to all prices before printing */
+        .markup-bar {
+            background: #fff8f0;
+            border: 1px solid #ffd6a0;
+            border-radius: 8px;
+            padding: 10px 16px;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .markup-bar label { font-size: 13px; font-weight: 600; color: #b45309; margin: 0; white-space: nowrap; }
+        .markup-input-wrap { display: flex; align-items: center; gap: 6px; }
+        .markup-input-wrap input {
+            width: 80px; padding: 5px 10px; border: 1px solid #ffd6a0; border-radius: 6px;
+            font-size: 14px; font-weight: 700; color: #b45309; background: #fff;
+            outline: none; text-align: center;
+        }
+        .markup-input-wrap input:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px #fde68a66; }
+        .markup-input-wrap span { font-size: 14px; font-weight: 700; color: #b45309; }
+        .markup-reset { font-size: 12px; color: #999; cursor: pointer; text-decoration: underline; border: none; background: none; padding: 0; }
+        .markup-preview { font-size: 11px; color: #b45309; margin-left: auto; }
+
+        /* Print optimizations */
+        @media print {
+            body { background: #fff; padding: 0; }
+            .catalogue-wrapper { box-shadow: none; border-radius: 0; padding: 24px 32px; }
+            .print-bar { display: none !important; }  /* Hide controls */
+            .fx-bar { display: none !important; }
+            .markup-bar { display: none !important; }
+            .products-grid { grid-template-columns: repeat(3, 1fr); }
+            .price-converted { display: block !important; }  /* Always show converted prices in print */
+        }
+    </style>
+</head>
+<body>
+
+<div class="print-bar">
+    <a href="/products/" class="back-btn">&#8592; Back</a>
+    <button class="print-btn" onclick="window.print()">&#128438; Print / Save PDF</button>
+</div>
+
+<div class="catalogue-wrapper">
+    
+    
+    <div class="catalogue-header">
+        <div>
+            <div class="company-name">{{ settings.company_name }}</div>
+            <div class="company-info">
+                {% if settings.company_email %}{{ settings.company_email }}{% endif %}
+                {% if settings.company_phone %}&nbsp;·&nbsp; {{ settings.company_phone }}{% endif %}
+            </div>
+        </div>
+        <div class="catalogue-badge">
+            <div class="catalogue-title">Catalogue</div>
+            <div class="catalogue-date">{% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency }}{% endif %} &nbsp;·&nbsp; {{ products|length }} product{{ products|length|pluralize }}</div>
+        </div>
+    </div>
+
+    
+    {% if fx_enabled %}
+    <div class="fx-bar" id="fxBar">
+        <label><i>&#8644;</i> Currency:</label>
+        <div class="fx-toggle-group">
+            <button id="btnFrom" onclick="switchCurrency('from')">{{ fx_from }}</button>
+            <button id="btnTo" class="active" onclick="switchCurrency('to')">{{ fx_to }}</button>
+        </div>
+        <span class="fx-rate-note">1 {{ fx_from }} = {{ fx_rate }} {{ fx_to }}</span>
+    </div>
+    {% endif %}
+
+    
+    
+    <div class="markup-bar" id="markupBar">
+        <label>&#43; Price Markup:</label>
+        <div class="markup-input-wrap">
+            <input type="number" id="markupPct" value="0" min="0" max="999" step="0.5"
+                   oninput="applyMarkup()" placeholder="0">
+            <span>%</span>
+        </div>
+        <button class="markup-reset" onclick="resetMarkup()">Reset</button>
+        <span class="markup-preview" id="markupPreview"></span>
+    </div>
+
+    
+    
+    {% if products %}
+    <div class="products-grid">
+        {% for product in products %}
+        <div class="product-card">
+            {% with product.images.first as img %}
+            {% if img %}
+            <img class="product-img" src="{{ img.image.url }}" alt="{{ product.name }}">
+            {% else %}
+            <div class="product-img-placeholder">📦</div>
+            {% endif %}
+            {% endwith %}
+            <div class="product-body">
+                <div class="product-name">{{ product.name }}</div>
+                <div class="product-meta">
+                    MOQ: <strong>{{ product.moq }}</strong>
+                    {% if product.weight %}<br>Weight: <strong>{{ product.weight }} KG</strong>{% endif %}
+                    {% if product.carton_length and product.carton_width and product.carton_height %}
+                    <br>Carton: <strong>{{ product.carton_length }} × {{ product.carton_width }} × {{ product.carton_height }} cm</strong>
+                    {% endif %}
+                </div>
+                
+                <div class="product-price" data-base-price="{{ product.price }}" data-conv-price="{{ product.price_converted|default:'' }}">
+                    <span class="price-to"><span class="product-currency">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %}</span> <span class="price-val">{{ product.price }}</span></span>
+                    {% if fx_enabled and product.price_converted %}
+                    <span class="price-from" style="display:none;"><span class="product-currency">{{ fx_from }}</span> <span class="price-val">{{ product.price_converted }}</span></span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:60px;color:#aaa;font-size:16px;">No published products yet.</div>
+    {% endif %}
+
+    
+    <div class="catalogue-footer">
+        {{ settings.company_name }}{% if settings.company_phone %} &nbsp;·&nbsp; {{ settings.company_phone }}{% endif %} &nbsp;·&nbsp; All prices in {% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency }}{% endif %}
+    </div>
+</div>
+
+<script>
+// Currency state tracking
+var currentCurrency = '{% if fx_enabled %}to{% else %}base{% endif %}';
+var fxRate = {% if fx_enabled %}{{ fx_rate }}{% else %}0{% endif %};
+
+// Calculate the display price with markup applied
+function calcDisplayPrice(basePrice, markup, currency) {
+    var p = parseFloat(basePrice) || 0;
+    var marked = p * (1 + markup / 100);  // Apply markup percentage
+    if (currency === 'from' && fxRate > 0) {
+        // Convert to the "from" currency by dividing by the exchange rate
+        return (marked / fxRate).toFixed(2);
+    }
+    return marked.toFixed(2);
+}
+
+// Apply markup to all product prices when the markup input changes
+function applyMarkup() {
+    var markup = parseFloat(document.getElementById('markupPct').value) || 0;
+    var preview = document.getElementById('markupPreview');
+    preview.textContent = markup > 0 ? '+' + markup + '% applied to all prices' : '';
+
+    // Update every product price on the page
+    document.querySelectorAll('.product-price[data-base-price]').forEach(function(el) {
+        var base = el.getAttribute('data-base-price');
+        var toEl = el.querySelector('.price-to .price-val');
+        var fromEl = el.querySelector('.price-from .price-val');
+        if (toEl) toEl.textContent = calcDisplayPrice(base, markup, 'to');
+        if (fromEl) fromEl.textContent = calcDisplayPrice(base, markup, 'from');
+    });
+}
+
+function resetMarkup() {
+    document.getElementById('markupPct').value = 0;
+    applyMarkup();
+}
+
+{% if fx_enabled %}
+// Switch between "from" and "to" currency display
+function switchCurrency(which) {
+    currentCurrency = which;
+    document.getElementById('btnFrom').classList.toggle('active', which === 'from');
+    document.getElementById('btnTo').classList.toggle('active', which === 'to');
+    document.querySelectorAll('.price-from').forEach(function(el) {
+        el.style.display = which === 'from' ? '' : 'none';
+    });
+    document.querySelectorAll('.price-to').forEach(function(el) {
+        el.style.display = which === 'to' ? '' : 'none';
+    });
+}
+{% endif %}
+</script>
+
+</body>
+</html>

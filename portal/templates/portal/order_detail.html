@@ -1,0 +1,174 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Order #{{ order.id }} — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+            <div>
+                <h4 class="fw-bold mb-1">Order #{{ order.id }}</h4>
+                <p class="text-secondary mb-0 small">{{ order.date|date:"F d, Y 'at' H:i" }}</p>
+            </div>
+            <a href="{% url 'portal_orders' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Orders
+            </a>
+        </div>
+
+        <div class="row g-4 mb-4">
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Order Items</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-4">Product</th>
+                                        <th>Qty</th>
+                                        <th>Unit Price</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for shipment in shipments %}
+                                    <tr class="table-secondary">
+                                        <td colspan="4" class="ps-4 fw-medium small">
+                                            <i class="bi bi-truck me-1"></i>Shipment #{{ shipment.shipment_no }}
+                                            {% if shipment.shipment_name %}— {{ shipment.shipment_name }}{% endif %}
+                                            <span class="badge bg-light text-dark ms-1">{{ shipment.method|title }}</span>
+                                        </td>
+                                    </tr>
+                                    {% for item in shipment.items %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center gap-2">
+                                                {% with img=item.product.images.first %}
+                                                {% if img %}
+                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                {% else %}
+                                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                                    <i class="bi bi-image text-muted"></i>
+                                                </div>
+                                                {% endif %}
+                                                {% endwith %}
+                                                <div>
+                                                    <span class="fw-medium">{{ item.product.name }}</span>
+                                                    {% if item.product.ready_to_ship %}
+                                                    <br><span class="badge bg-success" style="font-size:10px;"><i class="bi bi-truck me-1"></i>Ready to Ship</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                            {% if item.product.ready_to_ship %}
+                                            <div class="mt-2 small text-secondary">
+                                                {% if item.label_mark %}<div><strong>Label Mark:</strong> {{ item.label_mark }}</div>{% endif %}
+                                                {% if item.carton_mark %}<div><strong>Carton Mark:</strong> {{ item.carton_mark }}</div>{% endif %}
+                                                {% if item.carton_asn %}<div><strong>Carton ASN:</strong> {{ item.carton_asn }}</div>{% endif %}
+                                                {% if item.carton_quantity > 1 %}<div><strong>Carton Qty:</strong> {{ item.carton_quantity }}</div>{% endif %}
+                                                {% if item.shipping_label %}<div><a href="{{ item.shipping_label.url }}" target="_blank"><i class="bi bi-file-earmark-arrow-down me-1"></i>Shipping Label</a></div>{% endif %}
+                                                {% if item.carton_label %}<div><a href="{{ item.carton_label.url }}" target="_blank"><i class="bi bi-file-earmark-arrow-down me-1"></i>Carton Label</a></div>{% endif %}
+                                            </div>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td>{{ item.price }} {{ settings.currency }}</td>
+                                        <td class="fw-medium">{{ item.subtotal }} {{ settings.currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Subtotal</span>
+                            <span class="fw-medium">{{ total }} {{ settings.currency }}</span>
+                        </div>
+                        {% if order.show_shipping_details %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Shipping</span>
+                            <span class="fw-medium">{{ shipping }} {{ settings.currency }}</span>
+                        </div>
+                        {% if other > 0 %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Other Costs</span>
+                            <span class="fw-medium">{{ other }} {{ settings.currency }}</span>
+                        </div>
+                        {% endif %}
+                        {% if commission > 0 %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Commission</span>
+                            <span class="fw-medium">{{ commission }} {{ settings.currency }}</span>
+                        </div>
+                        {% endif %}
+                        <hr>
+                        {% else %}
+                        <hr>
+                        <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+                            <i class="bi bi-info-circle"></i>
+                            <span class="small">Shipping details will be provided separately.</span>
+                        </div>
+                        {% endif %}
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">Grand Total</span>
+                            <span class="fw-bold fs-5 text-primary">{{ grand_total }} {{ settings.currency }}</span>
+                        </div>
+                        <hr>
+                        <div class="mb-2">
+                            <span class="text-secondary small">Status:</span>
+                            {% if order.status == 'confirmed' %}
+                            <span class="status-badge confirmed">Confirmed</span>
+                            {% else %}
+                            <span class="status-badge pending">{{ order.status|title }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="mb-2">
+                            <span class="text-secondary small">Payment:</span>
+                            {% if order.payment_status == 'paid' %}
+                            <span class="status-badge paid">Paid</span>
+                            {% elif order.payment_status == 'partial' %}
+                            <span class="status-badge partial">Partial</span>
+                            {% else %}
+                            <span class="status-badge unpaid">Unpaid</span>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <span class="text-secondary small">Placed:</span>
+                            {% if order.is_placed %}
+                            <span class="status-badge confirmed">Yes</span>
+                            {% else %}
+                            <span class="status-badge pending">No</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                {% if order.notes %}
+                <div class="card shadow-sm border-0 mt-3">
+                    <div class="card-header py-3">
+                        <h6 class="fw-bold mb-0"><i class="bi bi-chat-left-text me-2 text-info"></i>Notes</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="mb-0 text-secondary">{{ order.notes }}</p>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

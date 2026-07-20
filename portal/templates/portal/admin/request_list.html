@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Product Requests — Admin{% endblock %}
+{% block nav_requests %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-clipboard-check me-2"></i>Product Quotation Requests
+    </h1>
+    <p class="text-secondary">Review and convert customer product requests</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="stat-card stat-amber">
+            <div class="stat-icon"><i class="bi bi-hourglass"></i></div>
+            <div class="stat-value">{{ counts.pending }}</div>
+            <div class="stat-label">Pending</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-info">
+            <div class="stat-icon"><i class="bi bi-tag"></i></div>
+            <div class="stat-value">{{ counts.quoted }}</div>
+            <div class="stat-label">Quoted</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="bi bi-check2-circle"></i></div>
+            <div class="stat-value">{{ counts.converted }}</div>
+            <div class="stat-label">Converted</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="stat-card stat-red">
+            <div class="stat-icon"><i class="bi bi-x-circle"></i></div>
+            <div class="stat-value">{{ counts.rejected }}</div>
+            <div class="stat-label">Rejected</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">All Requests</h5>
+        
+        <div class="btn-group btn-group-sm">
+            <a href="{% url 'admin_request_list' %}" class="btn btn-outline-secondary {% if not status_filter %}active{% endif %}">All</a>
+            <a href="?status=pending" class="btn btn-outline-secondary {% if status_filter == 'pending' %}active{% endif %}">Pending</a>
+            <a href="?status=converted" class="btn btn-outline-secondary {% if status_filter == 'converted' %}active{% endif %}">Converted</a>
+            <a href="?status=rejected" class="btn btn-outline-secondary {% if status_filter == 'rejected' %}active{% endif %}">Rejected</a>
+        </div>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Customer</th>
+                        <th>Product</th>
+                        <th>Qty</th>
+                        <th>Status</th>
+                        <th>Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for req in requests %}
+                    <tr>
+                        <td>#{{ req.id }}</td>
+                        <td class="fw-medium">{{ req.customer.name }}</td>
+                        <td>
+                            {{ req.name }}
+                            
+                            {% if req.product_link %}
+                            <a href="{{ req.product_link }}" target="_blank" class="ms-1"><i class="bi bi-link-45deg"></i></a>
+                            {% endif %}
+                        </td>
+                        <td>{{ req.requested_quantity }}</td>
+                        <td>
+                            
+                            <span class="badge bg-{{ req.get_status_display_class }}">
+                                {{ req.get_status_display }}
+                            </span>
+                        </td>
+                        <td class="small">{{ req.created_at|date:"M d, Y H:i" }}</td>
+                        <td>
+                            
+                            <a href="{% url 'admin_request_detail' req.id %}" class="btn btn-sm btn-primary">
+                                <i class="bi bi-eye"></i> View
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                            No requests found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include "portal/includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}

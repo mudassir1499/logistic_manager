@@ -1,0 +1,137 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Customer Login — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block content %}
+
+<section class="auth-section">
+    <div class="container">
+        <div class="auth-card-split">
+            <div class="auth-left">
+                <div class="auth-brand">
+                    <span class="brand-icon">📦</span>
+                    {{ settings.company_name|default:"LogiManager" }}
+                </div>
+                <h2 class="auth-title">Welcome Back</h2>
+                <p class="auth-subtitle">Access your orders, products, and ledger. Manage your China sourcing from one place.</p>
+                <div class="auth-feature">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Track orders in real-time</span>
+                </div>
+                <div class="auth-feature">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>View product catalogs</span>
+                </div>
+                <div class="auth-feature">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Request quotes instantly</span>
+                </div>
+                <div class="auth-feature">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Check your account balance</span>
+                </div>
+            </div>
+            <div class="auth-right">
+                <div class="text-center mb-4">
+                    <div class="auth-icon">
+                        <i class="bi bi-person-circle"></i>
+                    </div>
+                    <h3 class="fw-bold mb-1">Customer Login</h3>
+                    <p class="text-muted small mb-0">Access your orders, products, and ledger.</p>
+                </div>
+                <form id="loginForm" method="post">
+                    {% csrf_token %}
+                    <div class="auth-input-group">
+                        <label>Email Address</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                            <input type="email" name="email" class="form-control" placeholder="your@email.com" required autofocus>
+                        </div>
+                    </div>
+                    <div class="auth-input-group">
+                        <label>Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                            <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                            <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg" id="loginBtn">
+                            <span class="btn-text"><i class="bi bi-box-arrow-in-right me-2"></i>Log In</span>
+                            <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                        </button>
+                    </div>
+                </form>
+                <div class="alert alert-danger d-none mt-3 alert-permanent" id="loginError" role="alert"></div>
+                {% if is_locked %}
+                <div class="alert alert-warning mt-3 alert-permanent" role="alert">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                    Too many failed login attempts. Please try again in <strong>{{ lockout_remaining }} minute{{ lockout_remaining|pluralize }}</strong>.
+                </div>
+                {% endif %}
+                <div class="text-center mt-4">
+                    <p class="text-muted small mb-2"><a href="{% url 'forgot_password' %}">Forgot your password?</a></p>
+                    <p class="text-muted small mb-0">Don't have an account? <a href="{% url 'portal_register' %}">Register here</a></p>
+                </div>
+                <div class="text-center mt-3">
+                    <a href="/" class="text-decoration-none small"><i class="bi bi-arrow-left me-1"></i>Back to Home</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('loginBtn');
+    const errorDiv = document.getElementById('loginError');
+    btn.disabled = true;
+    btn.querySelector('.btn-text').classList.add('d-none');
+    btn.querySelector('.spinner-border').classList.remove('d-none');
+    errorDiv.classList.add('d-none');
+    try {
+        const formData = new FormData(this);
+        const response = await fetch(this.action || window.location.pathname, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        });
+        const data = await response.json();
+        if (data.success) {
+            if (typeof fbq === 'function') fbq('track', 'Lead');
+            window.location.href = data.redirect;
+        } else {
+            errorDiv.textContent = data.message || 'Login failed.';
+            errorDiv.classList.remove('d-none');
+        }
+    } catch (err) {
+        errorDiv.textContent = 'An error occurred. Please try again.';
+        errorDiv.classList.remove('d-none');
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').classList.remove('d-none');
+        btn.querySelector('.spinner-border').classList.add('d-none');
+    }
+});
+
+document.querySelector('.toggle-password').addEventListener('click', function() {
+    const input = document.querySelector('input[name="password"]');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+</script>
+{% endblock %}

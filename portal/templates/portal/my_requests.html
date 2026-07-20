@@ -1,0 +1,106 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}My Requests — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">My Product Requests</h4>
+                <p class="text-secondary mb-0 small">Track your quotation requests and their status.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{% url 'request_quote' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-plus-lg me-1"></i>New Request
+                </a>
+                <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i>Back
+                </a>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                {% if requests %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Request #</th>
+                                <th>Product</th>
+                                <th>Images</th>
+                                <th>Qty</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th class="pe-4">Result</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for req in requests %}
+                            <tr>
+                                <td class="ps-4 fw-medium">#{{ req.id }}</td>
+                                <td>
+                                    <div class="fw-medium">{{ req.name }}</div>
+                                    {% if req.product_link %}
+                                    <a href="{{ req.product_link }}" target="_blank" class="small text-decoration-none">
+                                        <i class="bi bi-link-45deg"></i> View Link
+                                    </a>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if req.images.exists %}
+                                    <div class="d-flex gap-1">
+                                        {% for img in req.images.all|slice:":3" %}
+                                        <a href="{{ img.image.url }}" target="_blank">
+                                            <img src="{{ img.image.url }}" class="rounded" style="width:40px;height:40px;object-fit:cover;" alt="">
+                                        </a>
+                                        {% endfor %}
+                                        {% if req.images.count > 3 %}
+                                        <span class="badge bg-light text-dark d-flex align-items-center">+{{ req.images.count|add:"-3" }}</span>
+                                        {% endif %}
+                                    </div>
+                                    {% else %}
+                                    <span class="text-muted small">—</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ req.requested_quantity }}</td>
+                                <td>
+                                    <span class="status-badge {{ req.get_status_display_class }}">
+                                        {{ req.get_status_display }}
+                                    </span>
+                                </td>
+                                <td class="text-secondary small">{{ req.created_at|date:"M d, Y" }}</td>
+                                <td class="pe-4">
+                                    {% if req.converted_product %}
+                                    <a href="{% url 'portal_products' %}" class="btn btn-sm btn-success">
+                                        <i class="bi bi-box-seam me-1"></i>View Product
+                                    </a>
+                                    {% elif req.status == 'rejected' %}
+                                    <span class="text-danger small"><i class="bi bi-x-circle me-1"></i>Rejected</span>
+                                    {% else %}
+                                    <span class="text-secondary small"><i class="bi bi-hourglass me-1"></i>In Review</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <p class="text-secondary mt-2 mb-3">No requests yet.</p>
+                    <a href="{% url 'request_quote' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i>Request a Quote
+                    </a>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

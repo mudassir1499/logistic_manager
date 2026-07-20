@@ -1,32 +1,80 @@
 {% extends 'base.html' %}
 
-{% block title %}Orders — Logistic Manager{% endblock %}
+{% block title %}{% if is_amazon_orders %}Amazon Orders{% else %}Orders{% endif %} — Logistic Manager{% endblock %}
 {% block nav_orders %}active{% endblock %}
-{% block page_title %}Orders{% endblock %}
+{% block page_title %}{% if is_amazon_orders %}Amazon Orders{% else %}Orders{% endif %}{% endblock %}
 
 {% block topbar_actions %}
+<button class="btn-ghost btn-sm me-2" data-bs-toggle="modal" data-bs-target="#quotationModal" style="border:1px solid var(--border-color);padding:7px 14px;border-radius:var(--radius-sm);">
+    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Quotation Sheet
+</button>
+<button class="btn-ghost btn-sm me-2" data-bs-toggle="modal" data-bs-target="#importQuotationModal" style="border:1px solid var(--border-color);padding:7px 14px;border-radius:var(--radius-sm);">
+    <i class="bi bi-upload me-1"></i> Import
+</button>
 <button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addOrderModal">
     <i class="bi bi-cart-plus"></i> New Order
 </button>
 {% endblock %}
 
 {% block content %}
-<!-- Search Bar -->
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="search-bar">
-            <i class="bi bi-search"></i>
-            <input type="text" class="form-control" id="orderSearch" placeholder="Search orders..." style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="glass-card py-3 px-3 text-center">
+            <div style="font-size:22px;font-weight:800;color:var(--text-primary)">{{ stats.total_count }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Total Orders</div>
         </div>
     </div>
-    <div class="col-md-6 text-end">
-        <span class="badge-glass badge-warning" style="font-size:14px;padding:8px 16px;">
-            <i class="bi bi-cart"></i> {{ orders|length }} Order{{ orders|length|pluralize }}
-        </span>
+    <div class="col-6 col-md-3">
+        <div class="glass-card py-3 px-3 text-center">
+            <div style="font-size:22px;font-weight:800;color:#f59e0b">{{ stats.draft_count }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Drafts</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card py-3 px-3 text-center">
+            <div style="font-size:22px;font-weight:800;color:#f87171">{{ stats.unpaid_count }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Unpaid</div>
+            {% if stats.unpaid_total %}<div style="font-size:11px;color:#f87171;margin-top:2px;">{{ currency }} {{ stats.unpaid_total|floatformat:0 }}</div>{% endif %}
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="glass-card py-3 px-3 text-center">
+            <div style="font-size:22px;font-weight:800;color:#4ade80">{{ stats.paid_count }}</div>
+            <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Paid</div>
+        </div>
     </div>
 </div>
 
-<!-- Orders Table -->
+<div class="row mb-3 g-2 align-items-center">
+    <div class="col-md-4">
+        {% comment %} Server-side search across order number, customer, product and notes.
+           The status/payment chips below still filter the current page client-side. {% endcomment %}
+        <form method="get" action="">
+            <div class="search-bar">
+                <i class="bi bi-search"></i>
+                <input type="text" class="form-control" id="orderSearch" name="q" value="{{ query }}"
+                       placeholder="Search order #, customer or product..." aria-label="Search orders"
+                       style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+                {% if query %}
+                <a href="?" class="search-clear" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    <div class="col-md-8">
+        <div class="d-flex flex-wrap gap-2">
+            <button class="filter-chip active" data-filter-type="all" onclick="setOrderFilter('all',this)">All <span class="filter-chip-count">{{ stats.total_count }}</span></button>
+            <button class="filter-chip" data-filter-type="status" data-filter-val="draft" onclick="setOrderFilter('status:draft',this)"><i class="bi bi-pencil-square me-1"></i>Draft <span class="filter-chip-count">{{ stats.draft_count }}</span></button>
+            <button class="filter-chip" data-filter-type="status" data-filter-val="confirmed" onclick="setOrderFilter('status:confirmed',this)"><i class="bi bi-check-circle me-1"></i>Confirmed <span class="filter-chip-count">{{ stats.confirmed_count }}</span></button>
+            <span style="width:1px;background:var(--border-color);margin:0 4px;"></span>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="unpaid" onclick="setOrderFilter('payment:unpaid',this)" style="color:#f87171"><i class="bi bi-x-circle-fill me-1"></i>Unpaid <span class="filter-chip-count">{{ stats.unpaid_count }}</span></button>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="partial" onclick="setOrderFilter('payment:partial',this)" style="color:#f59e0b"><i class="bi bi-dash-circle-fill me-1"></i>Partial <span class="filter-chip-count">{{ stats.partial_count }}</span></button>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="paid" onclick="setOrderFilter('payment:paid',this)" style="color:#4ade80"><i class="bi bi-check-circle-fill me-1"></i>Paid <span class="filter-chip-count">{{ stats.paid_count }}</span></button>
+        </div>
+    </div>
+</div>
+
 <div class="glass-card">
     <table class="table-glass" id="ordersTable">
         <thead>
@@ -34,25 +82,83 @@
                 <th>Order #</th>
                 <th>Customer</th>
                 <th>Date</th>
+                <th>Status</th>
+                <th>Payment</th>
+                <th>Placed</th>
                 <th>Items</th>
-                <th>Total (AED)</th>
-                <th style="width:150px">Actions</th>
+                <th>Total ({{ currency }})</th>
+                <th style="width:200px">Actions</th>
             </tr>
         </thead>
         <tbody>
-            {% for order in orders %}
-            <tr>
+            {% for order in page_obj %}
+            <tr data-order-status="{{ order.status }}" data-payment-status="{{ order.payment_status }}" data-customer="{{ order.customer.name|lower }}" data-order-id="{{ order.id }}">
                 <td style="font-weight:700;color:var(--accent-3)">#{{ order.id }}</td>
                 <td style="font-weight:600">{{ order.customer.name }}</td>
                 <td style="color:var(--text-secondary)">{{ order.date|date:"M d, Y" }}</td>
                 <td>
+                    {% if order.status == 'draft' %}
+                    <span class="badge-glass badge-warning" style="font-size:11px;"><i class="bi bi-pencil-square me-1"></i>Draft</span>
+                    {% else %}
+                    <span class="badge-glass badge-success" style="font-size:11px;"><i class="bi bi-check-circle me-1"></i>Confirmed</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="dropdown" id="pay-drop-{{ order.id }}">
+                        <button class="btn-payment-toggle dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                            data-status="{{ order.payment_status }}" style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                            {% if order.payment_status == 'paid' %}
+                            <span style="color:#4ade80"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
+                            {% elif order.payment_status == 'partial' %}
+                            <span style="color:#f59e0b"><i class="bi bi-dash-circle-fill me-1"></i>Partial</span>
+                            {% else %}
+                            <span style="color:#f87171"><i class="bi bi-x-circle-fill me-1"></i>Unpaid</span>
+                            {% endif %}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-dark" style="min-width:130px;font-size:13px;">
+                            <li><a class="dropdown-item {% if order.payment_status == 'unpaid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'unpaid');return false;"><i class="bi bi-x-circle-fill me-2" style="color:#f87171"></i>Unpaid</a></li>
+                            <li><a class="dropdown-item {% if order.payment_status == 'partial' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'partial');return false;"><i class="bi bi-dash-circle-fill me-2" style="color:#f59e0b"></i>Partial</a></li>
+                            <li><a class="dropdown-item {% if order.payment_status == 'paid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'paid');return false;"><i class="bi bi-check-circle-fill me-2" style="color:#4ade80"></i>Paid</a></li>
+                        </ul>
+                    </div>
+                </td>
+                <td>
+                    <button class="btn-payment-toggle" id="placed-btn-{{ order.id }}" onclick="togglePlaced({{ order.id }})" title="{% if order.is_placed %}Order placed with supplier{% else %}Not yet placed{% endif %}" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                        {% if order.is_placed %}
+                        <span style="color:#4ade80"><i class="bi bi-check-square-fill me-1"></i>Placed</span>
+                        {% else %}
+                        <span style="color:var(--text-secondary)"><i class="bi bi-square me-1"></i>Not Placed</span>
+                        {% endif %}
+                    </button>
+                </td>
+                <td>
                     <span class="badge-glass badge-info">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
+                    {% if order.has_ready_to_ship_labels %}
+                    <br><a href="{% url 'download_order_labels_zip' order.id %}" class="badge bg-success text-decoration-none mt-1" style="font-size:10px;"><i class="bi bi-file-zip me-1"></i>Labels</a>
+                    {% endif %}
                 </td>
                 <td style="font-weight:700;font-size:16px">{{ order.total }}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-ghost btn-sm" onclick="viewOrder({{ order.id }})">
+                        <button class="btn-ghost btn-sm" onclick="viewOrder({{ order.id }})" title="View">
                             <i class="bi bi-eye"></i>
+                        </button>
+                        <button class="btn-ghost btn-sm" onclick="editOrder({{ order.id }})" title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </button>
+                        {% if order.status == 'draft' %}
+                        <button class="btn-ghost btn-sm" style="color:var(--success)" onclick="confirmOrder({{ order.id }})" title="Confirm Order">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        {% endif %}
+                        <a class="btn-ghost btn-sm" href="/orders/invoice/{{ order.id }}/" target="_blank" title="Print Invoice">
+                            <i class="bi bi-printer"></i>
+                        </a>
+                        <a class="btn-ghost btn-sm" href="/orders/export/{{ order.id }}/" title="Export Excel" style="color:#4ade80;">
+                            <i class="bi bi-file-earmark-excel"></i>
+                        </a>
+                        <button class="btn-ghost btn-sm" onclick="duplicateOrder({{ order.id }})" title="Duplicate as Draft">
+                            <i class="bi bi-copy"></i>
                         </button>
                         <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/orders/delete/{{ order.id }}/', 'Order #{{ order.id }}')">
                             <i class="bi bi-trash"></i>
@@ -62,7 +168,7 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="6">
+                <td colspan="9">
                     <div class="empty-state">
                         <i class="bi bi-cart-x"></i>
                         <p>No orders yet. Create your first order!</p>
@@ -74,7 +180,206 @@
     </table>
 </div>
 
-<!-- Add Order Modal -->
+<div class="mt-4">
+    <ul class="nav nav-tabs" id="shipmentTabs" role="tablist" style="border-bottom:1px solid var(--border-color);">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="by-air-tab" data-bs-toggle="tab" data-bs-target="#by-air" type="button" role="tab" style="background:transparent;border-color:var(--border-color);color:var(--text-primary);font-size:13px;font-weight:600;">
+                <i class="bi bi-airplane me-1"></i> By Air <span class="badge bg-info ms-1">{{ air_items|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="by-sea-tab" data-bs-toggle="tab" data-bs-target="#by-sea" type="button" role="tab" style="background:transparent;border-color:transparent;color:var(--text-secondary);font-size:13px;font-weight:600;">
+                <i class="bi bi-ship me-1"></i> By Sea <span class="badge bg-primary ms-1">{{ sea_items|length }}</span>
+            </button>
+        </li>
+    </ul>
+    <div class="tab-content" id="shipmentTabsContent">
+        <div class="tab-pane fade show active" id="by-air" role="tabpanel">
+            <div class="glass-card" style="border-top-left-radius:0;border-top-right-radius:0;">
+                <table class="table-glass">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Shipment</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Actual Wt</th>
+                            <th>Vol. Wt</th>
+                            <th>CBM</th>
+                            <th>Shipping</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in air_items %}
+                        <tr>
+                            <td style="font-weight:700;color:var(--accent-3)">#{{ row.order_id }}</td>
+                            <td>{{ row.customer.name }}</td>
+                            <td>{% if row.shipment_name %}{{ row.shipment_name }}{% else %}#{{ row.shipment_no }}{% endif %}{% if row.shipment_company %} <span style="color:var(--text-secondary);font-size:11px;">via {{ row.shipment_company.name }}</span>{% endif %}</td>
+                            <td>{{ row.product.name }}</td>
+                            <td>{{ row.quantity }}</td>
+                            <td>{{ row.actual_weight }} KG</td>
+                            <td>{{ row.volumetric_weight }} KG</td>
+                            <td>{{ row.cbm }}</td>
+                            <td>{% if row.shipping_cost %}{{ currency }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="9"><div class="empty-state"><i class="bi bi-airplane"></i><p>No air shipments yet.</p></div></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        <div class="tab-pane fade" id="by-sea" role="tabpanel">
+            <div class="glass-card" style="border-top-left-radius:0;border-top-right-radius:0;">
+                <table class="table-glass">
+                    <thead>
+                        <tr>
+                            <th>Order</th>
+                            <th>Customer</th>
+                            <th>Shipment</th>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Weight</th>
+                            <th>CBM</th>
+                            <th>Shipping</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in sea_items %}
+                        <tr>
+                            <td style="font-weight:700;color:var(--accent-3)">#{{ row.order_id }}</td>
+                            <td>{{ row.customer.name }}</td>
+                            <td>{% if row.shipment_name %}{{ row.shipment_name }}{% else %}#{{ row.shipment_no }}{% endif %}{% if row.shipment_company %} <span style="color:var(--text-secondary);font-size:11px;">via {{ row.shipment_company.name }}</span>{% endif %}</td>
+                            <td>{{ row.product.name }}</td>
+                            <td>{{ row.quantity }}</td>
+                            <td>{{ row.actual_weight }} KG</td>
+                            <td>{{ row.cbm }}</td>
+                            <td>{% if row.shipping_cost %}{{ currency }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="8"><div class="empty-state"><i class="bi bi-ship"></i><p>No sea shipments yet.</p></div></td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="quotationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-file-earmark-spreadsheet me-2"></i>Generate Quotation Sheet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="/orders/quotation-excel/" id="quotationForm">
+        {% csrf_token %}
+        <div class="modal-body">
+
+          
+          <div class="mb-3">
+            <label class="form-label">Customer <span style="color:var(--text-secondary);font-size:11px">(optional)</span></label>
+            <select name="customer_id" class="form-select" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
+              <option value="">— No specific customer —</option>
+              {% for customer in customers %}
+              <option value="{{ customer.id }}">{{ customer.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          
+          <div class="mb-2 d-flex align-items-center gap-2">
+            <label class="form-label mb-0" style="flex-shrink:0">Products</label>
+            <input type="text" id="quotationProductSearch" class="form-control form-control-sm" placeholder="Search products…"
+              style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);max-width:260px;"
+              oninput="filterQuotationProducts(this.value)">
+            <div class="ms-auto d-flex gap-2">
+              <button type="button" class="btn-ghost btn-sm" onclick="selectAllQuotationProducts(true)"><i class="bi bi-check2-all me-1"></i>All</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="selectAllQuotationProducts(false)"><i class="bi bi-x-lg me-1"></i>None</button>
+            </div>
+          </div>
+
+          
+          <div id="quotationProductList" style="max-height:360px;overflow-y:auto;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-card);">
+            {% for product in products %}
+            {% if not product.is_draft %}
+            <label class="quotation-product-row d-flex align-items-center gap-3 px-3 py-2"
+              style="cursor:pointer;border-bottom:1px solid var(--border-color);transition:background .15s;"
+              onmouseover="this.style.background='var(--bg-input)'" onmouseout="this.style.background=''"
+              data-name="{{ product.name|lower }}">
+              <input type="checkbox" name="product_ids" value="{{ product.id }}" class="quotation-product-cb form-check-input" style="width:16px;height:16px;flex-shrink:0;">
+              {% with img=product.images.first %}
+              <div style="width:38px;height:38px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--bg-input);display:flex;align-items:center;justify-content:center;">
+                {% if img %}<img src="{{ img.image.url }}" style="width:38px;height:38px;object-fit:cover;" alt="">{% else %}<i class="bi bi-image" style="color:var(--text-secondary);font-size:14px;"></i>{% endif %}
+              </div>
+              {% endwith %}
+              <span style="flex:1;font-weight:600;font-size:13px">{{ product.name }}{% if product.is_private %} <span style="font-size:10px;color:#a78bfa;font-weight:700;margin-left:4px;">PRIVATE</span>{% endif %}</span>
+              <span style="font-size:12px;color:var(--text-secondary);">{{ currency }} {{ product.price }}</span>
+              <span style="font-size:11px;color:var(--text-secondary);min-width:64px;text-align:right">MOQ: {{ product.moq }}</span>
+            </label>
+            {% endif %}
+            {% endfor %}
+          </div>
+          <div id="quotationNoProducts" style="display:none;text-align:center;padding:24px;color:var(--text-secondary);">
+            <i class="bi bi-search" style="font-size:20px;"></i><br>No products match your search.
+          </div>
+
+          <div id="quotationSelectionCount" style="font-size:12px;color:var(--text-secondary);margin-top:8px;"></div>
+
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn-glow" id="quotationDownloadBtn" onclick="return validateQuotationForm()">
+            <i class="bi bi-download me-1"></i> Download Excel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="importQuotationModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Import Quotation Sheet</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">
+          Upload a completed quotation sheet with quantities filled in — from <strong>Orders → Quotation Sheet</strong>
+          or <strong>Customers → Export Quotation</strong>. A new <strong>Draft order</strong> will be created automatically.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">Customer <span style="color:#f87171">*</span></label>
+          <select id="importCustomerId" class="form-select" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
+            <option value="">— Select customer —</option>
+            {% for customer in customers %}
+            <option value="{{ customer.id }}">{{ customer.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Excel File (.xlsx) <span style="color:#f87171">*</span></label>
+          <input type="file" id="importExcelFile" class="form-control" accept=".xlsx"
+            style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:5px;">
+            <i class="bi bi-info-circle me-1"></i>Fill in the <strong>Quantity</strong> or <strong>Order Qty</strong> column before importing.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-glow" id="importQuotationBtn" onclick="importQuotationExcel(this)">
+          <i class="bi bi-upload me-1"></i> Import &amp; Create Draft
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -84,6 +389,7 @@
       </div>
       <div class="modal-body">
         <form id="addOrderForm" class="form-glass">
+          {% csrf_token %}
           <div class="mb-3">
             <label class="form-label">Customer</label>
             <select name="customer_id" class="form-select" required>
@@ -94,40 +400,95 @@
             </select>
           </div>
 
-          <label class="form-label">Order Items</label>
-          <div id="orderItemsContainer">
-              <div class="order-item-row">
-                  <div class="form-group">
-                      <label class="form-label" style="font-size:11px">Product</label>
-                      <select name="product_id" class="form-select" required>
-                          <option value="">Select product...</option>
-                          {% for product in products %}
-                          <option value="{{ product.id }}" data-price="{{ product.price }}">{{ product.name }} — AED {{ product.price }}</option>
-                          {% endfor %}
-                      </select>
-                  </div>
-                  <div class="form-group" style="max-width:120px">
-                      <label class="form-label" style="font-size:11px">Quantity</label>
-                      <input type="number" name="quantity" class="form-control" min="1" value="1" required>
-                  </div>
-                  <button type="button" class="remove-item-btn" onclick="this.closest('.order-item-row').remove()" title="Remove">
-                      <i class="bi bi-x-circle"></i>
-                  </button>
-              </div>
+          <label class="form-label">Shipments</label>
+          <div class="small text-secondary mb-2">Create one or more shipments. Each shipment can contain multiple products and has its own CBM total.</div>
+          <div id="addShipmentsContainer">
           </div>
 
-          <button type="button" class="btn-ghost btn-sm mt-2 mb-3" onclick="addOrderItemRow()">
-              <i class="bi bi-plus"></i> Add Item
+          <button type="button" class="btn-ghost btn-sm mt-2 mb-3" onclick="addShipmentBlock()">
+              <i class="bi bi-plus"></i> Add Shipment
           </button>
 
+          <hr style="border-color:var(--border-color);margin:8px 0 16px;">
+
+          <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ currency }})</label>
+                            <input type="number" id="addShippingCost" class="form-control" step="0.01" min="0" value="0" placeholder="0.00" readonly style="background:var(--bg-input);opacity:0.8;">
+                            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Auto-summed from per-shipment costs</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-plus-circle me-1"></i>Other Costs</label>
+                            <div id="addExtraCostsContainer"></div>
+                            <button type="button" class="btn btn-sm mt-1" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:6px;font-size:12px;" onclick="addExtraCostRow('add')"><i class="bi bi-plus"></i> Add Cost</button>
+                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="addExtraCostTotal">0.00</strong> {{ currency }}</span>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+              <label class="form-label" style="font-size:12px"><i class="bi bi-percent me-1"></i>Commission %</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="number" name="commission_percentage" id="addCommissionPct" class="form-control" step="0.01" min="0" max="100" value="{{ default_commission_pct }}" oninput="updateCommissionPreview('addCommissionPct','addCommissionPreview')">
+                <span id="addCommissionPreview" style="font-size:12px;color:var(--accent-3);white-space:nowrap;">= 0</span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:12px"><i class="bi bi-box-seam me-1"></i>Total Weight (KG)
+                <button type="button" id="weightLockBtn" onclick="toggleWeightLock('orderTotalWeight','weightLockBtn')" title="Toggle manual override" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0 4px;font-size:13px;"><i class="bi bi-lock-fill"></i></button>
+              </label>
+              <input type="number" name="total_weight" id="orderTotalWeight" class="form-control" step="0.001" min="0" value="0" placeholder="Auto-calculated" readonly style="background:var(--bg-input);opacity:0.8;" oninput="handleWeightInput('add')">
+            </div>
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-bounding-box me-1"></i>Total CBM</label>
+                            <input type="number" name="total_cbm" id="orderTotalCbm" class="form-control" step="0.001" min="0" value="0" readonly style="background:var(--bg-input);opacity:0.8;">
+                        </div>
+          </div>
+                    <div class="alert alert-info py-2 mb-3" style="background:rgba(13,202,240,.08);border-color:rgba(13,202,240,.2);color:var(--text-primary);">
+                        Weight, CBM and volumetric weight are entered manually for each shipment.
+                    </div>
+
+          <input type="hidden" name="status" id="orderStatus" value="confirmed">
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12px"><i class="bi bi-sticky me-1"></i>Notes <span style="color:var(--text-secondary);font-weight:400;">(private, not on invoice)</span></label>
+            <textarea name="notes" id="addNotes" class="form-control" rows="2" placeholder="Internal notes about this order..."></textarea>
+          </div>
+
+          <div class="mb-3 form-check">
+            <input class="form-check-input" type="checkbox" name="show_shipping_details" id="addShowShipping" value="true" checked>
+            <label class="form-check-label" for="addShowShipping" style="font-size:13px">
+              <i class="bi bi-eye me-1"></i>Show shipping details to customer
+            </label>
+            <div style="font-size:11px;color:var(--text-secondary);margin-left:1.5rem;">When unchecked, customer only sees subtotal and grand total.</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Shipping Companies <span style="color:var(--text-secondary);font-weight:400;">(optional, select multiple)</span></label>
+            {% if shipping_companies %}
+            <div style="max-height:120px;overflow-y:auto;border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;background:var(--bg-input);">
+              {% for sc in shipping_companies %}
+              <div class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" name="shipping_company_id" value="{{ sc.id }}" id="addSC{{ sc.id }}">
+                <label class="form-check-label" for="addSC{{ sc.id }}" style="font-size:13px;">{{ sc.name }}{% if sc.website %} <span style="color:var(--text-secondary);font-size:11px;">— {{ sc.website }}</span>{% endif %}</label>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div style="font-size:12px;color:var(--text-secondary);">No shipping companies configured. <a href="/settings/" target="_blank">Add them in Settings</a>.</div>
+            {% endif %}
+          </div>
+
           <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Create Order</button>
+          <button type="button" class="btn-ghost w-100 mt-2" onclick="document.getElementById('orderStatus').value='draft';document.getElementById('addOrderForm').requestSubmit()">
+              <i class="bi bi-pencil-square"></i> Save as Draft
+          </button>
         </form>
       </div>
     </div>
   </div>
 </div>
 
-<!-- View Order Modal -->
 <div class="modal fade" id="viewOrderModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -142,18 +503,690 @@
   </div>
 </div>
 
+<div class="modal fade" id="editOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Order <span id="editOrderTitle"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editOrderForm" class="form-glass">
+          {% csrf_token %}
+          <input type="hidden" name="status" id="editOrderStatus" value="confirmed">
+          <div class="mb-3">
+            <label class="form-label">Customer</label>
+            <select name="customer_id" id="editCustomerSelect" class="form-select" required>
+              <option value="">Select a customer...</option>
+              {% for customer in customers %}
+              <option value="{{ customer.id }}">{{ customer.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <label class="form-label">Shipments</label>
+          <div id="editShipmentsContainer"></div>
+          <button type="button" class="btn-ghost btn-sm mt-2 mb-3" onclick="addEditShipmentBlock()">
+              <i class="bi bi-plus"></i> Add Shipment
+          </button>
+          <hr style="border-color:var(--border-color);margin:8px 0 16px;">
+          <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ currency }})</label>
+                            <input type="number" id="editShipping" class="form-control" step="0.01" min="0" value="0" placeholder="0.00" readonly style="background:var(--bg-input);opacity:0.8;">
+                            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Auto-summed from per-shipment costs</div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-plus-circle me-1"></i>Other Costs</label>
+                            <div id="editExtraCostsContainer"></div>
+                            <button type="button" class="btn btn-sm mt-1" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:6px;font-size:12px;" onclick="addExtraCostRow('edit')"><i class="bi bi-plus"></i> Add Cost</button>
+                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="editExtraCostTotal">0.00</strong> {{ currency }}</span>
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+              <label class="form-label" style="font-size:12px"><i class="bi bi-percent me-1"></i>Commission %</label>
+              <div class="d-flex align-items-center gap-2">
+                <input type="number" name="commission_percentage" id="editCommissionPct" class="form-control" step="0.01" min="0" max="100" value="0" oninput="updateCommissionPreview('editCommissionPct','editCommissionPreview')">
+                <span id="editCommissionPreview" style="font-size:12px;color:var(--accent-3);white-space:nowrap;">= 0</span>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" style="font-size:12px"><i class="bi bi-box-seam me-1"></i>Total Weight (KG)
+                <button type="button" id="editWeightLockBtn" onclick="toggleWeightLock('editTotalWeight','editWeightLockBtn')" title="Toggle manual override" style="background:none;border:none;cursor:pointer;color:var(--text-secondary);padding:0 4px;font-size:13px;"><i class="bi bi-lock-fill"></i></button>
+              </label>
+              <input type="number" name="total_weight" id="editTotalWeight" class="form-control" step="0.001" min="0" value="0" readonly style="background:var(--bg-input);opacity:0.8;" oninput="handleWeightInput('edit')">
+            </div>
+                        <div class="col-md-4">
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-bounding-box me-1"></i>Total CBM</label>
+                            <input type="number" name="total_cbm" id="editTotalCbm" class="form-control" step="0.001" min="0" value="0" readonly style="background:var(--bg-input);opacity:0.8;">
+                        </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Shipping Companies <span style="color:var(--text-secondary);font-weight:400;">(optional, select multiple)</span></label>
+            {% if shipping_companies %}
+            <div id="editSCContainer" style="max-height:120px;overflow-y:auto;border:1px solid var(--border-color);border-radius:6px;padding:8px 10px;background:var(--bg-input);">
+              {% for sc in shipping_companies %}
+              <div class="form-check mb-1">
+                <input class="form-check-input edit-sc-check" type="checkbox" name="shipping_company_id" value="{{ sc.id }}" id="editSC{{ sc.id }}">
+                <label class="form-check-label" for="editSC{{ sc.id }}" style="font-size:13px;">{{ sc.name }}{% if sc.website %} <span style="color:var(--text-secondary);font-size:11px;">— {{ sc.website }}</span>{% endif %}</label>
+              </div>
+              {% endfor %}
+            </div>
+            {% else %}
+            <div style="font-size:12px;color:var(--text-secondary);">No shipping companies configured. <a href="/settings/" target="_blank">Add them in Settings</a>.</div>
+            {% endif %}
+          </div>
+
+          <input type="hidden" name="payment_status" id="editPaymentStatusHidden" value="unpaid">
+
+          <div class="mb-3">
+            <label class="form-label" style="font-size:12px"><i class="bi bi-sticky me-1"></i>Notes <span style="color:var(--text-secondary);font-weight:400;">(private, not on invoice)</span></label>
+            <textarea name="notes" id="editNotes" class="form-control" rows="2" placeholder="Internal notes about this order..."></textarea>
+          </div>
+
+          <div class="mb-3 form-check">
+            <input class="form-check-input" type="checkbox" name="show_shipping_details" id="editShowShipping" value="true" checked>
+            <label class="form-check-label" for="editShowShipping" style="font-size:13px">
+              <i class="bi bi-eye me-1"></i>Show shipping details to customer
+            </label>
+            <div style="font-size:11px;color:var(--text-secondary);margin-left:1.5rem;">When unchecked, customer only sees subtotal and grand total.</div>
+          </div>
+
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Changes</button>
+          <button type="button" class="btn-ghost w-100 mt-2" onclick="document.getElementById('editOrderStatus').value='draft';document.getElementById('editOrderForm').requestSubmit()">
+              <i class="bi bi-pencil-square"></i> Save as Draft
+          </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
+<style>
+.product-dropdown-item:hover { background: var(--accent-3) !important; color: #fff !important; }
+.product-search-input { cursor: text; }
+.btn-payment-toggle { background: none; border: none; cursor: pointer; padding: 2px 6px; border-radius: 6px; font-size: 12px; white-space: nowrap; }
+.btn-payment-toggle:hover { background: rgba(255,255,255,0.06); }
+.filter-chip { background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-secondary); border-radius: 20px; padding: 4px 12px; font-size: 12px; cursor: pointer; transition: all .15s; white-space: nowrap; }
+.filter-chip:hover { border-color: var(--accent-3); color: var(--text-primary); }
+.filter-chip.active { background: var(--accent-3); border-color: var(--accent-3); color: #fff; font-weight: 600; }
+.filter-chip-count { background: rgba(0,0,0,.25); border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 3px; }
+</style>
 <script>
-setupTableSearch('orderSearch', 'ordersTable');
+var CURRENCY = '{{ currency }}';
+var SHIPPING_COMPANIES_DATA = {{ shipping_companies_json|safe }};
+var SHIPPING_RATES = {
+    standard: {
+        air: parseFloat('{{ air_shipping_rate|default:"0" }}') || 0,
+        sea: parseFloat('{{ sea_shipping_rate|default:"0" }}') || 0,
+        ksa_air: parseFloat('{{ ksa_air_shipping_rate|default:"0" }}') || 0,
+        ksa_sea: parseFloat('{{ ksa_sea_shipping_rate|default:"0" }}') || 0,
+        ksa: parseFloat('{{ ksa_shipping_rate|default:"0" }}') || 0
+    },
+    no_brand_battery: {
+        air: parseFloat('{{ nbb_air_shipping_rate|default:"0" }}') || 0,
+        sea: parseFloat('{{ nbb_sea_shipping_rate|default:"0" }}') || 0,
+        ksa_air: parseFloat('{{ nbb_ksa_air_shipping_rate|default:"0" }}') || 0,
+        ksa_sea: parseFloat('{{ nbb_ksa_sea_shipping_rate|default:"0" }}') || 0,
+        ksa: parseFloat('{{ nbb_ksa_sea_shipping_rate|default:"0" }}') || 0
+    }
+};
+var _activeOrderFilter = 'all';
 
-function addOrderItemRow() {
-    var container = document.getElementById('orderItemsContainer');
-    var row = container.querySelector('.order-item-row').cloneNode(true);
-    row.querySelector('select').value = '';
-    row.querySelector('input').value = '1';
+function setOrderFilter(filter, btn) {
+    _activeOrderFilter = filter;
+    document.querySelectorAll('.filter-chip').forEach(function(c) { c.classList.remove('active'); });
+    if (btn) btn.classList.add('active');
+    applyOrderFilters();
+}
+
+// Applies the status/payment chips to the rows on the current page. Text search is
+// handled server-side by the GET form, so it is not repeated here.
+function applyOrderFilters() {
+    var rows = document.querySelectorAll('#ordersTable tbody tr');
+    rows.forEach(function(row) {
+        if (!row.hasAttribute('data-order-id')) { row.style.display = ''; return; }
+        var matchFilter = true;
+        if (_activeOrderFilter === 'status:draft') matchFilter = row.getAttribute('data-order-status') === 'draft';
+        else if (_activeOrderFilter === 'status:confirmed') matchFilter = row.getAttribute('data-order-status') === 'confirmed';
+        else if (_activeOrderFilter === 'payment:unpaid') matchFilter = row.getAttribute('data-payment-status') === 'unpaid';
+        else if (_activeOrderFilter === 'payment:partial') matchFilter = row.getAttribute('data-payment-status') === 'partial';
+        else if (_activeOrderFilter === 'payment:paid') matchFilter = row.getAttribute('data-payment-status') === 'paid';
+        row.style.display = matchFilter ? '' : 'none';
+    });
+}
+
+function handleWeightInput(prefix) {
+    recalcShipmentTotals(prefix);
+}
+
+function toggleWeightLock(inputId, btnId) {
+    var input = document.getElementById(inputId);
+    var btn = document.getElementById(btnId);
+    var icon = btn.querySelector('i');
+    if (input.readOnly) {
+        // Unlock — allow manual entry
+        input.readOnly = false;
+        input.style.opacity = '1';
+        input.style.background = 'var(--bg-input)';
+        input.style.borderColor = 'var(--accent-3)';
+        icon.className = 'bi bi-unlock-fill';
+        btn.style.color = 'var(--accent-3)';
+        input.focus();
+    } else {
+        // Lock — go back to auto-calc
+        input.readOnly = true;
+        input.style.opacity = '0.8';
+        input.style.borderColor = '';
+        icon.className = 'bi bi-lock-fill';
+        btn.style.color = 'var(--text-secondary)';
+        // Trigger recalc to restore computed value
+        if (inputId === 'orderTotalWeight') recalcTotalWeight();
+        else recalcEditWeight();
+    }
+}
+
+function syncShipmentName(inputEl) {
+    var block = inputEl.closest('.shipment-block');
+    if (!block) return;
+    block.querySelectorAll('.shipment-name-field').forEach(function(el) { el.value = inputEl.value; });
+}
+
+function syncShipmentCompany(selectEl) {
+    var block = selectEl.closest('.shipment-block');
+    if (!block) return;
+    var val = selectEl.value && selectEl.value !== '0' ? selectEl.value : '';
+    block.querySelectorAll('.shipment-company-field').forEach(function(el) { el.value = val; });
+}
+
+function syncShipmentMethod(selectEl) {
+    var block = selectEl.closest('.shipment-block');
+    if (!block) return;
+    var val = selectEl.value || 'manual';
+    block.querySelectorAll('.shipment-method-field').forEach(function(el) { el.value = val; });
+    recalcShipmentTotals(block.closest('#editShipmentsContainer') ? 'edit' : 'add');
+}
+
+function syncCargoType(selectEl) {
+    var block = selectEl.closest('.shipment-block');
+    if (!block) return;
+    var val = selectEl.value || 'standard';
+    block.querySelectorAll('.cargo-type-field').forEach(function(el) { el.value = val; });
+    recalcShipmentTotals(block.closest('#editShipmentsContainer') ? 'edit' : 'add');
+}
+
+function syncShipmentVolumetricWeight(inputEl) {
+    var block = inputEl.closest('.shipment-block');
+    if (!block) return;
+    var val = inputEl.value || '0';
+    block.querySelectorAll('.shipment-vol-weight-field').forEach(function(el) { el.value = parseFloat(val).toFixed(3); });
+}
+
+function syncItemCheck(checkbox) {
+    var row = checkbox.closest('.order-item-row');
+    if (!row) return;
+    var hidden = row.querySelector('.item-checked-field');
+    if (hidden) hidden.value = checkbox.checked ? '1' : '0';
+}
+
+function syncShipmentShippingCostToItems(block) {
+    var costInput = block.querySelector('.shipment-shipping-cost-input');
+    var cost = costInput ? (parseFloat(costInput.value) || 0) : 0;
+    block.querySelectorAll('.shipment-shipping-cost-field').forEach(function(el) { el.value = cost.toFixed(2); });
+    var calcCostEl = block.querySelector('.shipment-calc-cost');
+    if (calcCostEl) calcCostEl.textContent = cost.toFixed(2);
+}
+
+function onManualShipmentCostInput(el) {
+    var block = el.closest('.shipment-block');
+    if (block) {
+        syncShipmentShippingCostToItems(block);
+        syncShipmentsTotalShipping(block);
+    }
+}
+
+function calcAndDisplayShipment(block) {
+    if (!block) return 0;
+    syncShipmentShippingCostToItems(block);
+    var costInput = block.querySelector('.shipment-shipping-cost-input');
+    return costInput ? (parseFloat(costInput.value) || 0) : 0;
+}
+
+function addExtraCostRow(prefix, amount, reason) {
+    var container = document.getElementById(prefix + 'ExtraCostsContainer');
+    var row = document.createElement('div');
+    row.className = 'extra-cost-row d-flex gap-2 mb-2 align-items-center';
+    row.innerHTML = '<input type="number" name="extra_cost_amount" class="form-control form-control-sm" style="max-width:140px" step="0.01" min="0" value="' + (parseFloat(amount) || 0).toFixed(2) + '" placeholder="0.00" oninput="syncExtraCostTotal(\'' + prefix + '\')">' +
+        '<input type="text" name="extra_cost_reason" class="form-control form-control-sm" placeholder="Reason (e.g. Customs, Handling...)" maxlength="255" value="' + ((reason || '').replace(/"/g, '&quot;')) + '">' +
+        '<button type="button" class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 9px;flex-shrink:0;" onclick="removeExtraCostRow(this)"><i class="bi bi-x"></i></button>';
     container.appendChild(row);
+    syncExtraCostTotal(prefix);
+}
+
+function removeExtraCostRow(btn) {
+    var row = btn.closest('.extra-cost-row');
+    var container = row.parentElement;
+    var prefix = container.id.startsWith('add') ? 'add' : 'edit';
+    row.remove();
+    syncExtraCostTotal(prefix);
+}
+
+function syncExtraCostTotal(prefix) {
+    var container = document.getElementById(prefix + 'ExtraCostsContainer');
+    var totalEl = document.getElementById(prefix + 'ExtraCostTotal');
+    var total = 0;
+    if (container) {
+        container.querySelectorAll('input[name=extra_cost_amount]').forEach(function(el) {
+            total += parseFloat(el.value) || 0;
+        });
+    }
+    if (totalEl) totalEl.textContent = total.toFixed(2);
+}
+
+function syncShipmentsTotalShipping(blockOrPrefix) {
+    var prefix;
+    if (typeof blockOrPrefix === 'string') {
+        prefix = blockOrPrefix;
+    } else {
+        var addCont = document.getElementById('addShipmentsContainer');
+        prefix = addCont && addCont.contains(blockOrPrefix) ? 'add' : 'edit';
+    }
+    var container = document.getElementById(prefix === 'add' ? 'addShipmentsContainer' : 'editShipmentsContainer');
+    var costField = document.getElementById(prefix === 'add' ? 'addShippingCost' : 'editShipping');
+    if (!container || !costField) return;
+    var total = 0;
+    container.querySelectorAll('.shipment-block').forEach(function(block) {
+        total += calcAndDisplayShipment(block);
+    });
+    costField.value = total.toFixed(2);
+
+    // Update landed badges per shipment (matches invoice calculation)
+    container.querySelectorAll('.shipment-block').forEach(function(block) {
+        var costInput = block.querySelector('.shipment-shipping-cost-input');
+        var shipmentCost = costInput ? (parseFloat(costInput.value) || 0) : 0;
+        var shipmentUnits = 0;
+        block.querySelectorAll('.order-item-row').forEach(function(row) {
+            var hid = row.querySelector('.product-id-hidden');
+            if (hid && hid.value) {
+                shipmentUnits += parseFloat(row.querySelector('input[name=quantity]').value) || 0;
+            }
+        });
+        var shipPerUnit = (shipmentUnits > 0 && shipmentCost > 0) ? (shipmentCost / shipmentUnits) : 0;
+
+        block.querySelectorAll('.order-item-row').forEach(function(row) {
+            var hid = row.querySelector('.product-id-hidden');
+            var badge = row.querySelector('.landed-badge');
+            var valEl = row.querySelector('.landed-val');
+            if (!badge || !valEl) return;
+            if (hid && hid.value) {
+                var price = parseFloat(hid.getAttribute('data-price')) || 0;
+                valEl.textContent = CURRENCY + ' ' + (price + shipPerUnit).toFixed(2);
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        });
+    });
+}
+
+function recalcTotalWeight() {
+    recalcShipmentTotals('add');
+}
+
+function updateWeightBadge(hiddenEl) {
+    // Auto weight/CBM calculation from product data is disabled for now.
+    var prefix = hiddenEl.closest('#editShipmentsContainer') ? 'edit' : 'add';
+    recalcShipmentTotals(prefix);
+}
+
+function createOrderItemRow(shipmentNo, selectedProductId, quantity, isChecked) {
+    var selectedLabel = '';
+    var selectedData = '';
+    var checkedAttr = isChecked ? ' checked' : '';
+    if (selectedProductId) {
+        var sp = PRODUCTS.find(function(p) { return p.id == selectedProductId; });
+        if (sp) {
+            selectedLabel = sp.name + ' — ' + CURRENCY + ' ' + sp.price + (sp.weight ? ' (' + sp.weight + ' KG ctn)' : '');
+            selectedData = 'value="' + sp.id + '" data-price="' + sp.price + '" data-weight="' + (sp.weight||'') + '" data-carton-qty="' + (sp.carton_qty||'') + '" data-carton-length="' + (sp.carton_length||'') + '" data-carton-width="' + (sp.carton_width||'') + '" data-carton-height="' + (sp.carton_height||'') + '"';
+        }
+    }
+    return '<div class="order-item-row">' +
+        '<div class="form-group" style="max-width:36px;text-align:center;">' +
+        '<label class="form-label" style="font-size:11px"><i class="bi bi-check-square"></i></label>' +
+        '<input type="checkbox" class="form-check-input item-check" style="margin-top:8px;" title="Mark as checked"' + checkedAttr + ' onchange="syncItemCheck(this)">' +
+        '<input type="hidden" name="is_checked" class="item-checked-field" value="' + (isChecked ? '1' : '0') + '">' +
+        '</div>' +
+        '<div class="form-group">' +
+        '<label class="form-label" style="font-size:11px">Product</label>' +
+        '<div class="product-picker" style="position:relative;">' +
+        '<input type="text" class="form-control product-search-input" placeholder="Search product..." autocomplete="off" value="' + selectedLabel.replace(/"/g,'&quot;') + '" oninput="filterProductDropdown(this)" onfocus="openProductDropdown(this)" onblur="closeProductDropdown(this)">' +
+        '<div class="product-dropdown" style="display:none;position:absolute;z-index:9999;background:var(--bg-card);border:1px solid var(--border-color);border-radius:6px;width:100%;max-height:200px;overflow-y:auto;box-shadow:0 4px 16px rgba(0,0,0,0.18);top:100%;left:0;"></div>' +
+        '<input type="hidden" name="product_id" class="product-id-hidden" ' + selectedData + ' required>' +
+        '</div>' +
+        '<span class="weight-badge" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;"><i class="bi bi-box-seam"></i> Weight/pc: <strong class="weight-val"></strong> KG</span>' +
+        '<span class="cbm-badge" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;"><i class="bi bi-bounding-box"></i> CBM: <strong class="cbm-val"></strong></span>' +
+        '<span class="landed-badge" style="display:none;font-size:11px;color:var(--accent-3);margin-top:4px;font-weight:600;"><i class="bi bi-tag"></i> Landed: <strong class="landed-val"></strong>/pc</span>' +
+        '</div>' +
+        '<div class="form-group" style="max-width:120px">' +
+        '<label class="form-label" style="font-size:11px">Quantity</label>' +
+        '<input type="number" name="quantity" class="form-control" min="1" value="' + (quantity || 1) + '" required oninput="recalcAllShipments()">' +
+        '</div>' +
+        '<input type="hidden" name="shipment_no" value="' + shipmentNo + '">' +
+        '<input type="hidden" name="shipment_name" class="shipment-name-field" value="">' +
+        '<input type="hidden" name="shipment_method" class="shipment-method-field" value="manual">' +
+        '<input type="hidden" name="cargo_type" class="cargo-type-field" value="standard">' +
+        '<input type="hidden" name="shipment_cbm" class="shipment-cbm-field" value="0.000">' +
+        '<input type="hidden" name="shipment_weight" class="shipment-weight-field" value="0.000">' +
+        '<input type="hidden" name="shipment_volumetric_weight" class="shipment-vol-weight-field" value="0.000">' +
+        '<input type="hidden" name="shipment_company_id" class="shipment-company-field" value="">' +
+        '<input type="hidden" name="shipment_shipping_cost" class="shipment-shipping-cost-field" value="0.00">' +
+        '<button type="button" class="remove-item-btn" onclick="this.closest(\'.order-item-row\').remove();recalcAllShipments();" title="Remove">' +
+        '<i class="bi bi-x-circle"></i>' +
+        '</button>' +
+        '</div>';
+}
+
+function shipmentTemplate(shipmentNo, productId, quantity, shipmentCbm, prefix, shipmentWeight, shipmentName, shipmentMethod, cargoType, volumetricWeight) {
+    var cbmValue = shipmentCbm || '0.000';
+    var weightValue = shipmentWeight || '0.000';
+    var volWeightValue = volumetricWeight || '0.000';
+    var nameValue = (shipmentName || '').replace(/"/g, '&quot;');
+    var methodValue = shipmentMethod || 'manual';
+    var cargoValue = cargoType || 'standard';
+    var formPrefix = prefix || 'add';
+    var methodOptions = [
+        {val:'manual', label:'Manual'},
+        {val:'air', label:'✈ Air'},
+        {val:'sea', label:'🚢 Sea'},
+        {val:'ksa_air', label:'✈ KSA Air'},
+        {val:'ksa_sea', label:'🚢 KSA Sea'},
+        {val:'ksa', label:'🚢 KSA'}
+    ];
+    var cargoOptions = [
+        {val:'standard', label:'Standard'},
+        {val:'no_brand_battery', label:'No Brand Battery'}
+    ];
+    var methodOpts = methodOptions.map(function(o) { return '<option value="' + o.val + '"' + (o.val === methodValue ? ' selected' : '') + '>' + o.label + '</option>'; }).join('');
+    var cargoOpts = cargoOptions.map(function(o) { return '<option value="' + o.val + '"' + (o.val === cargoValue ? ' selected' : '') + '>' + o.label + '</option>'; }).join('');
+    return '<div class="shipment-block glass-card p-3 mb-3" data-shipment-no="' + shipmentNo + '" style="border:1px solid var(--border-color);">' +
+        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<div style="font-weight:700;color:var(--accent-3);">Shipment #' + shipmentNo + '</div>' +
+        '<button type="button" class="btn-danger btn-sm" onclick="removeShipmentBlock(this)">Remove Shipment</button>' +
+        '</div>' +
+        '<div class="row g-2 mb-2">' +
+        '<div class="col-md-6 mb-1">' +
+        '<label class="form-label mb-1" style="font-size:11px;color:var(--text-secondary);">Shipment Name <span style="font-weight:400;">(optional)</span></label>' +
+        '<input type="text" class="form-control form-control-sm shipment-name-input" maxlength="100" placeholder="e.g. Sea Batch 1, Air Express..." value="' + nameValue + '" oninput="syncShipmentName(this)">' +
+        '</div>' +
+        '<div class="col-md-6 mb-1">' +
+        '<label class="form-label mb-1" style="font-size:11px;color:var(--text-secondary);">Shipping Company <span style="font-weight:400;">(optional)</span></label>' +
+        '<select class="form-select form-select-sm shipment-company-select" onchange="syncShipmentCompany(this)">' +
+        (function() { var opts = ''; SHIPPING_COMPANIES_DATA.forEach(function(sc) { opts += '<option value="' + sc.id + '">' + sc.name.replace(/</g,'&lt;').replace(/>/g,'&gt;') + '</option>'; }); return opts; })() +
+        '</select>' +
+        '</div>' +
+        '<div class="col-md-6 mb-1">' +
+        '<label class="form-label mb-1" style="font-size:11px;color:var(--text-secondary);">Shipping Method</label>' +
+        '<select class="form-select form-select-sm shipment-method-select" onchange="syncShipmentMethod(this)">' + methodOpts + '</select>' +
+        '</div>' +
+        '<div class="col-md-6 mb-1">' +
+        '<label class="form-label mb-1" style="font-size:11px;color:var(--text-secondary);">Cargo Type</label>' +
+        '<select class="form-select form-select-sm cargo-type-select" onchange="syncCargoType(this)">' + cargoOpts + '</select>' +
+        '</div>' +
+        '</div>' +
+        '<div class="shipment-manual-cost mb-3 p-2" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-card);">' +
+        '<div class="small fw-bold mb-2" style="color:var(--accent-3);"><i class="bi bi-cash-coin me-1"></i>Shipment Shipping Cost</div>' +
+        '<div class="row g-2 align-items-center">' +
+        '<div class="col-sm-6">' +
+        '<label style="font-size:11px;color:var(--text-secondary);">Manual Shipping Cost (' + CURRENCY + ')</label>' +
+        '<input type="number" class="form-control form-control-sm shipment-shipping-cost-input" min="0" step="0.01" value="0.00" placeholder="0.00" oninput="onManualShipmentCostInput(this)">' +
+        '</div>' +
+        '<div class="col-sm-6 text-end">' +
+        '<div style="font-size:11px;color:var(--text-secondary);">Shipment Shipping</div>' +
+        '<div style="font-size:22px;font-weight:700;color:var(--accent-3);"><strong class="shipment-calc-cost">0.00</strong> ' + CURRENCY + '</div>' +
+        '</div>' +
+        '</div>' +
+        '</div>' +
+        '<div class="shipment-items">' + createOrderItemRow(shipmentNo, productId, quantity) + '</div>' +
+        '<div class="mt-2">' +
+        '<div class="row g-2 mb-2">' +
+        '<div class="col-auto d-flex align-items-center gap-2">' +
+        '<label class="form-label mb-0" style="font-size:11px;white-space:nowrap;">Shipment Weight (KG)</label>' +
+        '<input type="number" class="form-control form-control-sm shipment-weight-input" min="0" step="0.001" value="' + weightValue + '" oninput="recalcShipmentTotals(\'' + formPrefix + '\')" style="max-width:120px;">' +
+        '</div>' +
+        '<div class="col-auto d-flex align-items-center gap-2">' +
+        '<label class="form-label mb-0" style="font-size:11px;white-space:nowrap;">Shipment CBM</label>' +
+        '<input type="number" class="form-control form-control-sm shipment-cbm-input" min="0" step="0.001" value="' + cbmValue + '" oninput="recalcShipmentTotals(\'' + formPrefix + '\')" style="max-width:120px;">' +
+        '</div>' +
+        '<div class="col-auto d-flex align-items-center gap-2">' +
+        '<label class="form-label mb-0" style="font-size:11px;white-space:nowrap;">Vol. Weight (KG)</label>' +
+        '<input type="number" class="form-control form-control-sm shipment-vol-weight-input" min="0" step="0.001" value="' + volWeightValue + '" oninput="syncShipmentVolumetricWeight(this);recalcShipmentTotals(\'' + formPrefix + '\')" style="max-width:120px;">' +
+        '</div>' +
+        '<div class="col-12"><span class="small text-secondary">Weight, CBM and volumetric weight are manual only for now. Leave 0 to leave blank.</span></div>' +
+        '</div>' +
+        '<div class="mb-2 small text-secondary">Actual Weight: <strong class="shipment-actual-weight">0.000</strong> KG &nbsp;·&nbsp; Volumetric: <strong class="shipment-vol-weight">0.000</strong> KG &nbsp;·&nbsp; Chargeable: <strong class="shipment-chargeable-weight">0.000</strong> KG</div>' +
+        '<button type="button" class="btn-ghost btn-sm" onclick="addShipmentItem(this)"><i class="bi bi-plus"></i> Add Product</button>' +
+        '<span class="ms-3 small text-secondary">Shipment CBM: <strong class="shipment-cbm">0.000</strong></span>' +
+        '</div>' +
+        '</div>';
+}
+
+function ensureAddShipmentDefaults() {
+    var container = document.getElementById('addShipmentsContainer');
+    if (!container || container.children.length === 0) {
+        container.innerHTML = shipmentTemplate(1, null, 1, '0.000', 'add', '0.000', '', 'manual', 'standard', '0.000');
+    }
+}
+
+function addShipmentBlock() {
+    var container = document.getElementById('addShipmentsContainer');
+    var nextNo = container.querySelectorAll('.shipment-block').length + 1;
+    container.insertAdjacentHTML('beforeend', shipmentTemplate(nextNo, null, 1, '0.000', 'add', '0.000', '', 'manual', 'standard', '0.000'));
+    var block = container.lastElementChild;
+    var nameInput = block.querySelector('.shipment-name-input');
+    if (nameInput) syncShipmentName(nameInput);
+    recalcAllShipments();
+}
+
+function addEditShipmentBlock() {
+    var container = document.getElementById('editShipmentsContainer');
+    var nextNo = container.querySelectorAll('.shipment-block').length + 1;
+    container.insertAdjacentHTML('beforeend', shipmentTemplate(nextNo, null, 1, '0.000', 'edit', '0.000', '', 'manual', 'standard', '0.000'));
+    var block = container.lastElementChild;
+    var nameInput = block.querySelector('.shipment-name-input');
+    if (nameInput) syncShipmentName(nameInput);
+    recalcAllShipments();
+}
+
+function addShipmentItem(buttonEl) {
+    var shipmentBlock = buttonEl.closest('.shipment-block');
+    var shipmentNo = shipmentBlock.getAttribute('data-shipment-no');
+    shipmentBlock.querySelector('.shipment-items').insertAdjacentHTML('beforeend', createOrderItemRow(shipmentNo, null, 1));
+    // propagate current shipment values to the new row
+    var nameInput = shipmentBlock.querySelector('.shipment-name-input');
+    if (nameInput) syncShipmentName(nameInput);
+    var companySelect = shipmentBlock.querySelector('.shipment-company-select');
+    if (companySelect) syncShipmentCompany(companySelect);
+    var methodSelect = shipmentBlock.querySelector('.shipment-method-select');
+    if (methodSelect) syncShipmentMethod(methodSelect);
+    var cargoSelect = shipmentBlock.querySelector('.cargo-type-select');
+    if (cargoSelect) syncCargoType(cargoSelect);
+    var volInput = shipmentBlock.querySelector('.shipment-vol-weight-input');
+    if (volInput) syncShipmentVolumetricWeight(volInput);
+    recalcAllShipments();
+}
+
+function removeShipmentBlock(buttonEl) {
+    var container = buttonEl.closest('#addShipmentsContainer') || buttonEl.closest('#editShipmentsContainer');
+    var shipmentBlocks = container.querySelectorAll('.shipment-block');
+    if (shipmentBlocks.length <= 1) {
+        showToast('At least one shipment is required', 'error');
+        return;
+    }
+    buttonEl.closest('.shipment-block').remove();
+    recalcAllShipments();
+}
+
+function recalcAllShipments() {
+    recalcShipmentTotals('add');
+    recalcShipmentTotals('edit');
+}
+
+function recalcShipmentTotals(prefix) {
+    var container = document.getElementById(prefix === 'add' ? 'addShipmentsContainer' : 'editShipmentsContainer');
+    var tw = document.getElementById(prefix === 'add' ? 'orderTotalWeight' : 'editTotalWeight');
+    var tc = document.getElementById(prefix === 'add' ? 'orderTotalCbm' : 'editTotalCbm');
+    if (!container || !tw || !tc) return;
+
+    var totalWeight = 0;
+    var totalCbm = 0;
+
+    container.querySelectorAll('.shipment-block').forEach(function(block) {
+        var shipmentCbm = 0;
+        var shipmentWeight = 0;
+        var shipmentVolWeight = 0;
+        var methodSelect = block.querySelector('.shipment-method-select');
+        var method = methodSelect ? methodSelect.value : 'manual';
+        var isAir = (method === 'air' || method === 'ksa_air');
+        var manualShipmentCbmInput = block.querySelector('.shipment-cbm-input');
+        var manualShipmentCbm = manualShipmentCbmInput ? parseFloat(manualShipmentCbmInput.value) || 0 : 0;
+        var manualShipmentWeightInput = block.querySelector('.shipment-weight-input');
+        var manualShipmentWeight = manualShipmentWeightInput ? parseFloat(manualShipmentWeightInput.value) || 0 : 0;
+
+        // Weight, CBM and volumetric weight are manual-only for now
+        // (auto-calculation from product data is disabled).
+        shipmentWeight = manualShipmentWeight;
+        shipmentCbm = manualShipmentCbm;
+        var manualVolWeightInput = block.querySelector('.shipment-vol-weight-input');
+        var manualVolWeight = manualVolWeightInput ? (parseFloat(manualVolWeightInput.value) || 0) : 0;
+        shipmentVolWeight = manualVolWeight;
+        var chargeableWeight = isAir ? Math.max(shipmentWeight, shipmentVolWeight) : shipmentWeight;
+
+        var shipmentCbmEl = block.querySelector('.shipment-cbm');
+        if (shipmentCbmEl) shipmentCbmEl.textContent = shipmentCbm.toFixed(3);
+        block.querySelectorAll('.shipment-cbm-field').forEach(function(field) { field.value = shipmentCbm.toFixed(3); });
+        block.querySelectorAll('.shipment-weight-field').forEach(function(field) { field.value = shipmentWeight.toFixed(3); });
+        var awEl = block.querySelector('.shipment-actual-weight');
+        if (awEl) awEl.textContent = shipmentWeight.toFixed(3);
+        var vwEl = block.querySelector('.shipment-vol-weight');
+        if (vwEl) vwEl.textContent = shipmentVolWeight.toFixed(3);
+        var cwEl = block.querySelector('.shipment-chargeable-weight');
+        if (cwEl) cwEl.textContent = chargeableWeight.toFixed(3);
+        totalWeight += shipmentWeight;
+        totalCbm += shipmentCbm;
+    });
+
+    // Only update weight if it is in auto mode (readOnly = true). When the user
+    // unlocks it for manual entry (readOnly = false) we must not overwrite their value.
+    if (tw.readOnly) tw.value = totalWeight > 0 ? totalWeight.toFixed(3) : '0';
+    tc.value = totalCbm > 0 ? totalCbm.toFixed(3) : '0';
+    syncShipmentsTotalShipping(prefix);
+    updateCommissionPreview(prefix === 'add' ? 'addCommissionPct' : 'editCommissionPct', prefix === 'add' ? 'addCommissionPreview' : 'editCommissionPreview');
+}
+
+// ── Product Picker (searchable dropdown) ──────────────────────────
+function buildProductDropdown(dropdown, query, hiddenField) {
+    var q = (query || '').toLowerCase().trim();
+    var matches = PRODUCTS.filter(function(p) { return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1; });
+    if (matches.length === 0) {
+        dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-secondary);font-size:13px;">No products found</div>';
+    } else {
+        dropdown.innerHTML = matches.map(function(p) {
+            var label = p.name + (p.sku ? ' [' + p.sku + ']' : '') + ' — ' + CURRENCY + ' ' + p.price + (p.weight ? ' (' + p.weight + ' KG ctn)' : '');
+            var selected = hiddenField.value == p.id;
+            return '<div class="product-dropdown-item" style="padding:9px 14px;cursor:pointer;font-size:13px;' + (selected ? 'background:var(--accent-3);color:#fff;' : '') + '" ' +
+                'data-id="' + p.id + '" data-label="' + label.replace(/"/g,'&quot;') + '" ' +
+                'data-price="' + p.price + '" data-weight="' + (p.weight||'') + '" data-carton-qty="' + (p.carton_qty||'') + '" ' +
+                'data-carton-length="' + (p.carton_length||'') + '" data-carton-width="' + (p.carton_width||'') + '" data-carton-height="' + (p.carton_height||'') + '" ' +
+                'onmousedown="selectProductItem(this)">' + label + '</div>';
+        }).join('');
+    }
+    dropdown.style.display = 'block';
+}
+function openProductDropdown(inputEl) {
+    var picker = inputEl.closest('.product-picker');
+    var dropdown = picker.querySelector('.product-dropdown');
+    var hiddenField = picker.querySelector('.product-id-hidden');
+    buildProductDropdown(dropdown, inputEl.value, hiddenField);
+}
+function filterProductDropdown(inputEl) {
+    var picker = inputEl.closest('.product-picker');
+    var dropdown = picker.querySelector('.product-dropdown');
+    var hiddenField = picker.querySelector('.product-id-hidden');
+    // Clear selection if user types
+    hiddenField.value = '';
+    hiddenField.removeAttribute('data-price'); hiddenField.removeAttribute('data-weight'); hiddenField.removeAttribute('data-carton-qty');
+    hiddenField.removeAttribute('data-carton-length'); hiddenField.removeAttribute('data-carton-width'); hiddenField.removeAttribute('data-carton-height');
+    buildProductDropdown(dropdown, inputEl.value, hiddenField);
+}
+function closeProductDropdown(inputEl) {
+    setTimeout(function() {
+        var picker = inputEl.closest('.product-picker');
+        if (picker) picker.querySelector('.product-dropdown').style.display = 'none';
+    }, 180);
+}
+function selectProductItem(itemEl) {
+    var picker = itemEl.closest('.product-picker');
+    var inputEl = picker.querySelector('.product-search-input');
+    var hiddenField = picker.querySelector('.product-id-hidden');
+    var row = picker.closest('.order-item-row') || picker.closest('.form-group');
+    inputEl.value = itemEl.getAttribute('data-label');
+    hiddenField.value = itemEl.getAttribute('data-id');
+    hiddenField.setAttribute('data-price', itemEl.getAttribute('data-price'));
+    hiddenField.setAttribute('data-weight', itemEl.getAttribute('data-weight'));
+    hiddenField.setAttribute('data-carton-qty', itemEl.getAttribute('data-carton-qty'));
+    hiddenField.setAttribute('data-carton-length', itemEl.getAttribute('data-carton-length'));
+    hiddenField.setAttribute('data-carton-width', itemEl.getAttribute('data-carton-width'));
+    hiddenField.setAttribute('data-carton-height', itemEl.getAttribute('data-carton-height'));
+    picker.querySelector('.product-dropdown').style.display = 'none';
+    updateWeightBadge(hiddenField);
+    // Duplicate product warning
+    var selectedId = hiddenField.value;
+    if (selectedId) {
+        var container = picker.closest('#addShipmentsContainer') || picker.closest('#editShipmentsContainer');
+        if (container) {
+            var allHidden = container.querySelectorAll('.product-id-hidden');
+            var count = 0;
+            allHidden.forEach(function(h) { if (h !== hiddenField && h.value === selectedId) count++; });
+            if (count > 0) {
+                var pName = itemEl.getAttribute('data-label').split(' — ')[0];
+                showToast('⚠️ "' + pName + '" is already in this order', 'error');
+            }
+        }
+    }
+}
+// ─────────────────────────────────────────────────────────────────
+
+ensureAddShipmentDefaults();
+
+// Clear add modal extra costs when add modal is opened
+document.getElementById('addOrderModal').addEventListener('show.bs.modal', function() {
+    // Rebuild the shipments container so it always starts with the full template (including company selector)
+    var sc = document.getElementById('addShipmentsContainer');
+    if (sc) { sc.innerHTML = ''; ensureAddShipmentDefaults(); }
+    var c = document.getElementById('addExtraCostsContainer');
+    if (c) c.innerHTML = '';
+    syncExtraCostTotal('add');
+    document.getElementById('addShippingCost').value = '0';
+});
+
+function copyShippingLinks(links) {
+    var text = links.join('\n');
+    navigator.clipboard.writeText(text).then(function() {
+        showToast('Website links copied!', 'success');
+    }).catch(function() {
+        // Fallback for older browsers
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Website links copied!', 'success');
+    });
 }
 
 ajaxSubmit('addOrderForm', '/orders/add/', function() {
@@ -169,14 +1202,409 @@ function viewOrder(orderId) {
         .then(function(data) {
             var html = '<div class="mb-3"><strong>Customer:</strong> ' + data.customer + '</div>';
             html += '<div class="mb-3"><strong>Date:</strong> ' + data.date + '</div>';
-            html += '<table class="table-glass"><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>';
+            html += '<table class="table-glass"><thead><tr><th>Product</th><th>Qty</th><th>Weight(KG)</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>';
             data.items.forEach(function(item) {
-                html += '<tr><td>' + item.product + '</td><td>' + item.quantity + '</td><td>' + item.price + '</td><td style="font-weight:700">' + item.subtotal + '</td></tr>';
+                html += '<tr><td>' + item.product + '</td><td>' + item.quantity + '</td><td>' + (item.weight || '—') + '</td><td>' + item.price + '</td><td style="font-weight:700">' + item.subtotal + '</td></tr>';
             });
             html += '</tbody></table>';
-            html += '<div class="text-end mt-3" style="font-size:20px;font-weight:800;color:var(--accent-3)">Total: AED ' + data.total + '</div>';
+            html += '<div class="text-end mt-3" style="font-size:20px;font-weight:800;color:var(--accent-3)">Total: ' + CURRENCY + ' ' + data.total + '</div>';
+            if (parseFloat(data.shipping_cost) > 0) {
+                html += '<div class="text-end mt-1" style="font-size:15px;color:var(--text-secondary)"><i class="bi bi-truck"></i> Shipping: ' + CURRENCY + ' ' + data.shipping_cost + '</div>';
+            }
+            if (parseFloat(data.other_cost) > 0) {
+                var extraList = data.extra_costs || [];
+                if (extraList.length > 0) {
+                    extraList.forEach(function(ec) {
+                        var label = ec.reason ? ec.reason : 'Other Cost';
+                        html += '<div class="text-end mt-1" style="font-size:15px;color:var(--text-secondary)"><i class="bi bi-plus-circle"></i> ' + label + ': ' + CURRENCY + ' ' + parseFloat(ec.amount).toFixed(2) + '</div>';
+                    });
+                } else {
+                    var otherLabel = 'Other Costs' + (data.other_cost_reason ? ' (' + data.other_cost_reason + ')' : '');
+                    html += '<div class="text-end mt-1" style="font-size:15px;color:var(--text-secondary)"><i class="bi bi-plus-circle"></i> ' + otherLabel + ': ' + CURRENCY + ' ' + data.other_cost + '</div>';
+                }
+            }
+            if (parseFloat(data.commission_amount) > 0) {
+                html += '<div class="text-end mt-1" style="font-size:15px;color:var(--text-secondary)">Commission: ' + CURRENCY + ' ' + data.commission_amount + '</div>';
+            }
+            if (parseFloat(data.total_weight) > 0) {
+                html += '<div class="text-end mt-1" style="font-size:13px;color:var(--text-secondary)"><i class="bi bi-box-seam"></i> Total Weight: ' + data.total_weight + ' KG</div>';
+            }
+            if (parseFloat(data.total_cbm) > 0) {
+                html += '<div class="text-end mt-1" style="font-size:13px;color:var(--text-secondary)"><i class="bi bi-bounding-box"></i> Total CBM: ' + data.total_cbm + '</div>';
+            }
+            // Payment status
+            var payColors = {paid: '#4ade80', partial: '#f59e0b', unpaid: '#f87171'};
+            var payLabel = {paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid'};
+            var pStatus = data.payment_status || 'unpaid';
+            html += '<div class="mt-2" style="font-size:13px;"><span style="color:var(--text-secondary)">Payment: </span><strong style="color:' + payColors[pStatus] + '">' + (payLabel[pStatus] || pStatus) + '</strong></div>';
+            // Notes
+            if (data.notes) {
+                html += '<div class="mt-2 p-2" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-input);"><div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;"><i class="bi bi-sticky me-1"></i>Notes</div><div style="font-size:13px;white-space:pre-wrap;">' + data.notes.replace(/</g,'&lt;') + '</div></div>';
+            }
+            // Shipping companies + copy button
+            if (data.shipping_companies && data.shipping_companies.length > 0) {
+                var scLinks = data.shipping_companies.filter(function(sc) { return sc.website; }).map(function(sc) { return sc.website; });
+                html += '<div class="mt-3 p-2" style="border:1px solid var(--border-color);border-radius:6px;background:var(--bg-input);">';
+                html += '<div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;">Shipping Via</div>';
+                data.shipping_companies.forEach(function(sc) {
+                    html += '<div style="font-size:13px;margin-bottom:3px;"><strong>' + sc.name + '</strong>';
+                    if (sc.website) html += ' &mdash; <a href="' + sc.website + '" target="_blank" rel="noopener noreferrer" style="color:var(--accent-3);font-size:12px;">' + sc.website + '</a>';
+                    html += '</div>';
+                });
+                if (scLinks.length > 0) {
+                    html += '<button type="button" class="btn-ghost btn-sm mt-2" onclick="copyShippingLinks(' + JSON.stringify(scLinks) + ')"><i class="bi bi-clipboard me-1"></i>Copy Website Links</button>';
+                }
+                html += '</div>';
+            }
+            html += '<div class="text-end mt-2"><a class="btn-ghost btn-sm" href="/orders/invoice/' + orderId + '/" target="_blank"><i class="bi bi-printer"></i> Print Invoice</a></div>';
             document.getElementById('orderDetailBody').innerHTML = html;
         });
 }
+
+// ===== Product options HTML for edit modal =====
+var PRODUCTS = [
+  {% for product in products %}
+    {id: {{ product.id }}, name: "{{ product.name|escapejs }}", sku: "{{ product.sku|escapejs }}", price: "{{ product.price }}", weight: "{{ product.weight|default:'' }}", carton_qty: "{{ product.carton_qty|default:'' }}", carton_length: "{{ product.carton_length|default:'' }}", carton_width: "{{ product.carton_width|default:'' }}", carton_height: "{{ product.carton_height|default:'' }}"},
+  {% endfor %}
+];
+
+function buildProductSelect(selectedId, qty) {
+    var opts = '<option value="">Select product...</option>';
+    PRODUCTS.forEach(function(p) {
+        var label = p.name + (p.sku ? ' [' + p.sku + ']' : '') + ' — ' + CURRENCY + ' ' + p.price + (p.weight ? ' (' + p.weight + ' KG)' : '');
+        opts += '<option value="' + p.id + '" data-price="' + p.price + '" data-weight="' + p.weight + '" data-carton-length="' + p.carton_length + '" data-carton-width="' + p.carton_width + '" data-carton-height="' + p.carton_height + '"' + (p.id == selectedId ? ' selected' : '') + '>' + label + '</option>';
+    });
+    return '<div class="order-item-row">' +
+        '<div class="form-group">' +
+        '<label class="form-label" style="font-size:11px">Product</label>' +
+        '<select name="product_id" class="form-select" required onchange="recalcEditWeight()">' + opts + '</select>' +
+        '<span class="cbm-badge" style="display:none;font-size:11px;color:var(--text-secondary);margin-top:4px;"><i class="bi bi-bounding-box"></i> CBM: <strong class="cbm-val"></strong></span>' +
+        '</div>' +
+        '<div class="form-group" style="max-width:120px">' +
+        '<label class="form-label" style="font-size:11px">Quantity</label>' +
+        '<input type="number" name="quantity" class="form-control" min="1" value="' + (qty || 1) + '" required oninput="recalcEditWeight()">' +
+        '</div>' +
+        '<button type="button" class="remove-item-btn" onclick="this.closest(\'.order-item-row\').remove();recalcEditWeight();" title="Remove"><i class="bi bi-x-circle"></i></button>' +
+        '</div>';
+}
+
+function recalcEditWeight() {
+    recalcShipmentTotals('edit');
+}
+
+function getOrderItemsTotal(containerSelector) {
+    var total = 0;
+    document.querySelectorAll(containerSelector + ' .order-item-row').forEach(function(row) {
+        var sel = row.querySelector('select[name=product_id]');
+        var qty = parseFloat(row.querySelector('input[name=quantity]').value) || 0;
+        if (sel && sel.selectedIndex > 0) {
+            var price = parseFloat(sel.options[sel.selectedIndex].getAttribute('data-price')) || 0;
+            total += price * qty;
+        }
+    });
+    return total;
+}
+
+function updateCommissionPreview(pctInputId, previewId) {
+    var pct = parseFloat(document.getElementById(pctInputId).value) || 0;
+    var containerSel = pctInputId === 'addCommissionPct' ? '#addShipmentsContainer' : '#editShipmentsContainer';
+    var productTotal = getOrderItemsTotal(containerSel);
+    var amount = (productTotal * pct / 100).toFixed(2);
+    document.getElementById(previewId).textContent = '= ' + CURRENCY + ' ' + amount;
+}
+
+var currentEditOrderId = null;
+function editOrder(orderId) {
+    currentEditOrderId = orderId;
+    document.getElementById('editOrderTitle').textContent = '#' + orderId;
+    // Reset weight field to auto-calc mode
+    var tw = document.getElementById('editTotalWeight');
+    tw.readOnly = true; tw.style.opacity = '0.8'; tw.style.borderColor = '';
+    var btn = document.getElementById('editWeightLockBtn');
+    btn.querySelector('i').className = 'bi bi-lock-fill'; btn.style.color = 'var(--text-secondary)';
+    document.getElementById('editShipmentsContainer').innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span></div>';
+    var modal = new bootstrap.Modal(document.getElementById('editOrderModal'));
+    modal.show();
+    fetch('/orders/edit/' + orderId + '/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('editCustomerSelect').value = data.customer_id;
+            document.getElementById('editOrderStatus').value = data.status;
+            document.getElementById('editShipping').value = data.shipping_cost;
+            // Restore shipping company checkboxes
+            document.querySelectorAll('.edit-sc-check').forEach(function(cb) {
+                cb.checked = (data.shipping_company_ids || []).indexOf(parseInt(cb.value)) !== -1;
+            });
+            document.getElementById('editOtherCost') && (document.getElementById('editOtherCost').value = data.other_cost || '0');
+            // Restore extra costs
+            var ecContainer = document.getElementById('editExtraCostsContainer');
+            ecContainer.innerHTML = '';
+            var extraCosts = data.extra_costs || [];
+            if (extraCosts.length === 0 && parseFloat(data.other_cost) > 0) {
+                addExtraCostRow('edit', data.other_cost, data.other_cost_reason || '');
+            } else {
+                extraCosts.forEach(function(ec) { addExtraCostRow('edit', ec.amount, ec.reason); });
+            }
+            syncExtraCostTotal('edit');
+            document.getElementById('editCommissionPct').value = data.commission_percentage || '0';
+            var container = document.getElementById('editShipmentsContainer');
+            container.innerHTML = '';
+            var grouped = {};
+            data.items.forEach(function(item) {
+                var shipmentNo = item.shipment_no || 1;
+                if (!grouped[shipmentNo]) grouped[shipmentNo] = [];
+                grouped[shipmentNo].push(item);
+            });
+            var shipmentNos = Object.keys(grouped).sort(function(a, b) { return parseInt(a) - parseInt(b); });
+            if (shipmentNos.length === 0) shipmentNos = ['1'];
+            shipmentNos.forEach(function(shipmentNo) {
+                var firstItem = grouped[shipmentNo][0] || {};
+                container.insertAdjacentHTML('beforeend', shipmentTemplate(parseInt(shipmentNo), null, 1, firstItem.shipment_cbm || '0.000', 'edit', firstItem.shipment_weight || '0.000', firstItem.shipment_name || '', firstItem.shipment_method || 'manual', firstItem.cargo_type || 'standard', firstItem.shipment_volumetric_weight || '0.000'));
+                var block = container.lastElementChild;
+                block.setAttribute('data-shipment-no', shipmentNo);
+                var itemsWrap = block.querySelector('.shipment-items');
+                itemsWrap.innerHTML = '';
+                (grouped[shipmentNo] || []).forEach(function(item) {
+                    itemsWrap.insertAdjacentHTML('beforeend', createOrderItemRow(parseInt(shipmentNo), item.product_id, item.quantity, item.is_checked));
+                });
+                if ((grouped[shipmentNo] || []).length === 0) {
+                    itemsWrap.insertAdjacentHTML('beforeend', createOrderItemRow(parseInt(shipmentNo), null, 1));
+                }
+                // Restore shipment company select
+                var companyId = (firstItem.shipment_company_id || '') + '';
+                var companySelect = block.querySelector('.shipment-company-select');
+                if (companySelect && companyId) {
+                    companySelect.value = companyId;
+                    syncShipmentCompany(companySelect);
+                }
+                // Restore method/cargo selects
+                var methodSelect = block.querySelector('.shipment-method-select');
+                if (methodSelect && firstItem.shipment_method) {
+                    methodSelect.value = firstItem.shipment_method;
+                    syncShipmentMethod(methodSelect);
+                }
+                var cargoSelect = block.querySelector('.cargo-type-select');
+                if (cargoSelect && firstItem.cargo_type) {
+                    cargoSelect.value = firstItem.cargo_type;
+                    syncCargoType(cargoSelect);
+                }
+                // Sync shipment name hidden fields from text input (already set via shipmentTemplate)
+                var nameInput = block.querySelector('.shipment-name-input');
+                if (nameInput) syncShipmentName(nameInput);
+                // Restore per-shipment manual shipping cost
+                var savedShipCost = parseFloat(firstItem.shipment_shipping_cost) || 0;
+                var costInput = block.querySelector('.shipment-shipping-cost-input');
+                if (costInput) costInput.value = savedShipCost.toFixed(2);
+                syncShipmentShippingCostToItems(block);
+                // Restore per-shipment manual volumetric weight
+                var volInput = block.querySelector('.shipment-vol-weight-input');
+                if (volInput) {
+                    var savedVolWeight = parseFloat(firstItem.shipment_volumetric_weight) || 0;
+                    volInput.value = savedVolWeight.toFixed(3);
+                    syncShipmentVolumetricWeight(volInput);
+                }
+            });
+            document.getElementById('editTotalWeight').value = data.total_weight || '0';
+            document.getElementById('editTotalCbm').value = data.total_cbm || '0';
+            // Restore payment status, notes, and customer shipping visibility
+            document.getElementById('editPaymentStatusHidden').value = data.payment_status || 'unpaid';
+            document.getElementById('editNotes').value = data.notes || '';
+            document.getElementById('editShowShipping').checked = data.show_shipping_details !== false;
+            recalcAllShipments();
+            // Re-apply saved weight/CBM after recalcAllShipments(), because recalc
+            // overwrites them with auto-computed product totals even when the user had
+            // saved a custom manual value.
+            if (data.total_weight) document.getElementById('editTotalWeight').value = data.total_weight;
+            if (data.total_cbm) document.getElementById('editTotalCbm').value = data.total_cbm;
+        });
+}
+
+document.getElementById('editOrderForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!currentEditOrderId) return;
+    var data = new FormData(this);
+    var btn = this.querySelector('[type=submit]');
+    btn.disabled = true;
+    fetch('/orders/edit/' + currentEditOrderId + '/', { method: 'POST', body: data })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            btn.disabled = false;
+            if (res.success) {
+                showToast(res.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide();
+                setTimeout(function() { location.reload(); }, 600);
+            } else {
+                showToast(res.message || 'Error saving order', 'error');
+            }
+        }).catch(function() {
+            btn.disabled = false;
+            showToast('Network error', 'error');
+        });
+});
+
+function getCookie(name) {
+    var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : null;
+}
+
+// ===== Quotation Sheet =====
+function filterQuotationProducts(query) {
+    var rows = document.querySelectorAll('.quotation-product-row');
+    var q = query.toLowerCase().trim();
+    var visible = 0;
+    rows.forEach(function(row) {
+        var name = row.getAttribute('data-name') || '';
+        var show = !q || name.includes(q);
+        row.style.display = show ? '' : 'none';
+        if (show) visible++;
+    });
+    document.getElementById('quotationNoProducts').style.display = visible === 0 ? '' : 'none';
+    updateQuotationCount();
+}
+
+function selectAllQuotationProducts(checked) {
+    document.querySelectorAll('.quotation-product-cb').forEach(function(cb) {
+        var row = cb.closest('.quotation-product-row');
+        if (row && row.style.display !== 'none') cb.checked = checked;
+    });
+    updateQuotationCount();
+}
+
+function updateQuotationCount() {
+    var total = document.querySelectorAll('.quotation-product-cb').length;
+    var selected = document.querySelectorAll('.quotation-product-cb:checked').length;
+    var el = document.getElementById('quotationSelectionCount');
+    if (el) el.textContent = selected + ' of ' + total + ' product' + (total !== 1 ? 's' : '') + ' selected';
+}
+
+function validateQuotationForm() {
+    var checked = document.querySelectorAll('.quotation-product-cb:checked').length;
+    if (checked === 0) {
+        showToast('Please select at least one product.', 'error');
+        return false;
+    }
+    return true;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.quotation-product-cb').forEach(function(cb) {
+        cb.addEventListener('change', updateQuotationCount);
+    });
+    updateQuotationCount();
+});
+
+function confirmOrder(orderId) {
+    if (!confirm('Confirm this draft order?')) return;
+    fetch('/orders/confirm/' + orderId + '/', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) setTimeout(function() { location.reload(); }, 600);
+        });
+}
+
+function setPaymentStatus(orderId, newStatus) {
+    var body = new FormData();
+    body.append('status', newStatus);
+    fetch('/orders/payment-status/' + orderId + '/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        var s = data.payment_status;
+        var icons  = {paid: 'bi-check-circle-fill', partial: 'bi-dash-circle-fill', unpaid: 'bi-x-circle-fill'};
+        var colors = {paid: '#4ade80', partial: '#f59e0b', unpaid: '#f87171'};
+        var labels = {paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid'};
+        var drop = document.getElementById('pay-drop-' + orderId);
+        if (!drop) return;
+        var btn = drop.querySelector('.btn-payment-toggle');
+        btn.setAttribute('data-status', s);
+        btn.querySelector('span').innerHTML = '<i class="bi ' + icons[s] + ' me-1"></i>' + labels[s];
+        btn.querySelector('span').style.color = colors[s];
+        // Update active state in dropdown items
+        drop.querySelectorAll('.dropdown-item').forEach(function(a) {
+            a.classList.toggle('active', a.getAttribute('onclick').indexOf("'" + s + "'") !== -1);
+        });
+        // Update row for filter sync
+        var row = btn.closest('tr');
+        if (row) row.setAttribute('data-payment-status', s);
+        applyOrderFilters();
+    });
+}
+function togglePaymentStatus(orderId, btn) { setPaymentStatus(orderId, null); }
+
+function togglePlaced(orderId) {
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+    fetch('/orders/toggle-placed/' + orderId + '/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: body
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        var btn = document.getElementById('placed-btn-' + orderId);
+        if (!btn) return;
+        var isPlaced = data.is_placed;
+        if (isPlaced) {
+            btn.innerHTML = '<span style="color:#4ade80"><i class="bi bi-check-square-fill me-1"></i>Placed</span>';
+            btn.title = 'Order placed with supplier';
+        } else {
+            btn.innerHTML = '<span style="color:var(--text-secondary)"><i class="bi bi-square me-1"></i>Not Placed</span>';
+            btn.title = 'Not yet placed';
+        }
+    });
+}
+
+function duplicateOrder(orderId) {
+    if (!confirm('Duplicate Order #' + orderId + ' as a new Draft?')) return;
+    fetch('/orders/duplicate/' + orderId + '/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')}
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        showToast(data.message, data.success ? 'success' : 'error');
+        if (data.success) setTimeout(function() { location.reload(); }, 700);
+    });
+}
+
+function importQuotationExcel(btn) {
+    var customerId = document.getElementById('importCustomerId').value;
+    var fileInput  = document.getElementById('importExcelFile');
+    if (!customerId) { showToast('Please select a customer.', 'error'); return; }
+    if (!fileInput.files.length) { showToast('Please select an Excel file.', 'error'); return; }
+
+    var formData = new FormData();
+    formData.append('customer_id', customerId);
+    formData.append('excel_file', fileInput.files[0]);
+    formData.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Importing…';
+
+    fetch('/orders/import-quotation/', { method: 'POST', body: formData })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i> Import &amp; Create Draft';
+            showToast(data.message, data.success ? 'success' : 'error');
+            if (data.success) {
+                bootstrap.Modal.getInstance(document.getElementById('importQuotationModal')).hide();
+                setTimeout(function() { location.reload(); }, 700);
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-upload me-1"></i> Import &amp; Create Draft';
+            showToast('Upload failed. Please try again.', 'error');
+        });
+}
 </script>
+
+{% include "includes/pagination.html" with page_obj=page_obj %}
 {% endblock %}

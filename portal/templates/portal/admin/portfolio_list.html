@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Portfolio — Admin{% endblock %}
+{% block nav_portfolio %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-collection-play me-2"></i>Portfolio Management
+    </h1>
+    <p class="text-secondary">Manage images and videos shown on the homepage and portfolio page</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-6">
+        <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="bi bi-collection-play"></i></div>
+            <div class="stat-value">{{ total_count }}</div>
+            <div class="stat-label">Total Items</div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="bi bi-eye"></i></div>
+            <div class="stat-value">{{ active_count }}</div>
+            <div class="stat-label">Active on Website</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Portfolio Items</h5>
+        <a href="{% url 'admin_portfolio_add' %}" class="btn btn-success btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add Item
+        </a>
+    </div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>Order</th>     
+                        <th>Preview</th>   
+                        <th>Title</th>     
+                        <th>Type</th>      
+                        <th>Status</th>    
+                        <th>Added</th>     
+                        <th>Actions</th>   
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.display_order }}</td>
+                        <td>
+                            
+                            {% if item.is_image %}
+                            <img src="{{ item.file.url }}" alt="" class="rounded" style="width:60px;height:40px;object-fit:cover;">
+                            {% else %}
+                            <div class="bg-light border rounded d-flex align-items-center justify-content-center" style="width:60px;height:40px;">
+                                <i class="bi bi-camera-video-fill text-primary"></i>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td class="fw-medium">{{ item.title }}</td>
+                        <td>
+                            {% if item.is_image %}
+                            <span class="badge bg-info">Image</span>
+                            {% else %}
+                            <span class="badge bg-primary">Video</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if item.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ item.created_at|date:"M d, Y" }}</td>
+                        <td>
+                            <a href="{% url 'admin_portfolio_edit' item.id %}" class="btn btn-sm btn-primary me-1">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <form action="{% url 'admin_portfolio_delete' item.id %}" method="post" class="d-inline" onsubmit="return confirm('Delete portfolio item {{ item.title }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                            No portfolio items yet. <a href="{% url 'admin_portfolio_add' %}">Add one</a>.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include "portal/includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}

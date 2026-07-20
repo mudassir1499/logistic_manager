@@ -1,91 +1,1981 @@
 {% extends 'base.html' %}
+
+{% block title %}Products — Logistic Manager{% endblock %}
+{% block nav_products %}active{% endblock %}
+{% block page_title %}Products{% endblock %}
+
+{% block topbar_actions %}
+<a href="/products/catalogue/" target="_blank" class="btn-ghost" style="margin-right:8px;">
+    <i class="bi bi-printer"></i> Print Catalogue
+</a>
+<a href="/products/catalogue-export/" class="btn-ghost" style="margin-right:8px;">
+    <i class="bi bi-file-earmark-excel"></i> Export Excel
+</a>
+<button class="btn-ghost" style="margin-right:8px;" data-bs-toggle="modal" data-bs-target="#bulkUploadModal">
+    <i class="bi bi-upload"></i> Bulk Upload
+</button>
+<button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addProductModal">
+    <i class="bi bi-plus-circle"></i> Add Product
+</button>
+{% endblock %}
+
 {% block content %}
-<h2>Products</h2>
-<button class="btn btn-primary mb-3" onclick="showAddProductModal()">Add Product</button>
-<div id="product-list">
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Name</th>
-                <th>Price</th>
-                <th>MOQ</th>
-                <th>Images</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for product in products %}
-            <tr>
-                <td>{{ product.name }}</td>
-                <td>{{ product.price }}</td>
-                <td>{{ product.moq }}</td>
-                <td>
-                    {% for img in product.images.all %}
-                        <img src="{{ img.image.url }}" width="50" height="50" class="me-1 mb-1"/>
-                    {% endfor %}
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+
+<style>
+.product-list-card {
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    position: relative;
+}
+.product-list-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--accent-3);
+}
+.product-card-check {
+    position: absolute;
+    top: 5px;
+    left: 5px;
+    z-index: 3;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 3px 4px;
+    line-height: 0;
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(4px);
+}
+.product-card-check input { width: 13px; height: 13px; cursor: pointer; margin: 0; accent-color: var(--accent-1); }
+.product-card-media {
+    position: relative;
+    height: 88px;
+    background: var(--bg-input);
+    cursor: pointer;
+    overflow: hidden;
+}
+.product-card-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.2s ease;
+}
+.product-list-card:hover .product-card-img { transform: scale(1.03); }
+.product-card-img-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    color: var(--text-secondary);
+}
+.product-card-view-hint {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+.product-card-media:hover .product-card-view-hint { opacity: 1; }
+.product-card-body { padding: 8px; }
+.product-card-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 1.3;
+    margin-bottom: 4px;
+    cursor: pointer;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    min-height: 28px;
+}
+.product-card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 4px;
+    font-size: 10px;
+}
+.product-card-price { font-weight: 800; color: var(--accent-3); font-size: 11px; }
+.product-card-moq { color: var(--text-secondary); white-space: nowrap; }
+.product-card-badges { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 5px; }
+.product-badge {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 8px;
+    line-height: 1.5;
+}
+.product-badge.draft { background: #f59e0b; color: #fff; }
+.product-badge.private { background: #a78bfa; color: #fff; }
+.product-badge.amazon { background: #ff9900; color: #fff; }
+.product-badge.noon { background: #6c5ce7; color: #fff; }
+.product-badge.complete { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.25); }
+.product-badge.incomplete { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
+.product-card-shipping { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; min-height: 30px; }
+.shipping-chip {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 3px 4px;
+    font-size: 9px;
+    line-height: 1.25;
+    text-align: center;
+}
+.product-card-actions { display: flex; gap: 2px; flex-wrap: nowrap; }
+.product-card-actions .btn-sm { padding: 2px 5px; font-size: 11px; line-height: 1.2; }
+.product-card-actions .btn-sm i { font-size: 11px; }
+#productsGrid, #privateProductsGrid { --bs-gutter-x: 0.5rem; --bs-gutter-y: 0.5rem; }
+.detail-spec-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+.detail-spec-item {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+}
+.detail-spec-label { font-size: 11px; color: var(--text-secondary); margin-bottom: 3px; }
+.detail-spec-value { font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.detail-shipping-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+.detail-shipping-box {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    min-height: 72px;
+}
+.detail-shipping-box.air { border-color: rgba(255, 140, 0, 0.25); }
+.detail-shipping-box.sea { border-color: rgba(56, 189, 248, 0.25); }
+.detail-shipping-box.ksa-air { border-color: rgba(167, 139, 250, 0.25); }
+.detail-shipping-box.ksa-sea { border-color: rgba(52, 211, 153, 0.25); }
+.detail-shipping-title { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+.detail-images { display: flex; flex-wrap: wrap; gap: 8px; }
+.detail-images img {
+    width: 88px;
+    height: 88px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+}
+.detail-main-image {
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+}
+</style>
+
+<div class="row mb-3 g-3 align-items-end">
+    <div class="col-md-4">
+        {% comment %} Submits to the server so the search covers the whole catalogue rather than
+           only the 24 cards on the current page. {% endcomment %}
+        <form method="get" action="" class="search-bar-form">
+            <div class="search-bar">
+                <i class="bi bi-search"></i>
+                <input type="text" id="productSearch" name="q" value="{{ query }}"
+                       class="form-control" placeholder="Search products by name or SKU..."
+                       aria-label="Search products"
+                       style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+                {% if query %}
+                <a href="?" class="search-clear" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+    <div class="col-auto d-flex align-items-end gap-2">
+        <button id="filterAll" onclick="filterByDetails('all')" class="btn-glow" style="font-size:12px;padding:6px 14px;border-radius:20px;">All</button>
+        <button id="filterComplete" onclick="filterByDetails('complete')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#4ade80;border-color:#4ade80;"><i class="bi bi-check-circle me-1"></i>Full Details</button>
+        <button id="filterIncomplete" onclick="filterByDetails('incomplete')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#f59e0b;border-color:#f59e0b;"><i class="bi bi-exclamation-circle me-1"></i>Missing Details</button>
+        <button id="filterAmazon" onclick="filterBySource('amazon')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#ff9900;border-color:#ff9900;">Amazon</button>
+        <button id="filterNoon" onclick="filterBySource('noon')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#6c5ce7;border-color:#6c5ce7;">Noon</button>
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;color:var(--accent-3);font-weight:600;"><i class="bi bi-airplane me-1"></i>Air Rate (per KG)</label>
+        <input type="number" id="airRateInput" class="form-control form-control-sm" style="width:120px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ air_rate }}" oninput="recalcPrices()">
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;color:#38bdf8;font-weight:600;"><i class="bi bi-water me-1"></i>Sea Rate (per CBM)</label>
+        <input type="number" id="seaRateInput" class="form-control form-control-sm" style="width:130px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ sea_rate }}" oninput="recalcPrices()">
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;color:#a78bfa;font-weight:600;"><i class="bi bi-airplane-fill me-1"></i>KSA Air (per KG)</label>
+        <input type="number" id="ksaAirRateInput" class="form-control form-control-sm" style="width:120px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ ksa_air_rate }}" oninput="recalcPrices()">
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;color:#34d399;font-weight:600;"><i class="bi bi-water me-1"></i>KSA Sea (per CBM)</label>
+        <input type="number" id="ksaSeaRateInput" class="form-control form-control-sm" style="width:130px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ ksa_sea_rate }}" oninput="recalcPrices()">
+    </div>
+    <div class="col-auto">
+        <label class="form-label mb-1" style="font-size:11px;color:#4ade80;font-weight:600;"><i class="bi bi-percent me-1"></i>Margin %</label>
+        <input type="number" id="marginInput" class="form-control form-control-sm" style="width:90px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.5" min="0" max="999" value="0" oninput="recalcPrices()">
+    </div>
+    {% if fx_enabled %}
+    <div class="col-auto" style="padding-bottom:6px;">
+        <span style="font-size:11px;color:var(--text-secondary);">Rate: 1 {{ fx_from }} = <strong style="color:var(--accent-3)">{{ fx_rate }} {{ fx_to }}</strong></span>
+    </div>
+    {% endif %}
 </div>
-<!-- Add Product Modal -->
+
+<div id="bulkActionsBar" class="mb-3" style="display:none;padding:12px 16px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);">
+    <div class="d-flex align-items-center flex-wrap gap-2">
+        <span id="bulkSelectedProductsCount" style="font-size:13px;font-weight:700;color:#60a5fa;white-space:nowrap;">0 selected</span>
+        <span style="color:var(--border-color);">|</span>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('save_prices')" title="Save calculated air &amp; sea prices">
+            <i class="bi bi-floppy me-1"></i> Save Prices
+        </button>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('publish')" title="Remove draft status">
+            <i class="bi bi-check-circle me-1" style="color:#4ade80;"></i> Publish
+        </button>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('draft')" title="Mark as draft">
+            <i class="bi bi-file-earmark me-1" style="color:#f59e0b;"></i> Mark Draft
+        </button>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('private')" title="Move to private section">
+            <i class="bi bi-lock me-1" style="color:#a78bfa;"></i> Move to Private
+        </button>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('public')" title="Restore to public list">
+            <i class="bi bi-unlock me-1" style="color:#a78bfa;"></i> Restore Public
+        </button>
+        <button type="button" class="btn-danger btn-sm" onclick="runBulkAction('delete')">
+            <i class="bi bi-trash me-1"></i> Delete
+        </button>
+        <button type="button" class="btn-ghost btn-sm ms-auto" onclick="clearProductSelection()" style="color:var(--text-secondary);">
+            <i class="bi bi-x-lg me-1"></i> Clear
+        </button>
+    </div>
+</div>
+
+<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <input type="checkbox" id="selectAllProducts" onchange="toggleSelectAllProducts('productsGrid', this.checked)" title="Select all visible" style="width:16px;height:16px;cursor:pointer;">
+        <label for="selectAllProducts" style="font-size:13px;color:var(--text-secondary);margin:0;cursor:pointer;">Select all visible</label>
+    </div>
+    {% comment %} Spell out exactly what is on screen — the header count, the filtered count and
+       the private count were three different numbers with no explanation. {% endcomment %}
+    <span style="font-size:12px;color:var(--text-secondary);">
+        Showing {{ page_obj|length }} of {{ public_count }} public{% if private_count %} · {{ private_count }} private{% endif %}{% if query %} · matching “{{ query }}”{% endif %}
+    </span>
+</div>
+<div class="row g-2" id="productsGrid">
+    {% for product in page_obj %}
+    {% include "products/_product_card.html" with product=product is_private=False %}
+    {% empty %}
+    <div class="col-12">
+        <div class="glass-card text-center" style="padding:48px 24px;color:var(--text-secondary);">
+            <i class="bi bi-box-seam" style="font-size:40px;display:block;margin-bottom:12px;opacity:0.4;"></i>
+            No products yet. Click <strong>Add Product</strong> to get started.
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if private_products %}
+<div class="mt-4">
+    <button class="btn-ghost w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
+        style="border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-card);"
+        type="button" data-bs-toggle="collapse" data-bs-target="#privateProductsCollapse" aria-expanded="false">
+        <span style="font-size:14px;font-weight:600;color:var(--text-secondary);">
+            <i class="bi bi-lock-fill me-2" style="color:#a78bfa"></i>Private Products
+            <span style="font-size:12px;background:rgba(167,139,250,0.15);color:#a78bfa;border-radius:10px;padding:2px 8px;margin-left:6px;">{{ private_products|length }}</span>
+        </span>
+        <i class="bi bi-chevron-down" style="color:var(--text-secondary);font-size:12px;"></i>
+    </button>
+    <div class="collapse" id="privateProductsCollapse">
+        <div class="mt-3">
+            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <input type="checkbox" id="selectAllPrivateProducts" onchange="toggleSelectAllProducts('privateProductsGrid', this.checked)" title="Select all visible" style="width:16px;height:16px;cursor:pointer;">
+                    <label for="selectAllPrivateProducts" style="font-size:13px;color:var(--text-secondary);margin:0;cursor:pointer;">Select all visible</label>
+                </div>
+            </div>
+            <div class="row g-2" id="privateProductsGrid">
+                {% for product in private_products %}
+                {% include "products/_product_card.html" with product=product is_private=True %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="modal fade" id="bulkUploadModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border-color);padding:20px 24px;">
+        <div>
+          <h5 class="modal-title" style="font-size:17px;font-weight:700;margin:0;"><i class="bi bi-upload me-2" style="color:var(--accent-3);"></i>Bulk Upload Products</h5>
+          <p style="font-size:12px;color:var(--text-secondary);margin:4px 0 0;">Upload a spreadsheet to create multiple products at once, with optional images.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body" style="padding:24px;">
+
+        
+        <div style="display:flex;gap:3px;margin-bottom:20px;padding:4px;background:rgba(0,0,0,0.2);border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+          <button id="tabBtnSpreadsheet" onclick="switchBulkTab('spreadsheet')" style="flex:1;padding:7px 14px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:var(--accent-3);color:#000;transition:all 0.15s;">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i> Spreadsheet
+          </button>
+          <button id="tabBtnPhotos" onclick="switchBulkTab('photos')" style="flex:1;padding:7px 14px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all 0.15s;">
+            <i class="bi bi-images me-1"></i> From Photos
+          </button>
+          <button id="tabBtn1688" onclick="switchBulkTab('1688')" style="flex:1;padding:7px 14px;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;background:transparent;color:var(--text-secondary);transition:all 0.15s;">
+            <i class="bi bi-bag me-1"></i> 1688 Import
+          </button>
+        </div>
+
+        
+        <div id="tabContentSpreadsheet">
+
+        
+        <div id="bulkStep1">
+          
+          <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding:14px 16px;background:rgba(29,78,216,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);">
+            <i class="bi bi-info-circle-fill" style="color:#3b82f6;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+            <div style="flex:1;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+              Required columns: <code style="color:#f9a8d4;">name</code>, <code style="color:#f9a8d4;">price</code>, <code style="color:#f9a8d4;">moq</code> &nbsp;·&nbsp;
+              Optional: <code>weight</code>, <code>carton_length</code>, <code>carton_width</code>, <code>carton_height</code>, <code>carton_qty</code><br>
+              Accepts <strong>.xlsx</strong> (recommended) or <strong>.csv</strong> files.
+            </div>
+            <a href="/products/bulk-upload-template/" class="btn-glow btn-sm" style="white-space:nowrap;flex-shrink:0;font-size:12px;padding:6px 14px;">
+              <i class="bi bi-download me-1"></i> Download Template
+            </a>
+          </div>
+
+          
+          <div id="bulkDropZone"
+               style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:60px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s,transform 0.15s;"
+               onclick="document.getElementById('bulkCsvInput').click()">
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,140,0,0.1);border:1px solid rgba(255,140,0,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-file-earmark-spreadsheet" style="font-size:34px;color:var(--accent-3);"></i>
+            </div>
+            <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop your spreadsheet here</p>
+            <p style="font-size:12px;color:var(--text-secondary);margin:0;">or click to browse &nbsp;·&nbsp; <span style="color:var(--accent-3);">.xlsx</span> or <span style="color:var(--accent-3);">.csv</span></p>
+            <input type="file" id="bulkCsvInput" accept=".csv,.xlsx" style="display:none;" onchange="handleBulkFileSelect(this)">
+          </div>
+        </div>
+
+        
+        <div id="bulkStep2" style="display:none;">
+
+          
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+              <span id="bulkValidCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(74,222,128,0.12);color:#4ade80;border:1px solid rgba(74,222,128,0.25);">0 valid</span>
+              <span id="bulkSelectedCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);">0 selected</span>
+              <span id="bulkErrorCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);display:none;">0 errors</span>
+              <span id="bulkImgCount"    style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);">0 images</span>
+            </div>
+            <button class="btn-ghost btn-sm" onclick="resetBulkUpload()" style="font-size:12px;">
+              <i class="bi bi-arrow-left me-1"></i> Change File
+            </button>
+          </div>
+
+          
+          <div class="table-responsive" style="max-height:300px;overflow-y:auto;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+            <table class="table-glass" id="bulkPreviewTable" style="margin:0;">
+              <thead>
+                <tr>
+                  <th style="width:42px; text-align:center;">
+                    <input type="checkbox" id="bulkSelectAll" onchange="toggleBulkSelectAll(this.checked)" title="Select all rows" style="width:16px;height:16px;cursor:pointer;">
+                  </th>
+                  <th style="width:40px;">#</th>
+                  <th>Image</th>
+                  <th>Name *</th>
+                  <th>Price *</th>
+                  <th>MOQ *</th>
+                  <th>Weight</th>
+                  <th>L (CM)</th>
+                  <th>W (CM)</th>
+                  <th>H (CM)</th>
+                  <th>Qty/Ctn</th>
+                  <th style="width:90px;">Status</th>
+                </tr>
+              </thead>
+              <tbody id="bulkPreviewBody"></tbody>
+            </table>
+          </div>
+
+          
+          <div style="margin-top:18px;padding:16px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <div>
+                <span style="font-size:13px;font-weight:700;color:#a78bfa;"><i class="bi bi-images me-2"></i>Product Images <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></span>
+              </div>
+              <span style="font-size:11px;color:var(--text-secondary);">Name each image after its product &nbsp;·&nbsp; e.g. <code>Red Widget.jpg</code></span>
+            </div>
+            <div id="bulkImgDropZone"
+                 style="border:1px dashed rgba(167,139,250,0.4);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:background 0.2s,border-color 0.2s;"
+                 onclick="document.getElementById('bulkImgInput').click()">
+              <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:#a78bfa;display:block;margin-bottom:6px;"></i>
+              <p style="font-size:13px;color:var(--text-secondary);margin:0;">Drop images here or click to browse &nbsp;·&nbsp; multiple files supported</p>
+              <input type="file" id="bulkImgInput" accept="image/*" multiple style="display:none;" onchange="handleBulkImages(this.files)">
+            </div>
+            
+            <div id="bulkImgStrip" style="display:none;margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+
+        </div>
+        </div>
+
+        
+        <div id="tabContentPhotos" style="display:none;">
+
+          
+          <div id="photoDropZone"
+               style="border:2px dashed rgba(167,139,250,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
+               onclick="document.getElementById('photoInput').click()">
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-images" style="font-size:34px;color:#a78bfa;"></i>
+            </div>
+            <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop product photos here</p>
+            <p style="font-size:12px;color:var(--text-secondary);margin:0 0 4px;">One photo = one product &nbsp;·&nbsp; name is auto-filled from the filename</p>
+            <p style="font-size:11px;color:var(--text-secondary);margin:0;">Then fill in the price &amp; MOQ for each row</p>
+            <input type="file" id="photoInput" accept="image/*" multiple style="display:none;" onchange="handlePhotosDrop(this.files)">
+          </div>
+
+          
+          <div id="photoTableSection" style="display:none;margin-top:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+              <span id="photoCountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);">0 photos</span>
+              <button class="btn-ghost btn-sm" onclick="clearPhotos()" style="font-size:12px;color:var(--text-secondary);">
+                <i class="bi bi-x-circle me-1"></i> Clear All
+              </button>
+            </div>
+            <div class="table-responsive" style="max-height:360px;overflow-y:auto;overflow-x:auto;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <table class="table-glass" style="margin:0;min-width:860px;">
+                <thead>
+                  <tr>
+                    <th style="width:58px;">Photo</th>
+                    <th>Product Name *</th>
+                    <th style="width:95px;">Price *</th>
+                    <th style="width:75px;">MOQ *</th>
+                    <th style="width:80px;">Weight<br><span style="font-weight:400;font-size:10px;color:var(--text-secondary);">(KG)</span></th>
+                    <th style="width:68px;">L<br><span style="font-weight:400;font-size:10px;color:var(--text-secondary);">(CM)</span></th>
+                    <th style="width:68px;">W<br><span style="font-weight:400;font-size:10px;color:var(--text-secondary);">(CM)</span></th>
+                    <th style="width:68px;">H<br><span style="font-weight:400;font-size:10px;color:var(--text-secondary);">(CM)</span></th>
+                    <th style="width:72px;">Pcs/<br>Ctn</th>
+                    <th style="width:38px;"></th>
+                  </tr>
+                </thead>
+                <tbody id="photoTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        
+        <div id="tabContent1688" style="display:none;">
+
+          
+          <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding:14px 16px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.25);border-radius:var(--radius-sm);">
+            <i class="bi bi-bag-check-fill" style="color:#ef4444;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+            <div style="flex:1;font-size:13px;color:var(--text-secondary);line-height:1.7;">
+              Export your cart from <strong style="color:#fff;">1688.com</strong> or <strong style="color:#fff;">aiprice.com</strong> as a CSV, then upload it here.<br>
+              Product names, <strong style="color:#fff;">¥ RMB prices</strong>, MOQ and product images will be imported automatically.
+            </div>
+          </div>
+
+          
+          <div id="alibaba1688DropZone"
+               style="border:2px dashed rgba(239,68,68,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
+               onclick="document.getElementById('alibaba1688Input').click()">
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-bag" style="font-size:34px;color:#ef4444;"></i>
+            </div>
+            <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop your 1688 CSV here</p>
+            <p style="font-size:12px;color:var(--text-secondary);margin:0 0 4px;">Exported from 1688.com cart or aiprice.com</p>
+            <p id="alibaba1688FileName" style="font-size:12px;color:#ef4444;margin:8px 0 0;display:none;font-weight:600;"></p>
+            <input type="file" id="alibaba1688Input" accept=".csv" style="display:none;" onchange="handle1688FileSelect(this)">
+          </div>
+
+          
+          <div id="alibaba1688PreviewSection" style="display:none;margin-top:20px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+              <span id="alibaba1688CountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);">0 products</span>
+              <button class="btn-ghost btn-sm" onclick="clear1688()" style="font-size:12px;color:var(--text-secondary);">
+                <i class="bi bi-x-circle me-1"></i> Clear
+              </button>
+            </div>
+            <div class="table-responsive" style="max-height:320px;overflow-y:auto;border-radius:var(--radius-sm);border:1px solid var(--border-color);">
+              <table class="table-glass" style="margin:0;">
+                <thead>
+                  <tr>
+                    <th style="width:56px;">Image</th>
+                    <th>Product Name</th>
+                    <th style="width:90px;text-align:center;">Price (¥)</th>
+                    <th style="width:65px;text-align:center;">MOQ</th>
+                    <th>Specifications</th>
+                  </tr>
+                </thead>
+                <tbody id="alibaba1688TableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer" id="bulkModalFooter" style="display:none;border-top:1px solid var(--border-color);padding:16px 24px;">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="bulkUploadBtn" class="btn-glow" onclick="submitBulkUpload()">
+          <i class="bi bi-cloud-upload me-1"></i> <span id="bulkUploadBtnText">Upload Products</span>
+        </button>
+        <button type="button" id="bulkSelectedUploadBtn" class="btn-glow" onclick="submitSelectedBulkUpload()" style="display:none;background:linear-gradient(135deg,#2563eb,#1d4ed8);">
+          <i class="bi bi-check2-square me-1"></i> <span id="bulkSelectedUploadBtnText">Import Selected</span>
+        </button>
+        <button type="button" id="photoUploadBtn" class="btn-glow" onclick="submitPhotoUpload()" style="display:none;background:linear-gradient(135deg,#C84B31,#C84B31);">
+          <i class="bi bi-cloud-upload me-1"></i> <span id="photoUploadBtnText">Create Products</span>
+        </button>
+        <button type="button" id="alibaba1688UploadBtn" class="btn-glow" onclick="submit1688Upload()" style="display:none;background:linear-gradient(135deg,#dc2626,#b91c1c);">
+          <i class="bi bi-bag-check me-1"></i> <span id="alibaba1688UploadBtnText">Import Products</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="productDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header" style="border-bottom:1px solid var(--border-color);">
+        <div>
+          <h5 class="modal-title" id="detailProductTitle" style="font-weight:700;">Product Details</h5>
+          <div id="detailProductBadges" class="mt-1"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-md-5">
+            <img id="detailMainImage" class="detail-main-image mb-3" style="display:none;" alt="">
+            <div id="detailNoImage" class="detail-main-image mb-3 d-flex align-items-center justify-content-center" style="min-height:200px;color:var(--text-secondary);">
+              <div class="text-center"><i class="bi bi-box-seam" style="font-size:48px;opacity:0.4;"></i><div style="font-size:13px;margin-top:8px;">No image</div></div>
+            </div>
+            <div id="detailThumbImages" class="detail-images"></div>
+          </div>
+          <div class="col-md-7">
+            <div class="detail-spec-grid mb-3">
+              <div class="detail-spec-item">
+                <div class="detail-spec-label">Unit Price</div>
+                <div class="detail-spec-value" id="detailPrice" style="color:var(--accent-3);">—</div>
+              </div>
+              <div class="detail-spec-item">
+                <div class="detail-spec-label">MOQ</div>
+                <div class="detail-spec-value" id="detailMoq">—</div>
+              </div>
+              <div class="detail-spec-item">
+                <div class="detail-spec-label">Weight (KG)</div>
+                <div class="detail-spec-value" id="detailWeight">—</div>
+              </div>
+              <div class="detail-spec-item">
+                <div class="detail-spec-label">Qty / Carton</div>
+                <div class="detail-spec-value" id="detailCartonQty">—</div>
+              </div>
+              <div class="detail-spec-item" style="grid-column:span 2;">
+                <div class="detail-spec-label">Carton Size (L × W × H cm)</div>
+                <div class="detail-spec-value" id="detailCartonSize">—</div>
+              </div>
+              <div class="detail-spec-item" style="grid-column:span 2;">
+                <div class="detail-spec-label">SKU / Barcode</div>
+                <div class="detail-spec-value" id="detailSku">—</div>
+              </div>
+            </div>
+            <h6 style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;">Landed Prices</h6>
+            <div class="detail-shipping-grid">
+              <div class="detail-shipping-box air">
+                <div class="detail-shipping-title" style="color:var(--accent-3);">✈ Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div id="detail-air-cell"></div>
+              </div>
+              <div class="detail-shipping-box sea">
+                <div class="detail-shipping-title" style="color:#38bdf8;">⛵ Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div id="detail-sea-cell"></div>
+              </div>
+              <div class="detail-shipping-box ksa-air">
+                <div class="detail-shipping-title" style="color:#a78bfa;">✈ KSA Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div id="detail-ksa-air-cell"></div>
+              </div>
+              <div class="detail-shipping-box ksa-sea">
+                <div class="detail-shipping-title" style="color:#34d399;">⛵ KSA Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div id="detail-ksa-sea-cell"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="border-top:1px solid var(--border-color);flex-wrap:wrap;gap:8px;">
+        <button type="button" class="btn-ghost btn-sm" id="detailEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
+        <a href="#" class="btn-ghost btn-sm" id="detailQuoteBtn" style="color:#38bdf8;"><i class="bi bi-send me-1"></i> Quote</a>
+        <button type="button" class="btn-ghost btn-sm" id="detailSaveBtn" disabled><i class="bi bi-floppy me-1"></i> Save Prices</button>
+        <button type="button" class="btn-ghost btn-sm" id="detailPrivateBtn"><i class="bi bi-lock me-1"></i> Private</button>
+        <button type="button" class="btn-danger btn-sm" id="detailDeleteBtn"><i class="bi bi-trash me-1"></i> Delete</button>
+        <button type="button" class="btn-ghost btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="addProductModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title">Add Product</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title"><i class="bi bi-box-seam me-2"></i>Add Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <form id="addProductForm" enctype="multipart/form-data">
+        <form id="addProductForm" class="form-glass" enctype="multipart/form-data">
+          {% csrf_token %}
           <div class="mb-3">
-            <label>Name</label>
+            <label class="form-label">Name</label>
             <input type="text" name="name" class="form-control" required>
           </div>
           <div class="mb-3">
-            <label>Price</label>
-            <input type="number" name="price" class="form-control" step="0.01" required>
+            <label class="form-label">SKU / Barcode <span style="color:var(--text-secondary);font-size:11px">optional — for barcode scanning</span></label>
+            <input type="text" name="sku" class="form-control" placeholder="e.g. ABC-12345">
           </div>
-          <div class="mb-3">
-            <label>MOQ</label>
-            <input type="number" name="moq" class="form-control" required>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Price</label>
+              <input type="number" name="price" class="form-control" step="0.01" min="0" required>
+            </div>
+            <div class="col">
+              <label class="form-label">MOQ</label>
+              <input type="number" name="moq" class="form-control" min="1" required>
+            </div>
+            <div class="col">
+              <label class="form-label">Weight (KG) <span style="color:var(--text-secondary);font-size:11px">optional</span></label>
+              <input type="number" name="weight" class="form-control" step="0.001" min="0" placeholder="0.000">
+            </div>
           </div>
-          <div class="mb-3">
-            <label>Images (up to 3)</label>
-            <input type="file" name="images" class="form-control" multiple accept="image/*">
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Carton Length (CM)</label>
+              <input type="number" name="carton_length" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Carton Width (CM)</label>
+              <input type="number" name="carton_width" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Carton Height (CM)</label>
+              <input type="number" name="carton_height" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Pcs/Carton</label>
+              <input type="number" name="carton_qty" class="form-control" min="1" placeholder="optional">
+            </div>
           </div>
-          <button type="submit" class="btn btn-success">Add</button>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Product Source</label>
+              <select name="source" class="form-select">
+                <option value="general" selected>General</option>
+                <option value="amazon">Amazon</option>
+                <option value="noon">Noon</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Images <span style="color:var(--text-secondary);font-size:11px">up to 3</span></label>
+              <input type="file" name="images" class="form-control" multiple accept="image/*">
+            </div>
+          </div>
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <input type="checkbox" name="ready_to_ship" id="addProductReadyToShip" value="1" class="form-check-input" style="width:18px;height:18px;">
+            <label for="addProductReadyToShip" class="form-label mb-0" style="color:#4ade80;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
+          </div>
+          <input type="hidden" name="is_draft" id="addProductIsDraft" value="0">
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn-glow flex-fill" onclick="document.getElementById('addProductIsDraft').value='0'"><i class="bi bi-check-lg me-1"></i> Add Product</button>
+            <button type="submit" class="btn-ghost flex-fill" onclick="document.getElementById('addProductIsDraft').value='1'" style="border:1px solid #f59e0b;color:#f59e0b;"><i class="bi bi-file-earmark me-1"></i> Save as Draft</button>
+          </div>
         </form>
       </div>
     </div>
   </div>
 </div>
-<script>
-function showAddProductModal() {
-    var modal = new bootstrap.Modal(document.getElementById('addProductModal'));
-    modal.show();
-}
 
-document.getElementById('addProductForm').onsubmit = function(e) {
-    e.preventDefault();
-    var form = e.target;
-    var data = new FormData(form);
-    fetch("/products/add/", {
-        method: "POST",
-        body: data
-    })
-    .then(response => response.json())
-    .then(data => {
-        if(data.success) {
-            var modal = bootstrap.Modal.getInstance(document.getElementById('addProductModal'));
-            modal.hide();
-            // Show action modal
-            document.getElementById('actionModalBody').innerText = data.message;
-            var actionModal = new bootstrap.Modal(document.getElementById('actionModal'));
-            actionModal.show();
-            setTimeout(() => { location.reload(); }, 1000);
+<div class="modal fade" id="editProductModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Product</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="editProductForm" class="form-glass" enctype="multipart/form-data">
+          {% csrf_token %}
+          <div class="mb-3">
+            <label class="form-label">Name</label>
+            <input type="text" name="name" id="editProductName" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">SKU / Barcode <span style="color:var(--text-secondary);font-size:11px">optional</span></label>
+            <input type="text" name="sku" id="editProductSku" class="form-control" placeholder="e.g. ABC-12345">
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Price</label>
+              <input type="number" name="price" id="editProductPrice" class="form-control" step="0.01" min="0" required>
+            </div>
+            <div class="col">
+              <label class="form-label">MOQ</label>
+              <input type="number" name="moq" id="editProductMoq" class="form-control" min="1" required>
+            </div>
+            <div class="col">
+              <label class="form-label">Weight (KG)</label>
+              <input type="number" name="weight" id="editProductWeight" class="form-control" step="0.001" min="0" placeholder="optional">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col">
+              <label class="form-label">Carton Length (CM)</label>
+              <input type="number" name="carton_length" id="editProductCartonLength" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Carton Width (CM)</label>
+              <input type="number" name="carton_width" id="editProductCartonWidth" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Carton Height (CM)</label>
+              <input type="number" name="carton_height" id="editProductCartonHeight" class="form-control" step="0.01" min="0" placeholder="optional">
+            </div>
+            <div class="col">
+              <label class="form-label">Pcs/Carton</label>
+              <input type="number" name="carton_qty" id="editProductCartonQty" class="form-control" min="1" placeholder="optional">
+            </div>
+          </div>
+          
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label">Product Source</label>
+              <select name="source" id="editProductSource" class="form-select">
+                <option value="general">General</option>
+                <option value="amazon">Amazon</option>
+                <option value="noon">Noon</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Add New Images <span style="color:var(--text-secondary);font-size:11px">up to 3 total</span></label>
+              <input type="file" name="images" id="editProductNewImages" class="form-control" multiple accept="image/*">
+            </div>
+          </div>
+          <div class="mb-3" id="editProductImagesContainer"></div>
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <input type="checkbox" name="ready_to_ship" id="editProductReadyToShip" value="1" class="form-check-input" style="width:18px;height:18px;">
+            <label for="editProductReadyToShip" class="form-label mb-0" style="color:#4ade80;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
+          </div>
+          <div class="mb-3 d-flex align-items-center gap-2">
+            <input type="checkbox" name="is_draft_toggle" id="editProductIsDraftToggle" class="form-check-input" style="width:18px;height:18px;" onchange="document.getElementById('editProductIsDraftHidden').value=this.checked?'1':'0'">
+            <label for="editProductIsDraftToggle" class="form-label mb-0" style="color:#f59e0b;font-size:13px;"><i class="bi bi-file-earmark me-1"></i> Mark as Draft</label>
+            <input type="hidden" name="is_draft" id="editProductIsDraftHidden" value="0">
+          </div>
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Changes</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+var PRODUCT_CALC_DATA = [
+{% for p in products %}
+  { id: {{ p.id }}, price: {{ p.price }}, weight: {{ p.weight|default:'null' }}, carton_qty: {{ p.carton_qty|default:'null' }}, carton_cbm: {{ p.carton_cbm|default:'null' }}, saved_air: {{ p.price_air|default:'null' }}, saved_sea: {{ p.price_sea|default:'null' }} },
+{% endfor %}
+{% for p in private_products %}
+  { id: {{ p.id }}, price: {{ p.price }}, weight: {{ p.weight|default:'null' }}, carton_qty: {{ p.carton_qty|default:'null' }}, carton_cbm: {{ p.carton_cbm|default:'null' }}, saved_air: {{ p.price_air|default:'null' }}, saved_sea: {{ p.price_sea|default:'null' }} },
+{% endfor %}
+];
+var FX_RATE = {{ fx_rate|default:'0' }};
+var FX_FROM = '{{ fx_from }}';
+var FX_TO = '{{ fx_to }}';
+
+var currentDetailProductId = null;
+var currentDetailProductData = null;
+
+function recalcPrices() {
+    var airRate = parseFloat(document.getElementById('airRateInput').value) || 0;
+    var seaRate = parseFloat(document.getElementById('seaRateInput').value) || 0;
+    var ksaAirRate = parseFloat(document.getElementById('ksaAirRateInput').value) || 0;
+    var ksaSeaRate = parseFloat(document.getElementById('ksaSeaRateInput').value) || 0;
+    var margin = parseFloat(document.getElementById('marginInput').value) || 0;
+
+    function buildCell(p, landedVal, shipCost, color, bg, savedVal) {
+        var h = '<span style="font-weight:700;color:' + color + '">' + landedVal.toFixed(2) + '</span>';
+        h += '<div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">' + p.price.toFixed(2) + ' + ' + shipCost.toFixed(2) + '</div>';
+        if (FX_RATE > 0) {
+            var converted = landedVal / FX_RATE;
+            h += '<div style="font-size:12px;font-weight:700;color:#fff;background:' + bg + ';border-radius:4px;padding:1px 6px;display:inline-block;margin-top:3px;">' + FX_FROM + ' ' + converted.toFixed(2) + '</div>';
+            if (margin > 0) {
+                var sell = converted * (1 + margin / 100);
+                h += '<div style="font-size:11px;color:#4ade80;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + FX_FROM + ' ' + sell.toFixed(2) + '</strong></div>';
+            }
+        } else if (margin > 0) {
+            var sell = landedVal * (1 + margin / 100);
+            h += '<div style="font-size:11px;color:#4ade80;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + sell.toFixed(2) + '</strong></div>';
+        }
+        if (savedVal !== null) {
+            h += '<div style="font-size:10px;color:#4ade80;margin-top:2px;"><i class="bi bi-check-circle-fill"></i> saved: ' + savedVal.toFixed(2) + '</div>';
+        }
+        return h;
+    }
+
+    function buildCardChip(label, color, landedVal, missing) {
+        if (missing) {
+            return '<div style="font-size:9px;color:var(--text-secondary);">' + label + '</div><div style="font-weight:600;color:var(--text-secondary);">—</div>';
+        }
+        return '<div style="font-size:9px;color:' + color + ';font-weight:700;">' + label + '</div><div style="font-weight:700;color:' + color + ';">' + landedVal.toFixed(2) + '</div>';
+    }
+
+    function buildMissing(p, missingItems) {
+        return '<span style="font-weight:400;color:var(--text-secondary);">' + p.price.toFixed(2) + '</span>' +
+               '<div style="font-size:10px;color:var(--text-secondary);margin-top:1px;">need: ' + missingItems.join(', ') + '</div>';
+    }
+
+    function setCellContent(el, html) {
+        if (el) el.innerHTML = html;
+    }
+
+    PRODUCT_CALC_DATA.forEach(function(p) {
+        var cardAir = document.getElementById('card-air-' + p.id);
+        var cardSea = document.getElementById('card-sea-' + p.id);
+        var detailAir = (currentDetailProductId === p.id) ? document.getElementById('detail-air-cell') : null;
+        var detailSea = (currentDetailProductId === p.id) ? document.getElementById('detail-sea-cell') : null;
+        var detailKsaAir = (currentDetailProductId === p.id) ? document.getElementById('detail-ksa-air-cell') : null;
+        var detailKsaSea = (currentDetailProductId === p.id) ? document.getElementById('detail-ksa-sea-cell') : null;
+        var airVal = null, seaVal = null;
+
+        if (p.weight !== null && p.carton_qty !== null && airRate > 0) {
+            var airShip = (p.weight * airRate) / p.carton_qty;
+            airVal = p.price + airShip;
+            var airHtml = buildCell(p, airVal, airShip, 'var(--accent-3)', 'rgba(255,140,0,0.2)', p.saved_air);
+            setCellContent(detailAir, airHtml);
+            setCellContent(cardAir, buildCardChip('✈ Air', 'var(--accent-3)', airVal, false));
+        } else {
+            var airMissing = [];
+            if (p.weight === null) airMissing.push('weight');
+            if (p.carton_qty === null) airMissing.push('qty/ctn');
+            if (airRate === 0) airMissing.push('rate');
+            setCellContent(detailAir, buildMissing(p, airMissing));
+            setCellContent(cardAir, buildCardChip('✈ Air', 'var(--accent-3)', 0, true));
+        }
+
+        if (p.carton_cbm !== null && p.carton_qty !== null && seaRate > 0) {
+            var seaShip = (p.carton_cbm / p.carton_qty) * seaRate;
+            seaVal = p.price + seaShip;
+            var seaHtml = buildCell(p, seaVal, seaShip, '#38bdf8', 'rgba(56,189,248,0.2)', p.saved_sea);
+            setCellContent(detailSea, seaHtml);
+            setCellContent(cardSea, buildCardChip('⛵ Sea', '#38bdf8', seaVal, false));
+        } else {
+            var seaMissing = [];
+            if (p.carton_cbm === null) seaMissing.push('carton dims');
+            if (p.carton_qty === null) seaMissing.push('qty/ctn');
+            if (seaRate === 0) seaMissing.push('rate');
+            setCellContent(detailSea, buildMissing(p, seaMissing));
+            setCellContent(cardSea, buildCardChip('⛵ Sea', '#38bdf8', 0, true));
+        }
+
+        if (p.weight !== null && p.carton_qty !== null && ksaAirRate > 0) {
+            var ksaAirShip = (p.weight * ksaAirRate) / p.carton_qty;
+            var ksaAirVal = p.price + ksaAirShip;
+            setCellContent(detailKsaAir, buildCell(p, ksaAirVal, ksaAirShip, '#a78bfa', 'rgba(167,139,250,0.2)', null));
+        } else {
+            var ksaAirMissing = [];
+            if (p.weight === null) ksaAirMissing.push('weight');
+            if (p.carton_qty === null) ksaAirMissing.push('qty/ctn');
+            if (ksaAirRate === 0) ksaAirMissing.push('rate');
+            setCellContent(detailKsaAir, buildMissing(p, ksaAirMissing));
+        }
+
+        if (p.carton_cbm !== null && p.carton_qty !== null && ksaSeaRate > 0) {
+            var ksaSeaShip = (p.carton_cbm / p.carton_qty) * ksaSeaRate;
+            var ksaSeaVal = p.price + ksaSeaShip;
+            setCellContent(detailKsaSea, buildCell(p, ksaSeaVal, ksaSeaShip, '#34d399', 'rgba(52,211,153,0.2)', null));
+        } else {
+            var ksaSeaMissing = [];
+            if (p.carton_cbm === null) ksaSeaMissing.push('carton dims');
+            if (p.carton_qty === null) ksaSeaMissing.push('qty/ctn');
+            if (ksaSeaRate === 0) ksaSeaMissing.push('rate');
+            setCellContent(detailKsaSea, buildMissing(p, ksaSeaMissing));
+        }
+
+        var saveBtn = document.getElementById('save-btn-' + p.id);
+        if (saveBtn) {
+            saveBtn.disabled = (airVal === null && seaVal === null);
+            saveBtn._airVal = airVal;
+            saveBtn._seaVal = seaVal;
+        }
+        if (currentDetailProductId === p.id) {
+            var detailSaveBtn = document.getElementById('detailSaveBtn');
+            if (detailSaveBtn) {
+                detailSaveBtn.disabled = (airVal === null && seaVal === null);
+                detailSaveBtn._airVal = airVal;
+                detailSaveBtn._seaVal = seaVal;
+            }
         }
     });
 }
+
+function saveProductPrices(productId, optionalBtn) {
+    var btn = optionalBtn || document.getElementById('save-btn-' + productId);
+    if (!btn) return;
+    var airVal = btn._airVal !== undefined ? btn._airVal : null;
+    var seaVal = btn._seaVal !== undefined ? btn._seaVal : null;
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';
+    fetch('/products/save-prices/' + productId + '/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({ price_air: airVal, price_sea: seaVal })
+    }).then(function(r) { return r.json(); }).then(function(res) {
+        if (res.success) {
+            btn.innerHTML = '<i class="bi bi-check-lg"></i>';
+            btn.style.color = '#4ade80';
+            var p = PRODUCT_CALC_DATA.find(function(x) { return x.id === productId; });
+            if (p) { p.saved_air = airVal; p.saved_sea = seaVal; }
+            recalcPrices();
+            setTimeout(function() {
+                btn.innerHTML = originalHtml;
+                btn.style.color = '';
+                btn.disabled = false;
+            }, 1500);
+        } else {
+            btn.innerHTML = originalHtml;
+            btn.disabled = false;
+            showToast('Failed to save', 'error');
+        }
+    }).catch(function() {
+        btn.innerHTML = originalHtml;
+        btn.disabled = false;
+        showToast('Network error', 'error');
+    });
+}
+
+function getCookie(name) {
+    var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : null;
+}
+
+function togglePrivate(productId, btn) {
+    fetch('/products/toggle-private/' + productId + '/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')}
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (!data.success) return;
+        var msg = data.is_private
+            ? '"' + data.name + '" moved to Private'
+            : '"' + data.name + '" restored to Public';
+        showToast(msg, 'success');
+        setTimeout(function() { location.reload(); }, 600);
+    });
+}
+
+var activeDetailFilter = 'all';
+var activeSourceFilter = 'all';
+
+// Text search is server-side (the input submits a GET form), so this only applies the
+// "full details" and marketplace-source toggles to the cards already on the page.
+function applyProductFilters() {
+    ['productsGrid', 'privateProductsGrid'].forEach(function(containerId) {
+        var container = document.getElementById(containerId);
+        if (!container) return;
+        container.querySelectorAll('[data-product-id]').forEach(function(card) {
+            var matchesDetail = activeDetailFilter === 'all'
+                || (activeDetailFilter === 'complete' && card.dataset.complete === '1')
+                || (activeDetailFilter === 'incomplete' && card.dataset.complete === '0');
+            var matchesSource = activeSourceFilter === 'all'
+                || card.dataset.source === activeSourceFilter;
+            card.style.display = (matchesDetail && matchesSource) ? '' : 'none';
+        });
+    });
+    updateProductBulkBar();
+}
+
+function filterBySource(source) {
+    activeSourceFilter = source;
+    document.getElementById('filterAmazon').className = source === 'amazon' ? 'btn-glow' : 'btn-ghost';
+    document.getElementById('filterNoon').className   = source === 'noon'   ? 'btn-glow' : 'btn-ghost';
+    document.getElementById('filterAmazon').style.cssText = source === 'amazon'
+        ? 'font-size:12px;padding:6px 14px;border-radius:20px;'
+        : 'font-size:12px;padding:6px 14px;border-radius:20px;color:#ff9900;border-color:#ff9900;';
+    document.getElementById('filterNoon').style.cssText = source === 'noon'
+        ? 'font-size:12px;padding:6px 14px;border-radius:20px;'
+        : 'font-size:12px;padding:6px 14px;border-radius:20px;color:#6c5ce7;border-color:#6c5ce7;';
+    applyProductFilters();
+}
+
+recalcPrices();
+
+function showProductDetail(productId) {
+    currentDetailProductId = productId;
+    fetch('/products/edit/' + productId + '/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            currentDetailProductData = data;
+            document.getElementById('detailProductTitle').textContent = data.name;
+
+            var badges = '';
+            if (data.is_draft) badges += '<span class="product-badge draft me-1">DRAFT</span>';
+            var cardEl = document.querySelector('[data-product-id="' + productId + '"]');
+            if (cardEl && cardEl.dataset.isPrivate === '1') badges += '<span class="product-badge private me-1">PRIVATE</span>';
+            if (data.ready_to_ship) badges += '<span class="product-badge complete me-1" title="Ready to ship"><i class="bi bi-truck"></i> READY</span>';
+            if (data.source === 'amazon') badges += '<span class="product-badge amazon me-1">Amazon</span>';
+            if (data.source === 'noon') badges += '<span class="product-badge noon me-1">Noon</span>';
+            document.getElementById('detailProductBadges').innerHTML = badges;
+
+            document.getElementById('detailPrice').textContent = data.price;
+            document.getElementById('detailMoq').textContent = data.moq || '—';
+            document.getElementById('detailWeight').textContent = data.weight || '—';
+            document.getElementById('detailCartonQty').textContent = data.carton_qty || '—';
+            var carton = (data.carton_length && data.carton_width && data.carton_height)
+                ? data.carton_length + ' × ' + data.carton_width + ' × ' + data.carton_height
+                : '—';
+            document.getElementById('detailCartonSize').textContent = carton;
+            document.getElementById('detailSku').textContent = data.sku || '—';
+
+            var mainImg = document.getElementById('detailMainImage');
+            var noImg = document.getElementById('detailNoImage');
+            var thumbs = document.getElementById('detailThumbImages');
+            thumbs.innerHTML = '';
+            if (data.images && data.images.length) {
+                mainImg.src = data.images[0].url;
+                mainImg.style.display = '';
+                noImg.style.display = 'none';
+                data.images.forEach(function(img, idx) {
+                    var thumb = document.createElement('img');
+                    thumb.src = img.url;
+                    thumb.title = 'Image ' + (idx + 1);
+                    thumb.onclick = function() {
+                        mainImg.src = img.url;
+                    };
+                    thumbs.appendChild(thumb);
+                });
+            } else {
+                mainImg.style.display = 'none';
+                noImg.style.display = '';
+            }
+
+            document.getElementById('detailQuoteBtn').href = '/products/supplier-quote/' + productId + '/';
+            document.getElementById('detailEditBtn').onclick = function() {
+                bootstrap.Modal.getInstance(document.getElementById('productDetailModal')).hide();
+                editProduct(productId);
+            };
+            document.getElementById('detailSaveBtn').onclick = function() {
+                saveProductPrices(productId, document.getElementById('detailSaveBtn'));
+            };
+            document.getElementById('detailPrivateBtn').onclick = function() {
+                togglePrivate(productId, this);
+            };
+            document.getElementById('detailPrivateBtn').innerHTML = (cardEl && cardEl.dataset.isPrivate === '1')
+                ? '<i class="bi bi-unlock me-1"></i> Restore Public'
+                : '<i class="bi bi-lock me-1"></i> Move to Private';
+            document.getElementById('detailDeleteBtn').onclick = function() {
+                confirmDelete('/products/delete/' + productId + '/', data.name);
+            };
+
+            recalcPrices();
+            new bootstrap.Modal(document.getElementById('productDetailModal')).show();
+        })
+        .catch(function() {
+            showToast('Could not load product details', 'error');
+        });
+}
+
+document.getElementById('productDetailModal').addEventListener('hidden.bs.modal', function() {
+    currentDetailProductId = null;
+    currentDetailProductData = null;
+});
+
+// ===== Product List Bulk Actions =====
+function getVisibleProductCards(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return [];
+    return Array.prototype.filter.call(container.querySelectorAll('[data-product-id]'), function(card) {
+        return card.style.display !== 'none';
+    });
+}
+
+function getSelectedProductIds() {
+    var ids = [];
+    document.querySelectorAll('.product-row-check:checked').forEach(function(cb) {
+        ids.push(parseInt(cb.value, 10));
+    });
+    return ids;
+}
+
+function updateProductBulkBar() {
+    var ids = getSelectedProductIds();
+    var bar = document.getElementById('bulkActionsBar');
+    var countEl = document.getElementById('bulkSelectedProductsCount');
+    if (!bar || !countEl) return;
+    if (ids.length) {
+        bar.style.display = '';
+        countEl.textContent = ids.length + ' product' + (ids.length !== 1 ? 's' : '') + ' selected';
+    } else {
+        bar.style.display = 'none';
+        countEl.textContent = '0 selected';
+    }
+    [
+        { id: 'productsGrid', box: 'selectAllProducts' },
+        { id: 'privateProductsGrid', box: 'selectAllPrivateProducts' }
+    ].forEach(function(cfg) {
+        var allBox = document.getElementById(cfg.box);
+        if (!allBox) return;
+        var visible = getVisibleProductCards(cfg.id);
+        var visibleChecks = visible.map(function(card) { return card.querySelector('.product-row-check'); }).filter(Boolean);
+        var selectedVisible = visibleChecks.filter(function(cb) { return cb.checked; }).length;
+        allBox.checked = visibleChecks.length > 0 && selectedVisible === visibleChecks.length;
+        allBox.indeterminate = selectedVisible > 0 && selectedVisible < visibleChecks.length;
+    });
+}
+
+function toggleSelectAllProducts(containerId, checked) {
+    getVisibleProductCards(containerId).forEach(function(card) {
+        var cb = card.querySelector('.product-row-check');
+        if (cb) cb.checked = checked;
+    });
+    updateProductBulkBar();
+}
+
+function clearProductSelection() {
+    document.querySelectorAll('.product-row-check').forEach(function(cb) { cb.checked = false; });
+    var allPublic = document.getElementById('selectAllProducts');
+    var allPrivate = document.getElementById('selectAllPrivateProducts');
+    if (allPublic) { allPublic.checked = false; allPublic.indeterminate = false; }
+    if (allPrivate) { allPrivate.checked = false; allPrivate.indeterminate = false; }
+    updateProductBulkBar();
+}
+
+var BULK_ACTION_LABELS = {
+    delete: 'delete',
+    private: 'move to private',
+    public: 'restore to public',
+    draft: 'mark as draft',
+    publish: 'publish',
+    save_prices: 'save prices for'
+};
+
+function runBulkAction(action) {
+    var ids = getSelectedProductIds();
+    if (!ids.length) {
+        showToast('Select at least one product', 'error');
+        return;
+    }
+    var label = BULK_ACTION_LABELS[action] || action;
+    var msg = action === 'delete'
+        ? 'Delete ' + ids.length + ' product(s)? This cannot be undone.'
+        : label.charAt(0).toUpperCase() + label.slice(1) + ' ' + ids.length + ' product(s)?';
+    if (!confirm(msg)) return;
+
+    fetch('/products/bulk-action/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({ action: action, ids: ids })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            showToast(res.message, 'success');
+            setTimeout(function() { location.reload(); }, 600);
+        } else {
+            showToast(res.message || 'Bulk action failed', 'error');
+        }
+    })
+    .catch(function() {
+        showToast('Network error', 'error');
+    });
+}
+
+// ===== Detail filter =====
+function filterByDetails(mode) {
+    activeDetailFilter = mode;
+    document.getElementById('filterAll').className       = mode === 'all'        ? 'btn-glow'  : 'btn-ghost';
+    document.getElementById('filterComplete').className  = mode === 'complete'   ? 'btn-glow'  : 'btn-ghost';
+    document.getElementById('filterIncomplete').className= mode === 'incomplete' ? 'btn-glow'  : 'btn-ghost';
+    document.getElementById('filterAll').style.cssText       = 'font-size:12px;padding:6px 14px;border-radius:20px;';
+    if (mode !== 'complete')   { document.getElementById('filterComplete').style.cssText   = 'font-size:12px;padding:6px 14px;border-radius:20px;color:#4ade80;border-color:#4ade80;'; }
+    else                       { document.getElementById('filterComplete').style.cssText   = 'font-size:12px;padding:6px 14px;border-radius:20px;'; }
+    if (mode !== 'incomplete') { document.getElementById('filterIncomplete').style.cssText = 'font-size:12px;padding:6px 14px;border-radius:20px;color:#f59e0b;border-color:#f59e0b;'; }
+    else                       { document.getElementById('filterIncomplete').style.cssText = 'font-size:12px;padding:6px 14px;border-radius:20px;'; }
+    applyProductFilters();
+}
+
+// Add product
+ajaxSubmit('addProductForm', '/products/add/', function() {
+    bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
+    setTimeout(function() { location.reload(); }, 500);
+});
+
+// Edit product
+var currentEditProductId = null;
+function editProduct(productId) {
+    currentEditProductId = productId;
+    fetch('/products/edit/' + productId + '/')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            document.getElementById('editProductName').value = data.name;
+            document.getElementById('editProductSku').value = data.sku || '';
+            document.getElementById('editProductPrice').value = data.price;
+            document.getElementById('editProductMoq').value = data.moq;
+            document.getElementById('editProductWeight').value = data.weight;
+            document.getElementById('editProductCartonLength').value = data.carton_length;
+            document.getElementById('editProductCartonWidth').value = data.carton_width;
+            document.getElementById('editProductCartonHeight').value = data.carton_height;
+            document.getElementById('editProductCartonQty').value = data.carton_qty;
+            // Set source
+            document.getElementById('editProductSource').value = data.source || 'general';
+            // Set ready-to-ship toggle
+            document.getElementById('editProductReadyToShip').checked = !!data.ready_to_ship;
+            // Set draft toggle
+            var draftToggle = document.getElementById('editProductIsDraftToggle');
+            var draftHidden = document.getElementById('editProductIsDraftHidden');
+            draftToggle.checked = !!data.is_draft;
+            draftHidden.value = data.is_draft ? '1' : '0';
+            // Render existing images with delete checkboxes
+            var container = document.getElementById('editProductImagesContainer');
+            if (data.images.length > 0) {
+                var html = '<label class="form-label">Current Images</label><div class="d-flex flex-wrap gap-2">';
+                data.images.forEach(function(img) {
+                    html += '<div style="position:relative;display:inline-block;">' +
+                        '<img src="' + img.url + '" style="width:64px;height:64px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color);" alt="">' +
+                        '<label style="position:absolute;top:-6px;right:-6px;background:var(--danger);border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:11px;" title="Delete image">' +
+                        '<input type="checkbox" name="delete_image_ids" value="' + img.id + '" style="display:none;" class="del-img-check" onchange="toggleDelImg(this)">' +
+                        '<i class="bi bi-x del-img-icon" style="color:#fff;"></i>' +
+                        '</label></div>';
+                });
+                html += '</div><div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">Click ✕ to mark an image for deletion</div>';
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '';
+            }
+            new bootstrap.Modal(document.getElementById('editProductModal')).show();
+        });
+}
+
+function toggleDelImg(checkbox) {
+    var card = checkbox.closest('div[style*="position:relative"]');
+    if (checkbox.checked) {
+        card.querySelector('img').style.opacity = '0.3';
+        card.querySelector('label').style.background = '#888';
+    } else {
+        card.querySelector('img').style.opacity = '1';
+        card.querySelector('label').style.background = 'var(--danger)';
+    }
+}
+
+document.getElementById('editProductForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!currentEditProductId) return;
+    var btn = this.querySelector('[type=submit]');
+    btn.disabled = true;
+    var data = new FormData(this);
+    fetch('/products/edit/' + currentEditProductId + '/', { method: 'POST', body: data })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            btn.disabled = false;
+            if (res.success) {
+                showToast(res.message, 'success');
+                bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+                setTimeout(function() { location.reload(); }, 500);
+            } else {
+                showToast(res.message || 'Error updating product', 'error');
+            }
+        }).catch(function() {
+            btn.disabled = false;
+            showToast('Network error', 'error');
+        });
+});
+
+// ===== Bulk Upload =====
+var bulkParsedRows = [];
+var bulkSelectedRows = {};
+var bulkImages    = {}; // normName -> {file, objectUrl}  (bulk drop zone, matched by name)
+var bulkRowImages = {}; // rowIdx  -> {file, objectUrl}  (per-row assignment, takes priority)
+
+(function () {
+    // CSV drop zone
+    var dz = document.getElementById('bulkDropZone');
+    dz.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        this.style.borderColor = 'var(--accent-3)';
+        this.style.background = 'rgba(255,140,0,0.06)';
+    });
+    dz.addEventListener('dragleave', function () {
+        this.style.borderColor = 'var(--border-color)';
+        this.style.background = '';
+    });
+    dz.addEventListener('drop', function (e) {
+        e.preventDefault();
+        this.style.borderColor = 'var(--border-color)';
+        this.style.background = '';
+        if (e.dataTransfer.files[0]) processBulkFile(e.dataTransfer.files[0]);
+    });
+
+    // Image drop zone
+    var idz = document.getElementById('bulkImgDropZone');
+    idz.addEventListener('dragover', function (e) {
+        e.preventDefault();
+        this.style.borderColor = '#a78bfa';
+        this.style.background = 'rgba(167,139,250,0.07)';
+    });
+    idz.addEventListener('dragleave', function () {
+        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.background = '';
+    });
+    idz.addEventListener('drop', function (e) {
+        e.preventDefault();
+        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.background = '';
+        handleBulkImages(e.dataTransfer.files);
+    });
+
+    document.getElementById('bulkUploadModal').addEventListener('hidden.bs.modal', function () {
+        resetBulkUpload();
+    });
+})();
+
+function handleBulkFileSelect(input) {
+    if (input.files[0]) processBulkFile(input.files[0]);
+}
+
+function splitCSVLine(line) {
+    var result = [], current = '', inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"') { inQuotes = !inQuotes; }
+        else if (ch === ',' && !inQuotes) { result.push(current); current = ''; }
+        else { current += ch; }
+    }
+    result.push(current);
+    return result;
+}
+
+function parseCSV(text) {
+    var lines = text.replace(/\r\n|\r/g, '\n').split('\n').filter(function (l) { return l.trim(); });
+    if (lines.length < 2) return [];
+    var headers = splitCSVLine(lines[0]).map(function (h) { return h.trim().replace(/^"|"$/g, '').toLowerCase().replace(' *', ''); });
+    var rows = [];
+    for (var i = 1; i < lines.length; i++) {
+        var vals = splitCSVLine(lines[i]);
+        var obj = {};
+        headers.forEach(function (h, idx) { obj[h] = (vals[idx] || '').trim().replace(/^"|"$/g, ''); });
+        if (Object.values(obj).some(function (v) { return v; })) rows.push(obj);
+    }
+    return rows;
+}
+
+function processBulkFile(file) {
+    var reader = new FileReader();
+    reader.onload = function (e) {
+        var text = e.target.result;
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        var rows = parseCSV(text);
+        if (!rows.length) { showToast('File is empty or could not be parsed', 'error'); return; }
+        bulkParsedRows = rows;
+        renderBulkPreview();
+    };
+    reader.readAsText(file);
+}
+
+function normName(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+
+function handleBulkImages(files) {
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        var base = f.name.replace(/\.[^/.]+$/, '');
+        var key = normName(base);
+        if (bulkImages[key]) URL.revokeObjectURL(bulkImages[key].objectUrl);
+        bulkImages[key] = { file: f, objectUrl: URL.createObjectURL(f) };
+    }
+    refreshImageStrip();
+    updatePreviewImageCells();
+    updateImgCountBadge();
+}
+
+function refreshImageStrip() {
+    var strip = document.getElementById('bulkImgStrip');
+    var keys = Object.keys(bulkImages);
+    if (!keys.length) { strip.style.display = 'none'; return; }
+    strip.style.display = 'flex';
+    var html = '';
+    keys.forEach(function (key) {
+        var matched = bulkParsedRows.some(function (r) { return normName(r.name || '') === key; });
+        html += '<div style="position:relative;" title="' + bulkImages[key].file.name + '">' +
+            '<img src="' + bulkImages[key].objectUrl + '" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:2px solid ' + (matched ? '#a78bfa' : '#ef4444') + ';" alt="">' +
+            '<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#fff;background:' + (matched ? '#a78bfa' : '#ef4444') + ';border-radius:8px;padding:1px 5px;white-space:nowrap;">' + (matched ? 'matched' : 'no match') + '</div>' +
+            '</div>';
+    });
+    strip.innerHTML = html;
+}
+
+// ── Per-row image assignment ──────────────────────────────────────────────
+function getRowImageSrc(idx) {
+    if (bulkRowImages[idx]) return bulkRowImages[idx].objectUrl;
+    var row = bulkParsedRows[idx];
+    if (row && bulkImages[normName(row.name || '')]) return bulkImages[normName(row.name || '')].objectUrl;
+    return null;
+}
+
+function assignRowImage(idx, input) {
+    var file = input.files[0];
+    if (!file) return;
+    if (bulkRowImages[idx]) URL.revokeObjectURL(bulkRowImages[idx].objectUrl);
+    bulkRowImages[idx] = { file: file, objectUrl: URL.createObjectURL(file) };
+    var cell = document.getElementById('bulk-img-' + idx);
+    if (cell) cell.innerHTML = getCellImageHtml(idx);
+    updateImgCountBadge();
+}
+
+function getCellImageHtml(idx) {
+    var src = getRowImageSrc(idx);
+    var inputTag = '<input type="file" accept="image/*" style="display:none;position:absolute;" onchange="assignRowImage(' + idx + ',this)">';
+    if (src) {
+        return '<label style="cursor:pointer;position:relative;display:inline-block;width:42px;height:42px;" title="Click to change image">' +
+            '<img src="' + src + '" style="width:42px;height:42px;object-fit:cover;border-radius:7px;border:2px solid #a78bfa;display:block;" alt="">' +
+            '<span style="position:absolute;inset:0;border-radius:7px;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">' +
+            '<i class="bi bi-camera-fill" style="color:#fff;font-size:14px;pointer-events:none;"></i></span>' +
+            inputTag + '</label>';
+    }
+    return '<label style="width:42px;height:42px;border-radius:7px;background:var(--bg-input);border:1.5px dashed rgba(167,139,250,0.45);display:inline-flex;align-items:center;justify-content:center;color:#a78bfa;font-size:17px;cursor:pointer;transition:background 0.15s,border-color 0.15s;" title="Click to add image" onmouseenter="this.style.background=\'rgba(167,139,250,0.12)\';this.style.borderColor=\'#a78bfa\'" onmouseleave="this.style.background=\'var(--bg-input)\';this.style.borderColor=\'rgba(167,139,250,0.45)\'">' +
+        '<i class="bi bi-camera-fill" style="pointer-events:none;"></i>' +
+        inputTag + '</label>';
+}
+
+function updatePreviewImageCells() {
+    bulkParsedRows.forEach(function (row, idx) {
+        var cell = document.getElementById('bulk-img-' + idx);
+        if (cell) cell.innerHTML = getCellImageHtml(idx);
+    });
+}
+
+function updateImgCountBadge() {
+    var matched = 0;
+    bulkParsedRows.forEach(function (r, idx) {
+        if (validateBulkRow(r).length === 0 && getRowImageSrc(idx)) matched++;
+    });
+    var badge = document.getElementById('bulkImgCount');
+    badge.textContent = matched + ' image' + (matched !== 1 ? 's' : '') + ' matched';
+}
+
+function validateBulkRow(row) {
+    var errors = [];
+    if (!row.name) errors.push('name required');
+    if (!row.price || isNaN(parseFloat(row.price))) errors.push('invalid price');
+    if (!row.moq || isNaN(parseInt(row.moq))) errors.push('invalid moq');
+    return errors;
+}
+
+function renderBulkPreview() {
+    var tbody = document.getElementById('bulkPreviewBody');
+    var validCount = 0, errorCount = 0;
+    var html = '';
+
+    bulkParsedRows.forEach(function (row, idx) {
+        var errors = validateBulkRow(row);
+        var isValid = errors.length === 0;
+        if (isValid) validCount++; else errorCount++;
+
+        var statusBadge = isValid
+            ? '<span style="font-size:11px;background:rgba(74,222,128,0.15);color:#4ade80;border-radius:10px;padding:2px 8px;font-weight:600;">\u2713 OK</span>'
+            : '<span style="font-size:11px;background:rgba(239,68,68,0.15);color:#ef4444;border-radius:10px;padding:2px 8px;font-weight:600;" title="' + errors.join(', ') + '">\u2717 ' + errors[0] + '</span>';
+
+        var selectedChecked = bulkSelectedRows[idx] ? 'checked' : '';
+        html += '<tr style="' + (isValid ? '' : 'opacity:0.5;') + '">' +
+            '<td style="text-align:center;padding:6px 4px;">' +
+                '<input type="checkbox" class="bulk-row-check" data-idx="' + idx + '" ' + selectedChecked + ' onchange="toggleBulkRowSelection(' + idx + ', this.checked)" style="width:16px;height:16px;cursor:pointer;">' +
+            '</td>' +
+            '<td style="color:var(--text-secondary);font-size:12px;">' + (idx + 2) + '</td>' +
+            '<td id="bulk-img-' + idx + '" style="padding:6px 10px;">' + getCellImageHtml(idx) + '</td>' +
+            '<td style="font-weight:600;">' + (row.name || '<em style="color:#ef4444">missing</em>') + '</td>' +
+            '<td>' + (row.price || '<em style="color:#ef4444">missing</em>') + '</td>' +
+            '<td>' + (row.moq || '<em style="color:#ef4444">missing</em>') + '</td>' +
+            '<td>' + (row.weight || '\u2014') + '</td>' +
+            '<td>' + (row.carton_length || '\u2014') + '</td>' +
+            '<td>' + (row.carton_width || '\u2014') + '</td>' +
+            '<td>' + (row.carton_height || '\u2014') + '</td>' +
+            '<td>' + (row.carton_qty || '\u2014') + '</td>' +
+            '<td>' + statusBadge + '</td>' +
+            '</tr>';
+    });
+
+    tbody.innerHTML = html;
+
+    bulkSelectedRows = {};
+    document.getElementById('bulkValidCount').textContent = validCount + ' valid';
+    var errBadge = document.getElementById('bulkErrorCount');
+    if (errorCount > 0) { errBadge.textContent = errorCount + ' error' + (errorCount > 1 ? 's' : ''); errBadge.style.display = ''; }
+    else { errBadge.style.display = 'none'; }
+    updateImgCountBadge();
+    updateBulkSelectionSummary();
+
+    document.getElementById('bulkStep1').style.display = 'none';
+    document.getElementById('bulkStep2').style.display = '';
+    document.getElementById('bulkModalFooter').style.display = '';
+
+    var btn = document.getElementById('bulkUploadBtn');
+    btn.disabled = validCount === 0;
+    document.getElementById('bulkUploadBtnText').textContent = 'Upload ' + validCount + ' Products';
+}
+
+function resetBulkUpload() {
+    bulkParsedRows = [];
+    bulkSelectedRows = {};
+    Object.keys(bulkImages).forEach(function (k) { URL.revokeObjectURL(bulkImages[k].objectUrl); });
+    Object.keys(bulkRowImages).forEach(function (k) { URL.revokeObjectURL(bulkRowImages[k].objectUrl); });
+    bulkImages = {};
+    bulkRowImages = {};
+    document.getElementById('bulkCsvInput').value = '';
+    document.getElementById('bulkImgInput').value = '';
+    document.getElementById('bulkImgStrip').innerHTML = '';
+    document.getElementById('bulkImgStrip').style.display = 'none';
+    document.getElementById('bulkStep1').style.display = '';
+    document.getElementById('bulkStep2').style.display = 'none';
+    document.getElementById('bulkModalFooter').style.display = 'none';
+    // reset photo tab
+    photoRows.forEach(function(r) { URL.revokeObjectURL(r.objectUrl); });
+    photoRows = [];
+    document.getElementById('photoInput').value = '';
+    document.getElementById('photoTableSection').style.display = 'none';
+    document.getElementById('photoTableBody').innerHTML = '';
+    // reset 1688 tab
+    alibaba1688File = null;
+    alibaba1688Rows = [];
+    document.getElementById('alibaba1688Input').value = '';
+    var fnEl = document.getElementById('alibaba1688FileName');
+    if (fnEl) fnEl.style.display = 'none';
+    var prevEl = document.getElementById('alibaba1688PreviewSection');
+    if (prevEl) prevEl.style.display = 'none';
+    var tbEl = document.getElementById('alibaba1688TableBody');
+    if (tbEl) tbEl.innerHTML = '';
+    switchBulkTab('spreadsheet');
+}
+
+function submitBulkUpload() {
+    var input = document.getElementById('bulkCsvInput');
+    if (!input.files[0]) { showToast('No file selected', 'error'); return; }
+    var btn = document.getElementById('bulkUploadBtn');
+    btn.disabled = true;
+    document.getElementById('bulkUploadBtnText').textContent = 'Uploading\u2026';
+
+    var formData = new FormData();
+    formData.append('csv_file', input.files[0]);
+
+    var rowsToUpload = bulkParsedRows.filter(function(_, idx) { return bulkSelectedRows[idx] && validateBulkRow(bulkParsedRows[idx]).length === 0; });
+    if (!rowsToUpload.length) { showToast('Select at least one valid row to import', 'error'); btn.disabled = false; document.getElementById('bulkUploadBtnText').textContent = 'Upload Products'; return; }
+    formData.append('selected_rows', JSON.stringify(Object.keys(bulkSelectedRows).map(function(k) { return parseInt(k, 10); }).filter(function(idx) { return validateBulkRow(bulkParsedRows[idx]).length === 0; })));
+
+    // Per-row images: rename to product name so backend filename-matching works
+    var coveredNames = new Set();
+    Object.keys(bulkRowImages).forEach(function (idxStr) {
+        var idx = parseInt(idxStr);
+        if (!bulkSelectedRows[idx]) return;
+        var row = bulkParsedRows[idx];
+        if (!row) return;
+        var img = bulkRowImages[idx];
+        var ext = img.file.name.split('.').pop();
+        var renamed = new File([img.file], row.name + '.' + ext, { type: img.file.type });
+        formData.append('images[]', renamed);
+        coveredNames.add(normName(row.name || ''));
+    });
+
+    // Bulk name-matched images not already covered by a per-row assignment
+    Object.keys(bulkImages).forEach(function (key) {
+        if (!coveredNames.has(key)) {
+            var matchesSelected = bulkParsedRows.some(function(row, idx) { return bulkSelectedRows[idx] && normName(row.name || '') === key; });
+            if (matchesSelected) formData.append('images[]', bulkImages[key].file);
+        }
+    });
+
+    fetch('/products/bulk-upload/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        btn.disabled = false;
+        document.getElementById('bulkUploadBtnText').textContent = 'Upload Products';
+        if (res.success) {
+            showToast(res.message, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('bulkUploadModal')).hide();
+            setTimeout(function () { location.reload(); }, 700);
+        } else {
+            showToast(res.message, 'error');
+        }
+    })
+    .catch(function () {
+        btn.disabled = false;
+        document.getElementById('bulkUploadBtnText').textContent = 'Upload Products';
+        showToast('Network error', 'error');
+    });
+}
+
+function toggleBulkRowSelection(idx, checked) {
+    if (checked) bulkSelectedRows[idx] = true;
+    else delete bulkSelectedRows[idx];
+    updateBulkSelectionSummary();
+}
+
+function toggleBulkSelectAll(checked) {
+    bulkParsedRows.forEach(function(row, idx) {
+        if (validateBulkRow(row).length === 0) {
+            bulkSelectedRows[idx] = checked;
+        }
+    });
+    if (!checked) {
+        bulkSelectedRows = {};
+    }
+    updateBulkSelectionSummary();
+    var boxes = document.querySelectorAll('.bulk-row-check');
+    boxes.forEach(function(box) { if (!box.disabled) box.checked = checked; });
+}
+
+function updateBulkSelectionSummary() {
+    var selected = Object.keys(bulkSelectedRows).filter(function(idx) { return validateBulkRow(bulkParsedRows[idx]).length === 0; }).length;
+    var el = document.getElementById('bulkSelectedCount');
+    if (el) el.textContent = selected + ' selected';
+    var btn = document.getElementById('bulkSelectedUploadBtn');
+    if (btn) btn.style.display = selected > 0 ? '' : 'none';
+    var text = document.getElementById('bulkSelectedUploadBtnText');
+    if (text) text.textContent = selected > 0 ? 'Import Selected (' + selected + ')' : 'Import Selected';
+    var allBox = document.getElementById('bulkSelectAll');
+    if (allBox) {
+        var validRows = bulkParsedRows.filter(function(row) { return validateBulkRow(row).length === 0; }).length;
+        allBox.checked = validRows > 0 && selected === validRows;
+        allBox.indeterminate = selected > 0 && selected < validRows;
+    }
+}
+
+function submitSelectedBulkUpload() {
+    var input = document.getElementById('bulkCsvInput');
+    if (!input.files[0]) { showToast('No file selected', 'error'); return; }
+    var selectedIndexes = Object.keys(bulkSelectedRows).map(function(k) { return parseInt(k, 10); }).filter(function(idx) { return validateBulkRow(bulkParsedRows[idx]).length === 0; });
+    if (!selectedIndexes.length) { showToast('Select at least one valid row to import', 'error'); return; }
+    document.getElementById('bulkUploadBtn').click();
+}
+
+// ===== Photo-First Bulk Upload =====
+var photoRows = [];
+var currentBulkTab = 'spreadsheet';
+
+// ===== 1688 Import =====
+var alibaba1688File = null;
+var alibaba1688Rows = [];
+
+function handle1688FileSelect(input) {
+    var file = input.files[0];
+    if (!file) return;
+    alibaba1688File = file;
+    var nameEl = document.getElementById('alibaba1688FileName');
+    nameEl.textContent = file.name;
+    nameEl.style.display = '';
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var text = e.target.result;
+        // Strip BOM
+        if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+        parse1688CSV(text);
+    };
+    reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSVLine1688(line) {
+    var result = [], cur = '', inQ = false;
+    for (var i = 0; i < line.length; i++) {
+        var ch = line[i];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+        else { cur += ch; }
+    }
+    result.push(cur);
+    return result;
+}
+
+function parse1688CSV(text) {
+    var lines = text.split(/\r?\n/);
+    if (lines.length < 2) { showToast('CSV appears empty', 'error'); return; }
+    var headers = parseCSVLine1688(lines[0]);
+    function colIdx(name) { return headers.findIndex(function(h){ return h.trim() === name; }); }
+    var nameIdx  = colIdx('Product name');
+    var priceIdx = colIdx('Price');
+    var qtyIdx   = colIdx('Quantity');
+    var specsIdx = colIdx('Specifications');
+    var imgIdx   = colIdx('Image link');
+
+    alibaba1688Rows = [];
+    var tbody = document.getElementById('alibaba1688TableBody');
+    tbody.innerHTML = '';
+
+    for (var r = 1; r < lines.length; r++) {
+        var line = lines[r].trim();
+        if (!line) continue;
+        var cols = parseCSVLine1688(line);
+        var name     = nameIdx  >= 0 ? (cols[nameIdx]  || '').trim() : '';
+        var priceRaw = priceIdx >= 0 ? (cols[priceIdx] || '').trim() : '';
+        var qty      = qtyIdx   >= 0 ? (cols[qtyIdx]   || '').trim() : '';
+        var specs    = specsIdx >= 0 ? (cols[specsIdx] || '').trim() : '';
+        var imgUrl   = imgIdx   >= 0 ? (cols[imgIdx]   || '').trim() : '';
+        var priceMatch = priceRaw.match(/¥([\d.]+)/);
+        var price = priceMatch ? priceMatch[1] : '';
+        alibaba1688Rows.push({name: name, price: price, qty: qty, specs: specs, imgUrl: imgUrl});
+        var tr = document.createElement('tr');
+        tr.innerHTML =
+            '<td style="text-align:center;">' +
+                (imgUrl ? '<img src="' + imgUrl + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" alt="">' : '<span style="color:var(--text-secondary);">—</span>') +
+            '</td>' +
+            '<td style="font-size:12px;">' + (name || '<span style="color:#ef4444;">missing</span>') + '</td>' +
+            '<td style="text-align:center;">' + (price ? '¥' + price : '<span style="color:#ef4444;">?</span>') + '</td>' +
+            '<td style="text-align:center;">' + (qty || '1') + '</td>' +
+            '<td style="font-size:11px;color:var(--text-secondary);">' + specs + '</td>';
+        tbody.appendChild(tr);
+    }
+
+    document.getElementById('alibaba1688PreviewSection').style.display = '';
+    document.getElementById('alibaba1688CountBadge').textContent = alibaba1688Rows.length + ' product(s)';
+    if (alibaba1688Rows.length > 0) {
+        document.getElementById('alibaba1688UploadBtn').style.display = '';
+        document.getElementById('bulkModalFooter').style.display = '';
+    }
+}
+
+function clear1688() {
+    alibaba1688File = null;
+    alibaba1688Rows = [];
+    document.getElementById('alibaba1688Input').value = '';
+    document.getElementById('alibaba1688FileName').style.display = 'none';
+    document.getElementById('alibaba1688PreviewSection').style.display = 'none';
+    document.getElementById('alibaba1688TableBody').innerHTML = '';
+    document.getElementById('alibaba1688UploadBtn').style.display = 'none';
+    document.getElementById('bulkModalFooter').style.display = 'none';
+}
+
+function submit1688Upload() {
+    if (!alibaba1688File) return;
+    var btn = document.getElementById('alibaba1688UploadBtn');
+    btn.disabled = true;
+    document.getElementById('alibaba1688UploadBtnText').textContent = 'Importing\u2026';
+    var formData = new FormData();
+    formData.append('csv_file', alibaba1688File);
+    fetch('/products/bulk-upload-1688/', {
+        method: 'POST',
+        headers: {'X-CSRFToken': getCookie('csrftoken')},
+        body: formData
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+        btn.disabled = false;
+        document.getElementById('alibaba1688UploadBtnText').textContent = 'Import Products';
+        if (res.success) {
+            showToast(res.message, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('bulkUploadModal')).hide();
+            setTimeout(function(){ location.reload(); }, 700);
+        } else {
+            showToast(res.message, 'error');
+        }
+    })
+    .catch(function(){
+        btn.disabled = false;
+        document.getElementById('alibaba1688UploadBtnText').textContent = 'Import Products';
+        showToast('Network error', 'error');
+    });
+}
+
+function switchBulkTab(tab) {
+    currentBulkTab = tab;
+    document.getElementById('tabContentSpreadsheet').style.display = tab === 'spreadsheet' ? '' : 'none';
+    document.getElementById('tabContentPhotos').style.display = tab === 'photos' ? '' : 'none';
+    document.getElementById('tabContent1688').style.display = tab === '1688' ? '' : 'none';
+    var btnSheet = document.getElementById('tabBtnSpreadsheet');
+    var btnPhoto = document.getElementById('tabBtnPhotos');
+    var btn1688  = document.getElementById('tabBtn1688');
+    btnSheet.style.background = tab === 'spreadsheet' ? 'var(--accent-3)' : 'transparent';
+    btnSheet.style.color      = tab === 'spreadsheet' ? '#000' : 'var(--text-secondary)';
+    btnPhoto.style.background = tab === 'photos' ? '#C84B31' : 'transparent';
+    btnPhoto.style.color      = tab === 'photos' ? '#fff' : 'var(--text-secondary)';
+    btn1688.style.background  = tab === '1688' ? '#dc2626' : 'transparent';
+    btn1688.style.color       = tab === '1688' ? '#fff' : 'var(--text-secondary)';
+    // footer visibility
+    var footer = document.getElementById('bulkModalFooter');
+    var bulkBtn    = document.getElementById('bulkUploadBtn');
+    var photoBtn   = document.getElementById('photoUploadBtn');
+    var importBtn  = document.getElementById('alibaba1688UploadBtn');
+    bulkBtn.style.display   = tab === 'spreadsheet' ? '' : 'none';
+    photoBtn.style.display  = (tab === 'photos' && photoRows.length > 0) ? '' : 'none';
+    importBtn.style.display = (tab === '1688' && alibaba1688Rows.length > 0) ? '' : 'none';
+    if (tab === 'spreadsheet') {
+        footer.style.display = document.getElementById('bulkStep2').style.display === 'none' ? 'none' : '';
+    } else {
+        var showFooter = (tab === 'photos' && photoRows.length > 0) || (tab === '1688' && alibaba1688Rows.length > 0);
+        footer.style.display = showFooter ? '' : 'none';
+    }
+}
+
+(function() {
+    var pdz = document.getElementById('photoDropZone');
+    pdz.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        this.style.borderColor = '#a78bfa';
+        this.style.background = 'rgba(167,139,250,0.07)';
+    });
+    pdz.addEventListener('dragleave', function() {
+        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.background = '';
+    });
+    pdz.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.background = '';
+        handlePhotosDrop(e.dataTransfer.files);
+    });
+})();
+
+function handlePhotosDrop(files) {
+    for (var i = 0; i < files.length; i++) {
+        var f = files[i];
+        if (!f.type.startsWith('image/')) continue;
+        var alreadyIn = photoRows.some(function(r) { return r.file.name === f.name; });
+        if (alreadyIn) continue;
+        var name = f.name.replace(/\.[^/.]+$/, '').replace(/[_\-]+/g, ' ').trim();
+        photoRows.push({ file: f, objectUrl: URL.createObjectURL(f), name: name, price: '', moq: '',
+                         weight: '', carton_l: '', carton_w: '', carton_h: '', carton_qty: '' });
+    }
+    renderPhotoTable();
+    updatePhotoFooter();
+}
+
+function updatePhotoName(idx, val)       { photoRows[idx].name       = val; }
+function updatePhotoPrice(idx, val)      { photoRows[idx].price      = val; }
+function updatePhotoMoq(idx, val)        { photoRows[idx].moq        = val; }
+function updatePhotoWeight(idx, val)     { photoRows[idx].weight     = val; }
+function updatePhotoCartonL(idx, val)    { photoRows[idx].carton_l   = val; }
+function updatePhotoCartonW(idx, val)    { photoRows[idx].carton_w   = val; }
+function updatePhotoCartonH(idx, val)    { photoRows[idx].carton_h   = val; }
+function updatePhotoCartonQty(idx, val)  { photoRows[idx].carton_qty = val; }
+
+function removePhotoRow(idx) {
+    URL.revokeObjectURL(photoRows[idx].objectUrl);
+    photoRows.splice(idx, 1);
+    renderPhotoTable();
+    updatePhotoFooter();
+}
+
+function clearPhotos() {
+    photoRows.forEach(function(r) { URL.revokeObjectURL(r.objectUrl); });
+    photoRows = [];
+    renderPhotoTable();
+    updatePhotoFooter();
+}
+
+function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function renderPhotoTable() {
+    var tbody = document.getElementById('photoTableBody');
+    var section = document.getElementById('photoTableSection');
+    if (!photoRows.length) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    var html = '';
+    var inp = 'class="form-control" style="padding:4px 7px;font-size:12px;"';
+    photoRows.forEach(function(row, idx) {
+        html += '<tr>' +
+            '<td style="padding:6px 8px;"><img src="' + row.objectUrl + '" style="width:50px;height:50px;object-fit:cover;border-radius:8px;border:1px solid var(--border-color);display:block;" alt=""></td>' +
+            '<td style="padding:4px 5px;"><input type="text" value="' + escHtml(row.name) + '" oninput="updatePhotoName(' + idx + ',this.value)" ' + inp + ' style="padding:4px 7px;font-size:12px;min-width:140px;" placeholder="Product name *"></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.price) + '" oninput="updatePhotoPrice(' + idx + ',this.value)" ' + inp + ' step="0.01" min="0" placeholder="Price *"></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.moq) + '" oninput="updatePhotoMoq(' + idx + ',this.value)" ' + inp + ' min="1" placeholder="MOQ *"></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.weight) + '" oninput="updatePhotoWeight(' + idx + ',this.value)" ' + inp + ' step="0.001" min="0" placeholder="opt."></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.carton_l) + '" oninput="updatePhotoCartonL(' + idx + ',this.value)" ' + inp + ' step="0.01" min="0" placeholder="opt."></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.carton_w) + '" oninput="updatePhotoCartonW(' + idx + ',this.value)" ' + inp + ' step="0.01" min="0" placeholder="opt."></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.carton_h) + '" oninput="updatePhotoCartonH(' + idx + ',this.value)" ' + inp + ' step="0.01" min="0" placeholder="opt."></td>' +
+            '<td style="padding:4px 5px;"><input type="number" value="' + escHtml(row.carton_qty) + '" oninput="updatePhotoCartonQty(' + idx + ',this.value)" ' + inp + ' min="1" placeholder="opt."></td>' +
+            '<td style="padding:4px 5px;"><button class="btn-danger btn-sm" onclick="removePhotoRow(' + idx + ')" title="Remove"><i class="bi bi-x-lg"></i></button></td>' +
+            '</tr>';
+    });
+    tbody.innerHTML = html;
+    document.getElementById('photoCountBadge').textContent = photoRows.length + ' photo' + (photoRows.length !== 1 ? 's' : '');
+}
+
+function updatePhotoFooter() {
+    var has = photoRows.length > 0;
+    document.getElementById('photoUploadBtn').style.display = has ? '' : 'none';
+    document.getElementById('bulkModalFooter').style.display = has ? '' : 'none';
+    if (has) document.getElementById('photoUploadBtnText').textContent = 'Create ' + photoRows.length + ' Products';
+}
+
+function submitPhotoUpload() {
+    var valid = photoRows.filter(function(r) {
+        return r.name.trim() && r.price && !isNaN(parseFloat(r.price)) && r.moq && parseInt(r.moq) > 0;
+    });
+    if (!valid.length) { showToast('Please fill in name, price and MOQ for at least one row', 'error'); return; }
+    var skip = photoRows.length - valid.length;
+    if (skip > 0 && !confirm(skip + ' row(s) are missing required fields and will be skipped. Continue?')) return;
+
+    var btn = document.getElementById('photoUploadBtn');
+    btn.disabled = true;
+    document.getElementById('photoUploadBtnText').textContent = 'Uploading\u2026';
+
+    var fd = new FormData();
+    valid.forEach(function(row) {
+        fd.append('images[]',         row.file);
+        fd.append('names[]',          row.name.trim());
+        fd.append('prices[]',         row.price);
+        fd.append('moqs[]',           row.moq);
+        fd.append('weights[]',        row.weight     || '');
+        fd.append('carton_lengths[]', row.carton_l   || '');
+        fd.append('carton_widths[]',  row.carton_w   || '');
+        fd.append('carton_heights[]', row.carton_h   || '');
+        fd.append('carton_qtys[]',    row.carton_qty || '');
+    });
+
+    fetch('/products/bulk-upload-photos/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: fd
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        btn.disabled = false;
+        document.getElementById('photoUploadBtnText').textContent = 'Create Products';
+        if (res.success) {
+            showToast(res.message, 'success');
+            bootstrap.Modal.getInstance(document.getElementById('bulkUploadModal')).hide();
+            setTimeout(function() { location.reload(); }, 700);
+        } else {
+            showToast(res.message, 'error');
+        }
+    })
+    .catch(function() {
+        btn.disabled = false;
+        document.getElementById('photoUploadBtnText').textContent = 'Create Products';
+        showToast('Network error', 'error');
+    });
+}
 </script>
+
+{% include "includes/pagination.html" with page_obj=page_obj %}
 {% endblock %}
+

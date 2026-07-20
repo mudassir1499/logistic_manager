@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if target %}Edit User{% else %}Add User{% endif %} — Admin{% endblock %}
+{% block page_title %}{% if target %}Edit User{% else %}Add User{% endif %}{% endblock %}
+{% block nav_users %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-person-badge me-2"></i>{% if target %}Edit “{{ target.username }}”{% else %}Add Team Member{% endif %}
+    </h1>
+    <p class="text-secondary mb-0">Set the role and choose which back-office modules this user can access</p>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<div class="card">
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Username</label>
+                    <input type="text" name="username" class="form-control" value="{{ form_data.username|default:'' }}"
+                           {% if target %}readonly{% endif %} required>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Email</label>
+                    <input type="email" name="email" class="form-control" value="{{ form_data.email|default:'' }}">
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">Role</label>
+                    <select name="role" class="form-select">
+                        {% for value, label in roles %}
+                            {% if value != 'customer' %}
+                            <option value="{{ value }}" {% if form_data.role == value %}selected{% endif %}>{{ label }}</option>
+                            {% endif %}
+                        {% endfor %}
+                    </select>
+                    <div class="form-text small">Admins have every permission automatically.</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold">
+                        {% if target %}New password (leave blank to keep){% else %}Password{% endif %}
+                    </label>
+                    <input type="password" name="password" class="form-control" {% if not target %}required{% endif %}>
+                </div>
+
+                {% if target %}
+                <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="is_active" name="is_active"
+                               {% if target.is_active %}checked{% endif %}>
+                        <label class="form-check-label small" for="is_active">Active (can log in)</label>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="col-12">
+                    <label class="form-label small fw-semibold d-block">Module permissions (staff & support)</label>
+                    <div class="row g-2">
+                        {% for module in modules %}
+                        <div class="col-md-4 col-sm-6">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input" id="perm_{{ module }}" name="perm_{{ module }}"
+                                    {% if profile %}
+                                        {% if module == 'orders' and profile.perm_orders %}checked{% endif %}
+                                        {% if module == 'products' and profile.perm_products %}checked{% endif %}
+                                        {% if module == 'customers' and profile.perm_customers %}checked{% endif %}
+                                        {% if module == 'khata' and profile.perm_khata %}checked{% endif %}
+                                        {% if module == 'noon_labels' and profile.perm_noon_labels %}checked{% endif %}
+                                        {% if module == 'support' and profile.perm_support %}checked{% endif %}
+                                        {% if module == 'settings' and profile.perm_settings %}checked{% endif %}
+                                    {% endif %}>
+                                <label class="form-check-label small text-capitalize" for="perm_{{ module }}">{{ module }}</label>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4 d-flex gap-2">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check2 me-1"></i>Save</button>
+                <a href="{% url 'user_list' %}" class="btn btn-outline-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

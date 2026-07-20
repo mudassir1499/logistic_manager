@@ -1,0 +1,263 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ customer.name }} — Ledger{% endblock %}
+{% block nav_khata %}active{% endblock %}
+
+{% block page_title %}
+<a href="/khata/" style="color:var(--text-secondary);text-decoration:none;font-size:15px;"><i class="bi bi-arrow-left me-1"></i>Khata</a>
+<span style="color:var(--border-color);margin:0 8px">/</span>
+{{ customer.name }}
+{% endblock %}  
+
+{% block topbar_actions %}
+
+<a href="/khata/customer/{{ customer.id }}/print/" target="_blank" class="btn-ghost" style="margin-right:8px;"
+   data-bs-toggle="tooltip" title="Open a printable report in a new tab">
+    <i class="bi bi-printer me-1"></i> Print
+</a>
+
+{# Carries the active date filter through, so the PDF matches what is on screen. #}
+<a id="exportPdfBtn" href="/khata/customer/{{ customer.id }}/export-pdf/{% if is_filtered %}?from={{ date_from }}&amp;to={{ date_to }}{% endif %}"
+   class="btn-ghost" style="margin-right:8px;"
+   data-bs-toggle="tooltip" title="Download a PDF statement for the selected date range">
+    <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
+</a>
+
+<button class="btn-glow" onclick="openAddEntry()">
+    <i class="bi bi-plus-circle"></i> Add Entry
+</button>
+{% endblock %}
+
+{% block content %}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="glass-card h-100">
+            <div class="d-flex align-items-center gap-3 mb-3">
+                <div class="avatar-circle lg">{{ customer.name|first|upper }}</div>
+                <div>
+                    <div style="font-weight:700;font-size:17px;color:var(--text-primary)">{{ customer.name }}</div>
+                    {% if customer.phone %}<div style="font-size:13px;color:var(--text-secondary)"><i class="bi bi-telephone me-1"></i>{{ customer.phone }}</div>{% endif %}
+                    {% if customer.email %}<div style="font-size:13px;color:var(--text-secondary)"><i class="bi bi-envelope me-1"></i>{{ customer.email }}</div>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-8">
+        <div class="glass-card h-100">
+            <div class="u-label" style="margin-bottom:12px">Current Balance <span class="text-lowercase">(full ledger)</span></div>
+            <div class="d-flex flex-wrap gap-3">
+                {% if balances %}
+                    {% for currency, bal in balances.items %}
+                    <div class="glass-card" style="padding:12px 20px;flex:1;min-width:120px;text-align:center;">
+                        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">{{ currency }}</div>
+                        <div style="font-size:22px;font-weight:800;{% if bal >= 0 %}color:var(--success){% else %}color:var(--danger){% endif %}">
+                            {% if bal >= 0 %}+{% endif %}{{ bal }}
+                        </div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-top:4px">{% if bal >= 0 %}advance with us{% else %}customer owes{% endif %}</div>
+                    </div>
+                    {% endfor %}  
+                {% else %}
+                    <div style="color:var(--text-secondary);padding:12px">No balance yet.</div>
+                {% endif %}  
+            </div>
+        </div>
+    </div>
+</div>
+
+{% comment %} ---- Date range filter ---------------------------------------------------
+   Drives the table below and the Export PDF button in the topbar. Presets cover
+   the periods actually used for settling accounts (this month, last month, this
+   year); the two date inputs handle anything else. ------------------------- {% endcomment %}
+<div class="glass-card mb-3">
+    <form method="get" action="" id="ledgerRangeForm" class="row g-2 align-items-end">
+        <div class="col-auto">
+            <label class="form-label mb-1" for="dateFrom" style="font-size:11px;color:var(--text-secondary);font-weight:600;">FROM</label>
+            <input type="date" id="dateFrom" name="from" value="{{ date_from }}" class="form-control form-control-sm" style="min-width:150px;">
+        </div>
+        <div class="col-auto">
+            <label class="form-label mb-1" for="dateTo" style="font-size:11px;color:var(--text-secondary);font-weight:600;">TO</label>
+            <input type="date" id="dateTo" name="to" value="{{ date_to }}" class="form-control form-control-sm" style="min-width:150px;">
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn-glow btn-sm"><i class="bi bi-funnel me-1"></i>Apply</button>
+        </div>
+        {% if is_filtered %}
+        <div class="col-auto">
+            <a href="?" class="btn-ghost btn-sm"><i class="bi bi-x-lg me-1"></i>Clear</a>
+        </div>
+        {% endif %}
+        <div class="col-auto ms-auto d-flex gap-2 flex-wrap">
+            <button type="button" class="filter-chip" onclick="setLedgerPreset('this_month')">This month</button>
+            <button type="button" class="filter-chip" onclick="setLedgerPreset('last_month')">Last month</button>
+            <button type="button" class="filter-chip" onclick="setLedgerPreset('this_year')">This year</button>
+            <button type="button" class="filter-chip" onclick="setLedgerPreset('all')">All time</button>
+        </div>
+    </form>
+    {% if is_filtered %}
+    <div class="u-muted-sm mt-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Showing {{ filtered_count }} of {{ total_count }} transaction{{ total_count|pluralize }} in this range.
+        The balance cards above always reflect the full ledger.
+    </div>
+    {% endif %}
+</div>
+
+<div class="glass-card">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h6 style="font-weight:700;margin:0"><i class="bi bi-journal-text me-2"></i>Transactions ({{ entries_with_running|length }})</h6>
+        <div class="search-bar">
+            <i class="bi bi-search"></i>
+            <input type="text" class="form-control" id="entrySearch" placeholder="Search entries..." aria-label="Search entries" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);" oninput="setupTableSearch('entrySearch','entriesTable')">
+        </div>
+    </div>
+    {% if entries_with_running %}
+    <div class="table-responsive">
+        <table class="table-glass" id="entriesTable">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Type</th>
+                    <th>Currency</th>
+                    <th>Amount</th>
+                    <th>Running Balance</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in entries_with_running %}
+                <tr>
+                    <td style="font-size:13px;color:var(--text-secondary)">{{ row.entry.date|date:"M d, Y" }}<br><span style="font-size:11px">{{ row.entry.date|date:"H:i" }}</span></td>
+                    <td>{{ row.entry.description|default:"—" }}</td>
+                    <td>
+                        {% if row.entry.entry_type == 'credit' %}
+                        <span class="badge-glass badge-success"><i class="bi bi-arrow-down-circle me-1"></i>Credit</span>
+                        {% else %}
+                        <span class="badge-glass badge-danger"><i class="bi bi-arrow-up-circle me-1"></i>Debit</span>
+                        {% endif %}  
+                    </td>
+                    <td><span class="badge-glass badge-info">{{ row.entry.currency }}</span></td>
+                    <td style="font-weight:700;{% if row.entry.entry_type == 'credit' %}color:var(--success){% else %}color:var(--danger){% endif %}">
+                        {% if row.entry.entry_type == 'credit' %}+{% else %}-{% endif %}{{ row.entry.amount }}
+                    </td>
+                    <td style="font-weight:700;{% if row.running >= 0 %}color:var(--success){% else %}color:var(--danger){% endif %}">
+                        {% if row.running >= 0 %}+{% endif %}{{ row.running }} {{ row.entry.currency }}
+                    </td>
+                    <td>
+                        <button class="btn-danger btn-sm" onclick="confirmDelete('/khata/delete/{{ row.entry.id }}/', 'this entry')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}  
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <i class="bi bi-journal-x"></i>
+        <p>No entries yet. Click <strong>Add Entry</strong> to get started.</p>
+    </div>
+    {% endif %}  
+</div>
+
+<div class="modal fade" id="addEntryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-plus me-2"></i>New Entry — {{ customer.name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addEntryForm" class="form-glass">
+          {% csrf_token %}
+          <input type="hidden" name="customer_id" value="{{ customer.id }}">
+          <div class="mb-3">
+            <label class="form-label">Entry Type</label>
+            <div class="d-flex gap-3">
+                <label class="d-flex align-items-center gap-2" style="cursor:pointer">
+                    <input type="radio" name="entry_type" value="credit" required class="form-check-input" checked>
+                    <span class="badge-glass badge-success" style="font-size:14px;padding:6px 14px"><i class="bi bi-arrow-down-circle me-1"></i>Credit (Received)</span>
+                </label>
+                <label class="d-flex align-items-center gap-2" style="cursor:pointer">
+                    <input type="radio" name="entry_type" value="debit" class="form-check-input">
+                    <span class="badge-glass badge-danger" style="font-size:14px;padding:6px 14px"><i class="bi bi-arrow-up-circle me-1"></i>Debit (Given)</span>
+                </label>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Currency</label>
+            <select name="currency" class="form-select">
+              {% for code, label in currencies %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}  
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount</label>
+            <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description <span style="color:var(--text-secondary);font-size:11px">(optional)</span></label>
+            <input type="text" name="description" class="form-control" placeholder="e.g. Payment for order #123">
+          </div>
+          <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Add Entry</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}  
+
+{% block extra_js %}
+<script>
+// Opens the Add Entry modal programmatically (since the button uses onclick, not data-bs-toggle)
+function openAddEntry() {
+    new bootstrap.Modal(document.getElementById('addEntryModal')).show();
+}
+
+// Wire up AJAX form submission for the Add Entry modal.
+ajaxSubmit('addEntryForm', '/khata/add/', function() {
+    bootstrap.Modal.getInstance(document.getElementById('addEntryModal')).hide();
+    setTimeout(function() { location.reload(); }, 500);
+});
+
+// Initialize table search on the entry search input.
+// setupTableSearch is a utility function from main.js that filters table rows.
+setupTableSearch('entrySearch', 'entriesTable');
+
+// Date-range presets. Each fills the two date inputs and submits, so the table and
+// the Export PDF link stay in sync with one click.
+function setLedgerPreset(preset) {
+    var fromEl = document.getElementById('dateFrom');
+    var toEl = document.getElementById('dateTo');
+    var now = new Date();
+
+    // Formats a Date as YYYY-MM-DD in local time. toISOString() would shift the
+    // date backwards for anyone east of UTC, which is exactly where this business
+    // operates, so it is deliberately not used here.
+    function iso(d) {
+        var m = String(d.getMonth() + 1).padStart(2, '0');
+        var day = String(d.getDate()).padStart(2, '0');
+        return d.getFullYear() + '-' + m + '-' + day;
+    }
+
+    if (preset === 'all') {
+        fromEl.value = '';
+        toEl.value = '';
+    } else if (preset === 'this_month') {
+        fromEl.value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+        toEl.value = iso(now);
+    } else if (preset === 'last_month') {
+        fromEl.value = iso(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+        toEl.value = iso(new Date(now.getFullYear(), now.getMonth(), 0));  // day 0 = last day of prev month
+    } else if (preset === 'this_year') {
+        fromEl.value = iso(new Date(now.getFullYear(), 0, 1));
+        toEl.value = iso(now);
+    }
+    document.getElementById('ledgerRangeForm').submit();
+}
+</script>
+{% endblock %}  

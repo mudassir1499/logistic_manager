@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block title %}Packing List{% endblock %}
+{% block page_title %}Packing List{% endblock %}
+{% block nav_packing %}active{% endblock %}
+
+{% block topbar_actions %}
+<a href="/orders/" class="btn btn-sm" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:8px;padding:6px 14px;font-size:13px;text-decoration:none;">
+    <i class="bi bi-arrow-left me-1"></i> Orders
+</a>
+{% endblock %}
+
+{% block content %}
+
+<form method="get" class="glass-card p-3 mb-4" style="border:1px solid var(--border-color);">
+    <div class="row g-2 align-items-end">
+        <div class="col-sm-auto col-12">
+            <label class="form-label mb-1" style="font-size:12px;color:var(--text-secondary);">Customer</label>
+            <select name="customer" class="form-select form-select-sm" style="min-width:180px;">
+                <option value="">— All Customers —</option>
+                {% for c in customers %}
+                <option value="{{ c.id }}" {% if selected_customer == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-sm-auto col-12">
+            <label class="form-label mb-1" style="font-size:12px;color:var(--text-secondary);">Shipping Method</label>
+            <select name="method" class="form-select form-select-sm">
+                <option value="">— All Methods —</option>
+                <option value="air" {% if selected_method == "air" %}selected{% endif %}>✈ Air (Air + KSA Air)</option>
+                <option value="sea" {% if selected_method == "sea" %}selected{% endif %}>🚢 Sea (Sea + KSA Sea + KSA)</option>
+                <option value="manual" {% if selected_method == "manual" %}selected{% endif %}>Manual / Not Set</option>
+            </select>
+        </div>
+        <div class="col-sm-auto col-12 d-flex gap-2">
+            <button type="submit" class="btn btn-sm" style="background:var(--accent-1);color:#fff;border:none;border-radius:8px;padding:6px 18px;">
+                <i class="bi bi-funnel me-1"></i> Filter
+            </button>
+            
+            {% if selected_customer or selected_method %}
+            <a href="/orders/packing-list/" class="btn btn-sm" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:8px;padding:6px 12px;">
+                <i class="bi bi-x-circle me-1"></i> Clear
+            </a>
+            {% endif %}
+        </div>
+        <div class="col ms-auto d-flex align-items-end justify-content-end">
+            <span class="small text-secondary">
+                {{ orders|length }} order{{ orders|length|pluralize }} found
+            </span>
+        </div>
+    </div>
+</form>
+
+{% if orders %}
+
+<div class="glass-card" style="border:1px solid var(--border-color);overflow:hidden;">
+    <table class="table table-hover mb-0" style="font-size:13px;">
+        <thead>
+            <tr style="background:var(--bg-card);border-bottom:1px solid var(--border-color);">
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Order</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Customer</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Date</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Method</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Items</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">Weight</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);">CBM</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);text-align:center;">Status</th>
+                <th style="padding:12px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-secondary);text-align:right;">Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for order in orders %}
+            <tr style="border-bottom:1px solid var(--border-color);">
+                <td style="padding:12px 16px;font-weight:700;color:var(--accent-1);">#{{ order.id }}</td>
+                <td style="padding:12px 16px;">{{ order.customer.name }}</td>
+                <td style="padding:12px 16px;color:var(--text-secondary);">{{ order.date|date:"d M Y" }}</td>
+                <td style="padding:12px 16px;">
+                    
+                    {% with m=order.shipping_method %}
+                    {% if m == "air" or m == "ksa_air" %}
+                        <span style="background:#0ea5e920;color:#0ea5e9;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">
+                            ✈ {% if m == "ksa_air" %}KSA {% endif %}Air
+                        </span>
+                    {% elif m == "sea" or m == "ksa_sea" or m == "ksa" %}
+                        <span style="background:#6366f120;color:#6366f1;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">
+                            🚢 {% if m == "ksa_sea" %}KSA {% elif m == "ksa" %}KSA {% endif %}Sea
+                        </span>
+                    {% else %}
+                        <span style="background:var(--bg-input);color:var(--text-secondary);border-radius:20px;padding:3px 10px;font-size:11px;">Manual</span>
+                    {% endif %}
+                    {% endwith %}
+                </td>
+                <td style="padding:12px 16px;">{{ order.items.count }} item{{ order.items.count|pluralize }}</td>
+                <td style="padding:12px 16px;color:var(--text-secondary);">{{ order.total_weight }} KG</td>
+                <td style="padding:12px 16px;color:var(--text-secondary);">{{ order.total_cbm }}</td>
+                <td style="padding:12px 16px;text-align:center;">
+                    {% if order.status == "confirmed" %}
+                        <span style="background:#22c55e20;color:#22c55e;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;">Confirmed</span>
+                    {% else %}
+                        <span style="background:#f59e0b20;color:#f59e0b;border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;">Draft</span>
+                    {% endif %}
+                </td>
+                <td style="padding:12px 16px;text-align:right;">
+                    <a href="/orders/packing-list/{{ order.id }}/" target="_blank"
+                       class="btn btn-sm"
+                       style="background:var(--accent-3);color:#fff;border:none;border-radius:6px;padding:5px 14px;font-size:12px;font-weight:600;text-decoration:none;">
+                        <i class="bi bi-printer me-1"></i> Packing List
+                    </a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+
+<div class="glass-card p-5 text-center" style="border:1px solid var(--border-color);">
+    <i class="bi bi-clipboard2-x" style="font-size:48px;color:var(--text-secondary);opacity:.4;"></i>
+    <div style="font-size:16px;font-weight:600;margin-top:16px;color:var(--text-secondary);">No orders found</div>
+    <div style="font-size:13px;color:var(--text-secondary);margin-top:6px;opacity:.7;">
+        {% if selected_customer or selected_method %}Try adjusting the filters above.{% else %}No orders in the system yet.{% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

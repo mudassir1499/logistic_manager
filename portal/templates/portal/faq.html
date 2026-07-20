@@ -1,0 +1,173 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}FAQ — Frequently Asked Questions — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Find answers to common questions about {{ settings.company_name|default:"LogiManager" }} China sourcing services, supplier verification, quality inspection, pricing, and shipping coordination.{% endblock %}
+{% block meta_keywords %}FAQ, frequently asked questions, China sourcing FAQ, product sourcing, supplier verification, quality inspection, price negotiation, order management, shipping from China{% endblock %}
+{% block og_title %}FAQ — Frequently Asked Questions — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block og_description %}Find answers to common questions about China sourcing services, supplier verification, quality inspection, and order management.{% endblock %}
+{% block twitter_title %}FAQ — Frequently Asked Questions — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block twitter_description %}Find answers to common questions about China sourcing services, supplier verification, quality inspection, and order management.{% endblock %}
+
+{% block content %}
+
+<section class="faq-hero">
+    <div class="container">
+        <div class="text-center py-5">
+            <span class="section-label">Help Center</span>
+            <h1 class="hero-title">Frequently Asked Questions</h1>
+            <p class="hero-subtitle">Everything you need to know about sourcing products from China with us.</p>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="accordion accordion-custom" id="faqAccordion">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading1">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse1" aria-expanded="true" aria-controls="faqCollapse1">
+                                <i class="bi bi-search me-2 text-primary"></i>
+                                What types of products can you source from China?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse1" class="accordion-collapse collapse show" aria-labelledby="faqHeading1" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                We source a wide range of products including <strong>electronics, machinery, construction materials, home goods, textiles, packaging materials, auto parts, and consumer products</strong>. If you have a specific product in mind, send us the details and we will identify suitable manufacturers. We specialize in B2B bulk orders for businesses in the UAE and Middle East.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading2">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse2" aria-expanded="false" aria-controls="faqCollapse2">
+                                <i class="bi bi-cash-stack me-2 text-primary"></i>
+                                How do you charge for sourcing services?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse2" class="accordion-collapse collapse" aria-labelledby="faqHeading2" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                We typically charge a <strong>sourcing fee</strong> based on the complexity of the product and order size, plus a <strong>commission</strong> on the total order value. Alternatively, we can work on a fixed fee per project. All costs are agreed upfront before we begin — no hidden charges. Contact us for a detailed quote tailored to your needs.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading3">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse3" aria-expanded="false" aria-controls="faqCollapse3">
+                                <i class="bi bi-shield-check me-2 text-primary"></i>
+                                How do you verify suppliers?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse3" class="accordion-collapse collapse" aria-labelledby="faqHeading3" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <strong>We verify suppliers through a multi-step process:</strong> physical factory visits, business license verification, production capability audits, reference checks with past clients, and review of certifications (ISO, CE, etc.). Because our team is based in China, we can visit factories in person — something remote agents cannot do. You receive a full supplier verification report before any payment is made.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading4">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse4" aria-expanded="false" aria-controls="faqCollapse4">
+                                <i class="bi bi-clipboard-check me-2 text-primary"></i>
+                                Do you handle quality inspections?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse4" class="accordion-collapse collapse" aria-labelledby="faqHeading4" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <strong>Yes.</strong> Quality inspection is one of our core services. We conduct <strong>pre-shipment inspections</strong> at the factory before goods leave China. Our inspections cover product specifications, functionality, packaging, labeling, and defect identification. We provide detailed photo and video reports so you can approve or reject the batch before shipping.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading5">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse5" aria-expanded="false" aria-controls="faqCollapse5">
+                                <i class="bi bi-box-seam me-2 text-primary"></i>
+                                Is there a minimum order quantity (MOQ)?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse5" class="accordion-collapse collapse" aria-labelledby="faqHeading5" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <strong>It depends on the supplier.</strong> Chinese manufacturers typically have their own MOQs, but we negotiate on your behalf to reduce minimums where possible. For the best pricing, larger quantities are recommended. We also offer <strong>order consolidation</strong> — combining multiple products from different suppliers into one shipment to save on freight costs.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading6">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse6" aria-expanded="false" aria-controls="faqCollapse6">
+                                <i class="bi bi-truck me-2 text-primary"></i>
+                                Do you handle shipping from China?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse6" class="accordion-collapse collapse" aria-labelledby="faqHeading6" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <strong>Yes.</strong> We coordinate <strong>air and sea freight</strong> from China to your destination in the UAE or Middle East. We do not own cargo ships — we work with trusted freight partners to arrange the best shipping option for your order. We also prepare export documentation and support customs clearance. You get door-to-door coordination without dealing with logistics yourself.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading7">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse7" aria-expanded="false" aria-controls="faqCollapse7">
+                                <i class="bi bi-credit-card me-2 text-primary"></i>
+                                What payment methods do you accept?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse7" class="accordion-collapse collapse" aria-labelledby="faqHeading7" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                We accept <strong>bank transfers</strong>, <strong>cash deposits</strong>, and <strong>online payments</strong>. New customers typically pay a deposit upfront to begin sourcing, with the balance due before shipping. For established clients with good payment history, we offer credit terms (Net 15 / Net 30). All invoices are available in the customer portal with downloadable PDFs and payment history.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading8">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse8" aria-expanded="false" aria-controls="faqCollapse8">
+                                <i class="bi bi-clock me-2 text-primary"></i>
+                                How long does the sourcing process take?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse8" class="accordion-collapse collapse" aria-labelledby="faqHeading8" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                <strong>Initial sourcing</strong> typically takes <strong>3–7 business days</strong> depending on product complexity. After supplier selection and sample approval, <strong>production</strong> usually takes <strong>15–45 days</strong>. <strong>Shipping</strong> adds <strong>5–10 days by air</strong> or <strong>25–35 days by sea</strong> to the UAE. We keep you updated at every stage through your customer portal.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading9">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse9" aria-expanded="false" aria-controls="faqCollapse9">
+                                <i class="bi bi-geo-alt me-2 text-primary"></i>
+                                Where is your office located?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse9" class="accordion-collapse collapse" aria-labelledby="faqHeading9" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                Our main office is in <strong>Xuzhou, China</strong> at 11-2-303, Penghouyuan. This is our biggest advantage — we are physically in China, visiting factories and managing supplier relationships in person. We primarily serve clients in the <strong>UAE and Middle East</strong>, but we work with businesses worldwide. Contact us via phone at <strong>+8617651652712</strong> or WhatsApp at the same number.
+                            </div>
+                        </div>
+                    </div>
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="faqHeading10">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#faqCollapse10" aria-expanded="false" aria-controls="faqCollapse10">
+                                <i class="bi bi-person-plus me-2 text-primary"></i>
+                                How do I create a customer account?
+                            </button>
+                        </h2>
+                        <div id="faqCollapse10" class="accordion-collapse collapse" aria-labelledby="faqHeading10" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body">
+                                Click <a href="{% url 'portal_register' %}">Register</a> and fill in your business details (name, email, phone, address). Once submitted, our team will verify your account within 24 hours. After approval, you can log in to submit sourcing requests, track orders, view your ledger, and manage communications. Existing customers can also <a href="{% url 'portal_login' %}">log in here</a>.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Still Have Questions?</h2>
+        <p class="text-white-50 mb-4">Our team is happy to answer any questions you have about sourcing from China.</p>
+        <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Contact Us</a>
+    </div>
+</section>
+
+{% endblock %}

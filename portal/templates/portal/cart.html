@@ -1,0 +1,206 @@
+
+
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}My Cart — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">My Cart</h4>
+                <p class="text-secondary mb-0 small">Review your items before checkout.</p>
+            </div>
+            <a href="{% url 'portal_products' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Products
+            </a>
+        </div>
+
+        {% if items %}
+        <div class="row g-4">
+            
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-cart me-2 text-primary"></i>Cart Items</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0" id="cartTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Product</th>
+                                        <th>Unit Price</th>
+                                        <th>Qty</th>
+                                        <th>Subtotal</th>
+                                        <th></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                    <tr data-item-id="{{ item.id }}">
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center gap-2">
+                                                {% with img=item.product.images.first %}
+                                                {% if img %}
+                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                {% else %}
+                                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                                    <i class="bi bi-image text-muted"></i>
+                                                </div>
+                                                {% endif %}
+                                                {% endwith %}
+                                                <div>
+                                                    <span class="fw-medium">{{ item.product.name }}</span>
+                                                    {% if item.product.ready_to_ship %}
+                                                    <br><span class="badge bg-success" style="font-size:10px;"><i class="bi bi-truck me-1"></i>Ready to Ship — labels at checkout</span>
+                                                    {% endif %}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>{{ item.product.price }} {{ settings.currency }}</td>
+                                        <td>
+                                            <input type="number" class="form-control form-control-sm cart-qty-input" value="{{ item.quantity }}" min="1" data-item-id="{{ item.id }}" style="width:70px;">
+                                        </td>
+                                        <td class="fw-medium item-subtotal">{{ item.subtotal }} {{ settings.currency }}</td>
+                                        <td>
+                                            <a href="{% url 'portal_remove_from_cart' item.id %}" class="btn btn-link text-danger p-0" onclick="return confirm('Remove this item from your cart?');">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Subtotal</span>
+                            <span class="fw-medium" id="cartSubtotal">{{ cart_total }} {{ settings.currency }}</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="fw-bold">Total</span>
+                            <span class="fw-bold fs-5 text-primary" id="cartTotal">{{ cart_total }} {{ settings.currency }}</span>
+                        </div>
+
+                        
+                        {% if currency_totals %}
+                        <div class="mb-3">
+                            <p class="text-secondary small mb-1">Also shown in:</p>
+                            {% for cur, total in currency_totals.items %}
+                            {% if cur != settings.currency %}
+                            <span class="badge bg-light text-dark border me-1">{{ total }} {{ cur }}</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        <a href="{% url 'portal_checkout' %}" class="btn btn-primary w-100">
+                            <i class="bi bi-credit-card me-2"></i>Proceed to Checkout
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        
+        <div class="card shadow-sm border-0">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-cart-x fs-1 text-muted"></i>
+                <p class="text-secondary mt-2 mb-3">Your cart is empty.</p>
+                <a href="{% url 'portal_products' %}" class="btn btn-primary btn-sm">
+                    <i class="bi bi-box-seam me-1"></i>Browse Products
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/*
+ * Cart Quantity Update Handler
+ * =============================
+ * When the customer changes a quantity input, this script sends an AJAX POST
+ * to update the quantity on the server. On success, it refreshes the displayed
+ * subtotal and cart total without reloading the page.
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    const qtyInputs = document.querySelectorAll('.cart-qty-input');
+    qtyInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            const itemId = this.dataset.itemId;
+            const newQty = parseInt(this.value) || 1;
+            if (newQty < 1) {
+                this.value = 1;
+                return;
+            }
+
+            // Send AJAX POST to update quantity.
+            const formData = new FormData();
+            formData.append('quantity', newQty);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+
+            fetch('/portal/cart/update/' + itemId + '/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.removed) {
+                        // Remove the row from the table.
+                        const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+                        if (row) row.remove();
+                        // If no rows left, reload to show empty state.
+                        if (document.querySelectorAll('#cartTable tbody tr').length === 0) {
+                            window.location.reload();
+                        }
+                    } else {
+                        // Update the subtotal for this row.
+                        const row = document.querySelector('tr[data-item-id="' + itemId + '"]');
+                        if (row) {
+                            const subtotalCell = row.querySelector('.item-subtotal');
+                            if (subtotalCell) {
+                                subtotalCell.textContent = data.subtotal + ' {{ settings.currency }}';
+                            }
+                        }
+                    }
+                    // Update overall totals.
+                    document.getElementById('cartSubtotal').textContent = data.cart_total + ' {{ settings.currency }}';
+                    document.getElementById('cartTotal').textContent = data.cart_total + ' {{ settings.currency }}';
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.message || 'Update failed.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error updating cart:', error);
+                showToast('Something went wrong. Please refresh the page.', 'error');
+            });
+        });
+    });
+});
+</script>
+{% endblock %}

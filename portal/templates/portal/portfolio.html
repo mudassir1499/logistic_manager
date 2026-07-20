@@ -1,0 +1,66 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Portfolio — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block content %}
+
+<section class="portfolio-hero">
+    <div class="container">
+        <div class="text-center py-5">
+            <span class="section-label">Our Work</span>
+            <h1 class="hero-title">Portfolio</h1>
+            <p class="hero-subtitle">Explore our products, shipments, and warehouse moments.</p>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        {% if items %}
+        <div class="masonry-grid">
+            {% for item in items %}
+            <div class="portfolio-card">
+                <div class="portfolio-media-wrapper">
+                    {% if item.is_video %}
+                    <video controls style="height:260px;object-fit:cover;background:#000;" poster="">
+                        <source src="{{ item.file.url }}" type="video/{{ item.file_extension }}">
+                        Your browser does not support the video tag.
+                    </video>
+                    {% else %}
+                    <img src="{{ item.file.url }}" alt="{{ item.title }}">
+                    {% endif %}
+                    {% if item.is_video %}
+                    <div class="portfolio-play-overlay">
+                        <i class="bi bi-play-circle-fill"></i>
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="portfolio-overlay">
+                    <h5>{{ item.title }}</h5>
+                    {% if item.description %}
+                    <p>{{ item.description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-collection-play fs-1 text-muted"></i>
+            <p class="text-secondary mt-2 mb-0">No portfolio items yet. Check back soon!</p>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Ready to Source from China?</h2>
+        <p class="text-white-50 mb-4">Let's discuss how we can help you find the right suppliers and products.</p>
+        <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Contact Us</a>
+    </div>
+</section>
+
+{% include "portal/includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}

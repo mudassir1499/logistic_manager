@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Customers — Admin{% endblock %}
+{% block nav_customers %}active{% endblock %}
+
+{% block content %}
+
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-people-fill me-2"></i>Customer Management
+    </h1>
+    <p class="text-secondary">Manage customer accounts and portal access</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="bi bi-people"></i></div>
+            <div class="stat-value">{{ total }}</div>
+            <div class="stat-label">Total Customers</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="bi bi-globe"></i></div>
+            <div class="stat-value">{{ with_portal }}</div>
+            <div class="stat-label">With Portal Access</div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="stat-card stat-red">
+            <div class="stat-icon"><i class="bi bi-person-x"></i></div>
+            <div class="stat-value">{{ inactive }}</div>
+            <div class="stat-label">Inactive</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">All Customers</h5>
+        
+        <a href="{% url 'admin_customer_add' %}" class="btn btn-success btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>Add Customer
+        </a>
+    </div>
+    <div class="card-body">
+        
+        <div class="mb-3">
+            <form method="get" class="d-flex gap-2">
+                <div class="input-group" style="max-width:400px">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" class="form-control" placeholder="Search by name, email, phone..." value="{{ search }}">
+                    <button type="submit" class="btn btn-primary">Search</button>
+                </div>
+                
+                {% if search %}
+                <a href="{% url 'admin_customer_list' %}" class="btn btn-outline-secondary">Clear</a>
+                {% endif %}
+            </form>
+        </div>
+
+        
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Portal</th>
+                        <th>Status</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in customers %}
+                    
+                    <tr class="{% if not c.is_active %}text-muted{% endif %}">
+                        <td>#{{ c.id }}</td>
+                        <td class="fw-medium">{{ c.name }}</td>
+                        <td>{{ c.email|default:"—" }}</td>
+                        <td>{{ c.phone }}</td>
+                        <td>
+                            
+                            {% if c.has_portal_access %}
+                            <span class="badge bg-success">Active</span>
+                            {% elif c.email %}
+                            <span class="badge bg-warning">No Password</span>
+                            {% else %}
+                            <span class="badge bg-secondary">No Email</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if c.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ c.created_at|date:"M d, Y" }}</td>
+                        <td>
+                            
+                            <a href="{% url 'admin_customer_edit' c.id %}" class="btn btn-sm btn-primary me-1">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            
+                            <form action="{% url 'admin_customer_delete' c.id %}" method="post" class="d-inline" onsubmit="return confirm('Delete customer {{ c.name }}?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="bi bi-inbox fs-4 d-block mb-2"></i>
+                            No customers found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include "portal/includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}

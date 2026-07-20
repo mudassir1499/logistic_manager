@@ -1,0 +1,497 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings — Logistic Manager{% endblock %}
+{% block nav_settings %}active{% endblock %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<div class="row">
+  
+  <div class="col-lg-7">
+
+    
+    <div class="glass-card mb-4">
+      <h5 class="mb-4" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-building me-2"></i>Company Information</h5>
+      <form id="settingsForm">
+        <div class="mb-3">
+          <label class="form-label">Company Name</label>
+          <input type="text" name="company_name" class="form-control" value="{{ settings.company_name }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Phone Number</label>
+          <input type="text" name="company_phone" class="form-control" value="{{ settings.company_phone }}" placeholder="+971 xx xxx xxxx">
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Address</label>
+          <textarea name="company_address" class="form-control" rows="3" placeholder="Full company address...">{{ settings.company_address }}</textarea>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        
+        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-currency-exchange me-2"></i>Currency</h5>
+        <div class="mb-4">
+          <label class="form-label">Display Currency</label>
+          <select name="currency" class="form-select">
+            
+            <option value="AED" {% if settings.currency == 'AED' %}selected{% endif %}>AED — UAE Dirham</option>
+            <option value="RMB" {% if settings.currency == 'RMB' %}selected{% endif %}>RMB — Chinese Yuan</option>
+            <option value="USD" {% if settings.currency == 'USD' %}selected{% endif %}>USD — US Dollar</option>
+            <option value="EUR" {% if settings.currency == 'EUR' %}selected{% endif %}>EUR — Euro</option>
+            <option value="GBP" {% if settings.currency == 'GBP' %}selected{% endif %}>GBP — British Pound</option>
+            <option value="SAR" {% if settings.currency == 'SAR' %}selected{% endif %}>SAR — Saudi Riyal</option>
+          </select>
+        </div>
+
+        
+        <div class="mb-3">
+          <div class="form-check form-switch mb-2">
+            
+            <input class="form-check-input" type="checkbox" name="exchange_rate_enabled" id="exchangeRateToggle"
+                   value="1" {% if settings.exchange_rate_enabled %}checked{% endif %}
+                   onchange="toggleExchangeRate(this.checked)">
+            <label class="form-check-label" for="exchangeRateToggle" style="font-weight:600;">Show exchange rate conversion on invoice</label>
+          </div>
+          
+          <div id="exchangeRateFields" style="{% if not settings.exchange_rate_enabled %}display:none;{% endif %}background:var(--bg-input);border:1px solid var(--border-color);border-radius:8px;padding:16px;">
+            <div class="row g-3 align-items-end">
+              <div class="col-sm-4">
+                <label class="form-label" style="font-size:12px;color:var(--text-secondary);">From Currency</label>
+                <select name="exchange_rate_from" class="form-select form-select-sm">
+                  <option value="AED" {% if settings.exchange_rate_from == 'AED' %}selected{% endif %}>AED</option>
+                  <option value="RMB" {% if settings.exchange_rate_from == 'RMB' %}selected{% endif %}>RMB</option>
+                  <option value="USD" {% if settings.exchange_rate_from == 'USD' %}selected{% endif %}>USD</option>
+                  <option value="EUR" {% if settings.exchange_rate_from == 'EUR' %}selected{% endif %}>EUR</option>
+                  <option value="GBP" {% if settings.exchange_rate_from == 'GBP' %}selected{% endif %}>GBP</option>
+                  <option value="SAR" {% if settings.exchange_rate_from == 'SAR' %}selected{% endif %}>SAR</option>
+                </select>
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" style="font-size:12px;color:var(--text-secondary);">To Currency</label>
+                <select name="exchange_rate_to" class="form-select form-select-sm">
+                  <option value="AED" {% if settings.exchange_rate_to == 'AED' %}selected{% endif %}>AED</option>
+                  <option value="RMB" {% if settings.exchange_rate_to == 'RMB' %}selected{% endif %}>RMB</option>
+                  <option value="USD" {% if settings.exchange_rate_to == 'USD' %}selected{% endif %}>USD</option>
+                  <option value="EUR" {% if settings.exchange_rate_to == 'EUR' %}selected{% endif %}>EUR</option>
+                  <option value="GBP" {% if settings.exchange_rate_to == 'GBP' %}selected{% endif %}>GBP</option>
+                  <option value="SAR" {% if settings.exchange_rate_to == 'SAR' %}selected{% endif %}>SAR</option>
+                </select>
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label" style="font-size:12px;color:var(--text-secondary);">Rate (1 FROM = ? TO)</label>
+                <input type="number" name="exchange_rate" class="form-control form-control-sm" step="0.000001" min="0"
+                       value="{{ settings.exchange_rate }}" placeholder="e.g. 1.94" id="exchangeRateInput"
+                       oninput="updateExchangePreview()">
+              </div>
+            </div>
+            <div id="exchangeRatePreview" class="mt-2" style="font-size:12px;color:var(--text-secondary);"></div>
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        
+        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-percent me-2"></i>Commission Settings</h5>
+        <div class="mb-4">
+          <label class="form-label">Commission Percentage (%)</label>
+          <div class="input-group">
+            <input type="number" name="commission_percentage" class="form-control" step="0.01" min="0" max="100"
+                   value="{{ settings.commission_percentage }}" placeholder="e.g. 5.00">
+            <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">%</span>
+          </div>
+          <div class="form-text text-muted">Commission is automatically calculated on each new order total.</div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-facebook me-2"></i>Meta Ads Tracking</h5>
+        <div class="mb-3">
+          <label class="form-label">Meta (Facebook) Pixel ID</label>
+          <input type="text" name="meta_pixel_id" class="form-control" value="{{ settings.meta_pixel_id }}" placeholder="e.g. 123456789012345">
+          <div class="form-text text-muted">Paste your Meta Pixel ID to enable conversion tracking on public pages.</div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Default Social Share Image (OG Image)</label>
+          <input type="file" name="og_image" class="form-control" accept="image/*">
+          {% if settings.og_image %}
+          <div class="mt-2">
+            <img src="{{ settings.og_image.url }}" alt="Current OG image" style="max-width:240px;max-height:126px;border-radius:6px;border:1px solid var(--border-color);">
+          </div>
+          {% endif %}
+          <div class="form-text text-muted">Recommended 1200x630 pixels. Used when pages are shared on Facebook, WhatsApp, LinkedIn.</div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-share me-2"></i>Social Media Links</h5>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-facebook me-1"></i> Facebook</label>
+            <input type="url" name="facebook_url" class="form-control" value="{{ settings.facebook_url }}" placeholder="https://facebook.com/mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-instagram me-1"></i> Instagram</label>
+            <input type="url" name="instagram_url" class="form-control" value="{{ settings.instagram_url }}" placeholder="https://instagram.com/mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-linkedin me-1"></i> LinkedIn</label>
+            <input type="url" name="linkedin_url" class="form-control" value="{{ settings.linkedin_url }}" placeholder="https://linkedin.com/company/mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-twitter-x me-1"></i> X (Twitter)</label>
+            <input type="url" name="twitter_url" class="form-control" value="{{ settings.twitter_url }}" placeholder="https://x.com/mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-youtube me-1"></i> YouTube</label>
+            <input type="url" name="youtube_url" class="form-control" value="{{ settings.youtube_url }}" placeholder="https://youtube.com/@mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-music-note-beamed me-1"></i> TikTok</label>
+            <input type="url" name="tiktok_url" class="form-control" value="{{ settings.tiktok_url }}" placeholder="https://tiktok.com/@mudassirllc">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label"><i class="bi bi-whatsapp me-1"></i> WhatsApp Channel</label>
+            <input type="url" name="whatsapp_channel_url" class="form-control" value="{{ settings.whatsapp_channel_url }}" placeholder="https://whatsapp.com/channel/...">
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-envelope-gear me-2"></i>Email / SMTP Configuration</h5>
+        <div class="mb-2" style="font-size:12px;color:var(--text-secondary);">
+          Configure separate sender profiles for order updates, security notifications, and product news.
+          Leave host/user/password empty to fall back to Django's default email backend.
+        </div>
+
+        <ul class="nav nav-pills mb-3" id="smtpTabs" role="tablist" style="font-size:13px;">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="smtp-order-tab" data-bs-toggle="pill" data-bs-target="#smtp-order" type="button" role="tab">Order Status</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="smtp-security-tab" data-bs-toggle="pill" data-bs-target="#smtp-security" type="button" role="tab">Security</button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="smtp-news-tab" data-bs-toggle="pill" data-bs-target="#smtp-news" type="button" role="tab">News / Products</button>
+          </li>
+        </ul>
+
+        <div class="tab-content" id="smtpTabContent">
+          <!-- Order Status SMTP -->
+          <div class="tab-pane fade show active" id="smtp-order" role="tabpanel">
+            <div class="mb-3">
+              <label class="form-label">From Address</label>
+              <input type="email" name="email_from_address" class="form-control" value="{{ settings.email_from_address }}" placeholder="order_status@mudassirllc.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">SMTP Host</label>
+              <input type="text" name="email_smtp_host" class="form-control" value="{{ settings.email_smtp_host }}" placeholder="smtp.example.com">
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-sm-4">
+                <label class="form-label">Port</label>
+                <input type="number" name="email_smtp_port" class="form-control" value="{{ settings.email_smtp_port }}" placeholder="587">
+              </div>
+              <div class="col-sm-8">
+                <label class="form-label">Username</label>
+                <input type="text" name="email_smtp_user" class="form-control" value="{{ settings.email_smtp_user }}" placeholder="order_status@mudassirllc.com">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" name="email_smtp_password" class="form-control" value="{{ settings.email_smtp_password }}" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="email_use_tls" id="emailUseTls" value="1" {% if settings.email_use_tls %}checked{% endif %}>
+              <label class="form-check-label" for="emailUseTls">Use TLS</label>
+            </div>
+          </div>
+
+          <!-- Security SMTP -->
+          <div class="tab-pane fade" id="smtp-security" role="tabpanel">
+            <div class="mb-3">
+              <label class="form-label">From Address</label>
+              <input type="email" name="security_email_from_address" class="form-control" value="{{ settings.security_email_from_address }}" placeholder="security@mudassirllc.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">SMTP Host</label>
+              <input type="text" name="security_email_smtp_host" class="form-control" value="{{ settings.security_email_smtp_host }}" placeholder="smtp.example.com">
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-sm-4">
+                <label class="form-label">Port</label>
+                <input type="number" name="security_email_smtp_port" class="form-control" value="{{ settings.security_email_smtp_port }}" placeholder="587">
+              </div>
+              <div class="col-sm-8">
+                <label class="form-label">Username</label>
+                <input type="text" name="security_email_smtp_user" class="form-control" value="{{ settings.security_email_smtp_user }}" placeholder="security@mudassirllc.com">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" name="security_email_smtp_password" class="form-control" value="{{ settings.security_email_smtp_password }}" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="security_email_use_tls" id="securityEmailUseTls" value="1" {% if settings.security_email_use_tls %}checked{% endif %}>
+              <label class="form-check-label" for="securityEmailUseTls">Use TLS</label>
+            </div>
+          </div>
+
+          <!-- News SMTP -->
+          <div class="tab-pane fade" id="smtp-news" role="tabpanel">
+            <div class="mb-3">
+              <label class="form-label">From Address</label>
+              <input type="email" name="news_email_from_address" class="form-control" value="{{ settings.news_email_from_address }}" placeholder="news@mudassirllc.com">
+            </div>
+            <div class="mb-3">
+              <label class="form-label">SMTP Host</label>
+              <input type="text" name="news_email_smtp_host" class="form-control" value="{{ settings.news_email_smtp_host }}" placeholder="smtp.example.com">
+            </div>
+            <div class="row g-3 mb-3">
+              <div class="col-sm-4">
+                <label class="form-label">Port</label>
+                <input type="number" name="news_email_smtp_port" class="form-control" value="{{ settings.news_email_smtp_port }}" placeholder="587">
+              </div>
+              <div class="col-sm-8">
+                <label class="form-label">Username</label>
+                <input type="text" name="news_email_smtp_user" class="form-control" value="{{ settings.news_email_smtp_user }}" placeholder="news@mudassirllc.com">
+              </div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label">Password</label>
+              <input type="password" name="news_email_smtp_password" class="form-control" value="{{ settings.news_email_smtp_password }}" placeholder="Leave blank to keep current">
+            </div>
+            <div class="form-check form-switch mb-2">
+              <input class="form-check-input" type="checkbox" name="news_email_use_tls" id="newsEmailUseTls" value="1" {% if settings.news_email_use_tls %}checked{% endif %}>
+              <label class="form-check-label" for="newsEmailUseTls">Use TLS</label>
+            </div>
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Settings</button>
+      </form>
+    </div>
+
+  </div>
+
+  
+  <div class="col-lg-5">
+    
+    <div class="glass-card">
+      <h6 style="color:var(--text-secondary);font-weight:600;margin-bottom:16px;"><i class="bi bi-eye me-2"></i>Invoice Preview</h6>
+      <div id="companyPreview" style="border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:16px;background:var(--bg-input);">
+        <div style="font-size:18px;font-weight:800;color:var(--text-primary);" id="prev_name">{{ settings.company_name }}</div>
+        <div style="color:var(--text-secondary);font-size:13px;margin-top:4px;" id="prev_phone">{{ settings.company_phone }}</div>
+        <div style="color:var(--text-secondary);font-size:13px;margin-top:4px;white-space:pre-line;" id="prev_address">{{ settings.company_address }}</div>
+        <hr style="border-color:var(--border-color);margin:12px 0;">
+        <div style="font-size:12px;color:var(--text-secondary);">Commission Rate: <strong id="prev_commission">{{ settings.commission_percentage }}%</strong></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">Currency: <strong id="prev_currency">{{ settings.currency }}</strong></div>
+        <div style="font-size:12px;color:var(--text-secondary);margin-top:8px;">
+          Shipping rates are managed on the dedicated calculator page.
+        </div>
+        <a href="/settings/shipping-calculator/" class="btn-ghost btn-sm mt-3">
+          <i class="bi bi-truck me-1"></i> Open Shipping Calculator
+        </a>
+      </div>
+    </div>
+
+    
+    <div class="glass-card mt-4">
+      <h6 style="color:var(--accent-3);font-weight:700;margin-bottom:16px;"><i class="bi bi-building-check me-2"></i>Shipping Companies</h6>
+      <div id="shippingCompaniesList" class="mb-3">
+        {% for sc in shipping_companies %}
+        <div class="d-flex align-items-center gap-2 mb-2 sc-row" data-id="{{ sc.id }}">
+          <div class="flex-grow-1" style="font-size:14px;">
+            <strong>{{ sc.name }}</strong>
+            {% if sc.website %}<a href="{{ sc.website }}" target="_blank" rel="noopener noreferrer" class="ms-2" style="font-size:12px;color:var(--accent-3);">{{ sc.website }}</a>{% endif %}
+          </div>
+          <button type="button" class="btn-ghost btn-sm px-2" onclick="downloadSheet({{ sc.id }}, '{{ sc.name|escapejs }}')" title="Download Excel"><i class="bi bi-file-earmark-excel"></i></button>
+          <label class="btn-ghost btn-sm px-2 mb-0" style="cursor:pointer;" title="Upload Excel">
+            <i class="bi bi-upload"></i>
+            <input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="uploadSheet({{ sc.id }}, this)">
+          </label>
+          <button type="button" class="btn-ghost btn-sm px-2" onclick="openEditSC({{ sc.id }}, '{{ sc.name|escapejs }}', '{{ sc.website|escapejs }}')" title="Edit"><i class="bi bi-pencil"></i></button>
+          <button type="button" class="btn-danger btn-sm px-2" onclick="deleteSC({{ sc.id }}, this)" title="Delete"><i class="bi bi-trash"></i></button>
+        </div>
+        {% empty %}
+        <div id="scEmptyMsg" style="font-size:13px;color:var(--text-secondary);">No shipping companies added yet.</div>
+        {% endfor %}
+      </div>
+
+      <hr style="border-color:var(--border-color);">
+      <div id="scFormTitle" style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-secondary);">Add New Shipping Company</div>
+      <form id="scForm" onsubmit="submitSCForm(event)">
+        <input type="hidden" id="scEditId" value="">
+        <div class="mb-2">
+          <input type="text" id="scName" class="form-control form-control-sm" placeholder="Company name *" maxlength="100" required>
+        </div>
+        <div class="mb-2">
+          <input type="url" id="scWebsite" class="form-control form-control-sm" placeholder="https://example.com (optional)" maxlength="255">
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn-glow btn-sm flex-grow-1"><i class="bi bi-plus-lg me-1"></i><span id="scSubmitLabel">Add</span></button>
+          <button type="button" class="btn-ghost btn-sm" id="scCancelBtn" onclick="cancelSCEdit()" style="display:none;">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Live preview: Updates the preview card as the user types in the form fields.
+// This gives immediate feedback on how the invoice header will look.
+document.querySelector('[name=company_name]').addEventListener('input', function() {
+    document.getElementById('prev_name').textContent = this.value;
+});
+document.querySelector('[name=company_phone]').addEventListener('input', function() {
+    document.getElementById('prev_phone').textContent = this.value;
+});
+document.querySelector('[name=company_address]').addEventListener('input', function() {
+    document.getElementById('prev_address').textContent = this.value;
+});
+document.querySelector('[name=commission_percentage]').addEventListener('input', function() {
+    document.getElementById('prev_commission').textContent = this.value + '%';
+});
+document.querySelector('[name=currency]').addEventListener('change', function() {
+    document.getElementById('prev_currency').textContent = this.value;
+});
+
+// Toggle exchange rate fields visibility based on the switch state
+function toggleExchangeRate(enabled) {
+    document.getElementById('exchangeRateFields').style.display = enabled ? '' : 'none';
+    if (enabled) updateExchangePreview();
+}
+
+// Show a preview calculation of the exchange rate (e.g., "100 AED = 194.00 RMB")
+function updateExchangePreview() {
+    var rate = parseFloat(document.getElementById('exchangeRateInput').value) || 0;
+    var from = document.querySelector('[name=exchange_rate_from]').value;
+    var to = document.querySelector('[name=exchange_rate_to]').value;
+    var el = document.getElementById('exchangeRatePreview');
+    if (rate > 0) {
+        el.innerHTML = 'Preview: <strong>1 ' + from + ' = ' + rate.toFixed(4) + ' ' + to + '</strong>'
+            + ' &nbsp;·&nbsp; e.g. 100 ' + from + ' = <strong>' + (100 * rate).toFixed(2) + ' ' + to + '</strong>';
+    } else {
+        el.textContent = 'Enter the rate above to preview.';
+    }
+}
+updateExchangePreview();
+
+// Wire up AJAX form submission for the main settings form.
+ajaxSubmit('settingsForm', '/settings/', null);
+
+// ── Shipping Companies CRUD (Create, Read, Update, Delete) ────────────────────
+function renderSCRow(id, name, website) {
+    var websiteHtml = website ? '<a href="' + website + '" target="_blank" rel="noopener noreferrer" class="ms-2" style="font-size:12px;color:var(--accent-3);">' + website + '</a>' : '';
+    return '<div class="d-flex align-items-center gap-2 mb-2 sc-row" data-id="' + id + '">' +
+        '<div class="flex-grow-1" style="font-size:14px;"><strong>' + name + '</strong>' + websiteHtml + '</div>' +
+        '<button type="button" class="btn-ghost btn-sm px-2" onclick="openEditSC(' + id + ', \'' + name.replace(/'/g, "\\'") + '\', \'' + (website || '').replace(/'/g, "\\'") + '\')" title="Edit"><i class="bi bi-pencil"></i></button>' +
+        '<button type="button" class="btn-danger btn-sm px-2" onclick="deleteSC(' + id + ', this)" title="Delete"><i class="bi bi-trash"></i></button>' +
+        '</div>';
+}
+
+function submitSCForm(e) {
+    e.preventDefault();
+    var editId = document.getElementById('scEditId').value;
+    var name = document.getElementById('scName').value.trim();
+    var website = document.getElementById('scWebsite').value.trim();
+    if (!name) return;
+    var url = editId ? '/settings/shipping-companies/' + editId + '/edit/' : '/settings/shipping-companies/add/';
+    var body = new FormData();
+    body.append('name', name);
+    body.append('website', website);
+    fetch(url, { method: 'POST', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                var list = document.getElementById('shippingCompaniesList');
+                var emptyMsg = document.getElementById('scEmptyMsg');
+                if (emptyMsg) emptyMsg.remove();
+                if (editId) {
+                    var existing = list.querySelector('[data-id="' + editId + '"]');
+                    if (existing) existing.outerHTML = renderSCRow(res.id, res.name, res.website);
+                } else {
+                    list.insertAdjacentHTML('beforeend', renderSCRow(res.id, res.name, res.website));
+                }
+                cancelSCEdit();
+                showToast(res.message, 'success');
+            } else {
+                showToast(res.message || 'Error', 'error');
+            }
+        });
+}
+
+function openEditSC(id, name, website) {
+    document.getElementById('scEditId').value = id;
+    document.getElementById('scName').value = name;
+    document.getElementById('scWebsite').value = website;
+    document.getElementById('scFormTitle').textContent = 'Edit Shipping Company';
+    document.getElementById('scSubmitLabel').textContent = 'Save';
+    document.getElementById('scCancelBtn').style.display = '';
+    document.getElementById('scForm').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function cancelSCEdit() {
+    document.getElementById('scEditId').value = '';
+    document.getElementById('scName').value = '';
+    document.getElementById('scWebsite').value = '';
+    document.getElementById('scFormTitle').textContent = 'Add New Shipping Company';
+    document.getElementById('scSubmitLabel').textContent = 'Add';
+    document.getElementById('scCancelBtn').style.display = 'none';
+}
+
+function downloadSheet(id, name) {
+    fetch('/settings/shipping-companies/' + id + '/sheet/download/')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (!res.success || !res.url) {
+                showToast(res.message || 'Unable to download sheet', 'error');
+                return;
+            }
+            var a = document.createElement('a');
+            a.href = res.url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.download = (name || 'shipping_company') + '_rates.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+}
+
+function uploadSheet(id, input) {
+    if (!input.files || !input.files[0]) return;
+    var fd = new FormData();
+    fd.append('sheet', input.files[0]);
+    fetch('/settings/shipping-companies/' + id + '/sheet/upload/', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            showToast(res.message || (res.success ? 'Uploaded' : 'Error'), res.success ? 'success' : 'error');
+            input.value = '';
+        });
+}
+
+function deleteSC(id, btn) {
+    if (!confirm('Delete this shipping company?')) return;
+    fetch('/settings/shipping-companies/' + id + '/delete/', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                var row = btn.closest('.sc-row');
+                if (row) row.remove();
+                var list = document.getElementById('shippingCompaniesList');
+                if (!list.querySelector('.sc-row')) {
+                    list.insertAdjacentHTML('afterbegin', '<div id="scEmptyMsg" style="font-size:13px;color:var(--text-secondary);">No shipping companies added yet.</div>');
+                }
+                showToast(res.message, 'success');
+            } else {
+                showToast(res.message || 'Error', 'error');
+            }
+        });
+}
+</script>
+{% endblock %}

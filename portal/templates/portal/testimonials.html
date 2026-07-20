@@ -1,0 +1,135 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Testimonials — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}See what our clients say about working with {{ settings.company_name|default:"LogiManager" }}. Trusted by 300+ businesses for China sourcing and product procurement.{% endblock %}
+{% block meta_keywords %}testimonials, reviews, client feedback, China sourcing testimonials, B2B sourcing reviews, procurement partner{% endblock %}
+{% block og_title %}What Our Clients Say — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block og_description %}Real reviews from real clients. Discover why businesses across the Middle East trust us for China sourcing, supplier verification, and quality inspection.{% endblock %}
+{% block twitter_title %}What Our Clients Say — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block twitter_description %}Real reviews from real clients. Discover why businesses across the Middle East trust us for China sourcing, supplier verification, and quality inspection.{% endblock %}
+
+{% block content %}
+
+<section class="testimonials-hero">
+    <div class="container">
+        <div class="text-center py-5">
+            <span class="section-label">Social Proof</span>
+            <h1 class="hero-title">Client Testimonials</h1>
+            <p class="hero-subtitle">Don't just take our word for it — hear from the businesses we help source from China.</p>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="testimonial-text">"Mudassir LLC helped us find a reliable electronics manufacturer in Shenzhen that we never would have found on our own. They visited the factory, checked certifications, and negotiated prices better than we could have."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">AR</div>
+                        <div>
+                            <div class="fw-bold">Omar Al-Rashid</div>
+                            <div class="text-secondary small">Owner, Dubai Electronics Trading</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="testimonial-text">"We've been sourcing construction materials through them for two years. Their quality inspections caught defective batches twice before shipping — saving us thousands. Highly recommended for any UAE importer."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">FA</div>
+                        <div>
+                            <div class="fw-bold">Faisal Al-Mansouri</div>
+                            <div class="text-secondary small">Procurement Manager, Gulf Build Materials</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="testimonial-text">"The online portal is a game changer. We can track sourcing progress, view inspection reports, and manage orders 24/7. Transparency like this is rare in China sourcing. Absolutely worth every dirham."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">KA</div>
+                        <div>
+                            <div class="fw-bold">Khaled Al-Farsi</div>
+                            <div class="text-secondary small">Founder, Al-Farsi Home Goods</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                    </div>
+                    <p class="testimonial-text">"From finding the supplier in China to inspecting the goods and shipping to Dubai, they handled everything. It's like having your own purchasing office in China without the overhead costs."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">MF</div>
+                        <div>
+                            <div class="fw-bold">Mohammad Faisal</div>
+                            <div class="text-secondary small">Supply Chain Manager, Gulf Retail Group</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="testimonial-text">"Their supplier verification process gave us confidence to place our first large order with a new factory. The detailed factory visit report with photos and videos was exactly what we needed to move forward."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">SA</div>
+                        <div>
+                            <div class="fw-bold">Sara Abdullah</div>
+                            <div class="text-secondary small">COO, Arabian Textile Imports</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <div class="star-rating mb-2">
+                        <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                    </div>
+                    <p class="testimonial-text">"What sets them apart is their physical presence in China. When our order had quality issues, their team was at the factory the same day to resolve it. That level of access is priceless for importers."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">HA</div>
+                        <div>
+                            <div class="fw-bold">Hassan Al-Zahra</div>
+                            <div class="text-secondary small">Procurement Lead, Emirates Distribution</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Join Our Satisfied Clients</h2>
+        <p class="text-white-50 mb-4">Experience the difference of a sourcing partner who is physically in China, working for you.</p>
+        <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Get a Free Quote</a>
+    </div>
+</section>
+
+{% endblock %}

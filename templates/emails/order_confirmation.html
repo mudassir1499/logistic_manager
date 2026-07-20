@@ -1,0 +1,115 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Order Confirmation — {{ order.id }}</title>
+    <style>
+        body { font-family: 'Inter', Arial, sans-serif; background: #f4f4f8; margin: 0; padding: 0; }
+        .wrapper { max-width: 600px; margin: 24px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08); }
+        .header { background: linear-gradient(135deg, #1a2744, #2a3f5f); padding: 32px 24px; text-align: center; color: #ffffff; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 700; }
+        .header p { margin: 8px 0 0; font-size: 14px; opacity: 0.85; }
+        .body { padding: 32px 24px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; color: #6366f1; margin-bottom: 8px; letter-spacing: 0.5px; }
+        .info-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        .info-row:last-child { border-bottom: none; }
+        .info-label { color: #6b7280; }
+        .info-value { font-weight: 600; color: #1f2937; }
+        .items-table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+        .items-table th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: #6b7280; border-bottom: 1px solid #e5e7eb; }
+        .items-table td { padding: 10px 12px; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        .items-table tr:last-child td { border-bottom: none; }
+        .total-row { font-size: 16px; font-weight: 700; color: #1a2744; text-align: right; padding: 16px 12px; border-top: 2px solid #e5e7eb; }
+        .btn { display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #6366f1, #8b5cf6); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px; margin-top: 16px; }
+        .footer { padding: 24px; text-align: center; font-size: 12px; color: #9ca3af; background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        
+        <div class="header">
+            <h1><i style="font-style:normal">&#128230;</i> Order Confirmed</h1>
+            <p>Your order #{{ order.id }} has been confirmed and placed with our suppliers.</p>
+        </div>
+
+        <div class="body">
+            
+            <div class="section">
+                <div class="section-title">Order Details</div>
+                <div class="info-row">
+                    <span class="info-label">Order Number</span>
+                    <span class="info-value">#{{ order.id }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Customer</span>
+                    <span class="info-value">{{ customer.name }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Date</span>
+                    <span class="info-value">{{ order.date|date:"F d, Y" }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span class="info-value" style="color:#10b981;">Confirmed</span>
+                </div>
+            </div>
+
+            
+            <div class="section">
+                <div class="section-title">Order Items</div>
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Qty</th>
+                            <th>Price</th>
+                            <th>Subtotal</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>{{ item.price }} {{ settings.currency }}</td>
+                            <td>{{ item.subtotal }} {{ settings.currency }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            
+            <div class="section">
+                <div class="section-title">Order Summary</div>
+                <div class="info-row">
+                    <span class="info-label">Subtotal</span>
+                    <span class="info-value">{{ total }} {{ settings.currency }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Shipping</span>
+                    <span class="info-value">{{ shipping }} {{ settings.currency }}</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Grand Total</span>
+                    <span class="info-value">{{ grand_total }} {{ settings.currency }}</span>
+                </div>
+            </div>
+
+            
+            <div style="text-align:center;">
+                <a href="{{ url }}" class="btn">View Order in Portal</a>
+            </div>
+        </div>
+
+        
+        <div class="footer">
+            <p style="margin:0 0 4px;"><strong>{{ settings.company_name }}</strong></p>
+            {% if settings.company_phone %}<p style="margin:0 0 4px;">{{ settings.company_phone }}</p>{% endif %}
+            {% if settings.company_address %}<p style="margin:0;">{{ settings.company_address }}</p>{% endif %}
+        </div>
+    </div>
+</body>
+</html>

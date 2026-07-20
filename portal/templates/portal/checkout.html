@@ -1,0 +1,203 @@
+
+
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Checkout — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">Checkout</h4>
+                <p class="text-secondary mb-0 small">Review your order before confirming.</p>
+            </div>
+            <a href="{% url 'portal_cart' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Cart
+            </a>
+        </div>
+
+        <div class="row g-4">
+            
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-box-seam me-2 text-primary"></i>Order Items</h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Product</th>
+                                        <th>Unit Price</th>
+                                        <th>Qty</th>
+                                        <th>Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in items %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <div class="d-flex align-items-center gap-2">
+                                                {% with img=item.product.images.first %}
+                                                {% if img %}
+                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                {% else %}
+                                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                                    <i class="bi bi-image text-muted"></i>
+                                                </div>
+                                                {% endif %}
+                                                {% endwith %}
+                                                <span class="fw-medium">{{ item.product.name }}</span>
+                                            </div>
+                                        </td>
+                                        <td>{{ item.product.price }} {{ settings.currency }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td class="fw-medium">{{ item.subtotal }} {{ settings.currency }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {% if ready_to_ship_items %}
+                <div class="card shadow-sm border-0 mb-4 border-start border-4 border-success">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-tags me-2 text-success"></i>Shipping & Carton Labels</h5>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-secondary small mb-3">
+                            The products below are marked <strong>ready to ship</strong>. Please upload your shipping and carton labels, or enter the label details so our team can prepare your shipment.
+                        </p>
+                        {% for item in ready_to_ship_items %}
+                        <div class="mb-4 p-3 rounded" style="background:var(--bg-input);border:1px solid var(--border-color);">
+                            <div class="d-flex align-items-center gap-2 mb-3">
+                                {% with img=item.product.images.first %}
+                                {% if img %}
+                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                {% else %}
+                                <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
+                                    <i class="bi bi-image text-muted"></i>
+                                </div>
+                                {% endif %}
+                                {% endwith %}
+                                <strong>{{ item.product.name }}</strong>
+                                <span class="badge bg-success">Ready to Ship</span>
+                            </div>
+                            <div class="row g-3">
+                                {% with prefix='item_'|add:item.id|stringformat:'s' %}
+                                <div class="col-md-6">
+                                    <label class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Shipping Label File</label>
+                                    <input type="file" name="{{ prefix }}_shipping_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Carton Label File</label>
+                                    <input type="file" name="{{ prefix }}_carton_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Label Mark</label>
+                                    <input type="text" name="{{ prefix }}_label_mark" class="form-control" placeholder="e.g. SKU / FNSKU">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Carton Mark</label>
+                                    <input type="text" name="{{ prefix }}_carton_mark" class="form-control" placeholder="e.g. Carton ID">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Carton ASN</label>
+                                    <input type="text" name="{{ prefix }}_carton_asn" class="form-control" placeholder="ASN number">
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Carton Quantity</label>
+                                    <input type="number" name="{{ prefix }}_carton_quantity" class="form-control" value="1" min="1">
+                                </div>
+                                {% endwith %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-person me-2 text-primary"></i>Customer Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <p class="text-secondary small mb-1">Name</p>
+                                <p class="fw-medium mb-0">{{ customer.name }}</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <p class="text-secondary small mb-1">Email</p>
+                                <p class="fw-medium mb-0">{{ customer.email|default:"Not provided" }}</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <p class="text-secondary small mb-1">Phone</p>
+                                <p class="fw-medium mb-0">{{ customer.phone|default:"Not provided" }}</p>
+                            </div>
+                            <div class="col-sm-6">
+                                <p class="text-secondary small mb-1">Address</p>
+                                <p class="fw-medium mb-0">{{ customer.address|default:"Not provided" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Order Summary</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="text-secondary">Subtotal</span>
+                            <span class="fw-medium">{{ cart_total }} {{ settings.currency }}</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span class="fw-bold">Total</span>
+                            <span class="fw-bold fs-5 text-primary">{{ cart_total }} {{ settings.currency }}</span>
+                        </div>
+
+                        
+                        {% if currency_totals %}
+                        <div class="mb-3">
+                            <p class="text-secondary small mb-1">Also shown in:</p>
+                            {% for cur, total in currency_totals.items %}
+                            {% if cur != settings.currency %}
+                            <span class="badge bg-light text-dark border me-1">{{ total }} {{ cur }}</span>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+
+                        
+                        <div class="alert alert-info d-flex align-items-center gap-2 small mb-3" role="alert">
+                            <i class="bi bi-info-circle"></i>
+                            <span>Shipping costs will be calculated by our team and added to your order.</span>
+                        </div>
+
+                        <form method="post" action="{% url 'portal_checkout_confirm' %}" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <!-- Hidden label fields for ready-to-ship products are rendered per item below -->
+                            <button type="submit" class="btn btn-primary w-100">
+                                <i class="bi bi-check-circle me-2"></i>Confirm Order
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

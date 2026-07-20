@@ -1,0 +1,426 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Reliable China Sourcing Agent for UAE & Middle East — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Source products from China without the risk. We verify suppliers, inspect quality, negotiate prices, and ship to UAE & Middle East. Get a free quote in 24 hours.{% endblock %}
+{% block meta_keywords %}China sourcing agent UAE, buy from China, supplier verification China, China procurement Middle East, product sourcing Xuzhou, import from China to Dubai{% endblock %}
+
+{% block content %}
+
+<section class="hero-v2">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-7">
+                <span class="hero-badge">Based in China — Serving UAE & Middle East</span>
+                <h1 class="hero-title">Source from China Without the Risk</h1>
+                <p class="hero-subtitle">
+                    We find reliable factories, verify suppliers on-site, negotiate better prices, and manage shipping — so you can focus on growing your business in the UAE & Middle East.
+                </p>
+                <ul class="hero-checklist list-unstyled mb-4">
+                    <li><i class="bi bi-check-circle-fill"></i> On-the-ground supplier verification</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Pre-shipment quality inspections</li>
+                    <li><i class="bi bi-check-circle-fill"></i> End-to-end shipping coordination</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Free quote within 24 hours</li>
+                </ul>
+                <div class="d-flex gap-3 flex-wrap hero-cta-row">
+                    <a href="{% url 'services_page' %}" class="btn btn-primary btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroExploreServices');}">Explore Services</a>
+                    <a href="{% url 'contact_page' %}" class="btn btn-outline-light btn-lg" onclick="if(typeof fbq==='function'){fbq('track','Contact');}">Get a Quote</a>
+                    <a href="https://whatsapp.com/channel/0029Vb7luVX0G0XkqhMjD82f" target="_blank" rel="noopener" class="btn btn-success btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroWhatsAppCommunity');}">
+                        <i class="bi bi-whatsapp me-2"></i>Join WhatsApp Community
+                    </a>
+                </div>
+                <div class="whatsapp-banner mt-3">
+                    <i class="bi bi-whatsapp"></i>
+                    <span>Get exclusive product drops, sourcing tips, and shipping updates on our WhatsApp channel.</span>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="hero-lead-card">
+                    <div class="lead-card-header">
+                        <h3 class="mb-1">Get Your Free Quote</h3>
+                        <p class="mb-0">Tell us what you need and we'll reply within 24 hours.</p>
+                    </div>
+                    <form method="post" action="{% url 'contact_page' %}" id="heroLeadForm">
+                        {% csrf_token %}
+                        <input type="hidden" name="subject" value="Meta Ads Lead — Homepage Form">
+                        <div class="mb-3">
+                            <label for="leadName" class="form-label">Full Name</label>
+                            <input type="text" class="form-control" id="leadName" name="name" placeholder="Your name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="leadEmail" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="leadEmail" name="email" placeholder="you@company.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="leadPhone" class="form-label">WhatsApp / Phone</label>
+                            <input type="tel" class="form-control" id="leadPhone" name="phone" placeholder="+971 50 123 4567" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="leadMessage" class="form-label">What product are you looking for?</label>
+                            <textarea class="form-control" id="leadMessage" name="message" rows="3" placeholder="Product name, quantity, destination..." required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-accent btn-lg w-100">Get My Free Quote</button>
+                        <p class="small text-center mt-2 mb-0" style="color:rgba(255,255,255,0.7)"><i class="bi bi-shield-lock me-1"></i>No spam. Unsubscribe anytime.</p>
+                    </form>
+                </div>
+            </div>
+        </div>
+        <div class="hero-stats mt-5">
+            <div class="row justify-content-center g-4">
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">500+</div>
+                        <div class="stat-label">Products Sourced</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">98%</div>
+                        <div class="stat-label">Quality Pass Rate</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">200+</div>
+                        <div class="stat-label">Verified Suppliers</div>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">24/7</div>
+                        <div class="stat-label">Client Support</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="trust-bar">
+    <div class="container">
+        <div class="row g-4 align-items-center justify-content-center text-center">
+            <div class="col-6 col-md-3">
+                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Verified Suppliers</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-truck"></i>
+                    <span>Shipping Coordination</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-broadcast"></i>
+                    <span>Order Tracking</span>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
+                    <i class="bi bi-tags"></i>
+                    <span>Competitive Pricing</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="proof-strip">
+    <div class="container">
+        <div class="row g-4 text-center justify-content-center">
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <div class="star-rating mb-1"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i></div>
+                    <div class="proof-value">4.8/5</div>
+                    <div class="proof-label">Client Rating</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-people-fill proof-icon"></i>
+                    <div class="proof-value">150+</div>
+                    <div class="proof-label">Active Importers</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-globe proof-icon"></i>
+                    <div class="proof-value">7+</div>
+                    <div class="proof-label">Years in China</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-shield-check proof-icon"></i>
+                    <div class="proof-value">100%</div>
+                    <div class="proof-label">Payment Protection</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Shop Marketplaces</span>
+            <h2 class="section-title">Amazon & Noon Products</h2>
+            <p class="section-subtitle mx-auto">Browse ready-to-ship products from China for Amazon FBA and Noon. Registered customers can view prices, place orders, and upload shipping labels.</p>
+        </div>
+        <div class="row g-4 justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <a href="{% url 'portal_marketplace' %}" class="text-decoration-none">
+                    <div class="service-card h-100 text-center">
+                        <div class="service-icon">
+                            <i class="bi bi-shop"></i>
+                        </div>
+                        <h5 class="fw-bold mb-2">Marketplace</h5>
+                        <p class="text-secondary small mb-0">Browse Amazon and Noon products in one place. Filter by source, add to cart, and checkout.</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'portal_login' %}" class="btn btn-primary"><i class="bi bi-box-arrow-in-right me-2"></i>Login to Browse Products</a>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">What We Do</span>
+            <h2 class="section-title">Our Services</h2>
+            <p class="section-subtitle mx-auto">End-to-end China sourcing solutions tailored for Middle East businesses</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="bi bi-search"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Product Sourcing</h5>
+                    <p class="text-secondary small mb-0">We find the right manufacturers in China for your exact product requirements and specifications.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Supplier Verification</h5>
+                    <p class="text-secondary small mb-0">We physically visit factories, verify credentials, and audit production capabilities before you pay.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Quality Inspection</h5>
+                    <p class="text-secondary small mb-0">On-site pre-shipment inspections ensure your products meet agreed quality standards every time.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon">
+                        <i class="bi bi-building"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Shipping Coordination</h5>
+                    <p class="text-secondary small mb-0">We manage air and sea freight from China to your door in the UAE or Middle East, fully documented.</p>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'services_page' %}" class="btn btn-outline-primary">View All Services</a>
+        </div>
+    </div>
+</section>
+
+<section class="feature-section section-padding">
+    <div class="container">
+        <div class="row g-5 align-items-center">
+            <div class="col-lg-6">
+                <img src="https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80" alt="China sourcing operations" class="about-image img-fluid w-100">
+            </div>
+            <div class="col-lg-6">
+                <span class="section-label">Why Choose Us</span>
+                <h2 class="section-title">We Are on the Ground in China</h2>
+                <p class="section-subtitle mb-4">While other agents operate remotely, our office is in Xuzhou — we visit factories, meet suppliers face-to-face, and inspect goods before they ever leave China.</p>
+                <div class="feature-list-item">
+                    <div class="feature-icon">
+                        <i class="bi bi-globe"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1">Local Presence</h6>
+                        <p class="text-secondary small mb-0">Our team is based in Xuzhou, China — we visit factories personally, not over email.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon">
+                        <i class="bi bi-shield-fill"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1">Risk Protection</h6>
+                        <p class="text-secondary small mb-0">Supplier verification and pre-shipment inspections protect you from scams and defective goods.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon">
+                        <i class="bi bi-graph-up"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1">Real-Time Updates</h6>
+                        <p class="text-secondary small mb-0">Track every stage — factory visit, sampling, production, inspection, and shipment — from your dashboard.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1">Dedicated Agent</h6>
+                        <p class="text-secondary small mb-0">A personal sourcing agent assigned to your account who understands your product category.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon">
+                        <i class="bi bi-currency-dollar"></i>
+                    </div>
+                    <div>
+                        <h6 class="fw-bold mb-1">Transparent Pricing</h6>
+                        <p class="text-secondary small mb-0">No hidden fees. Get upfront quotes for sourcing fees, product costs, and shipping — all in one place.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% if portfolio_items %}
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Our Work</span>
+            <h2 class="section-title">Featured Projects</h2>
+            <p class="section-subtitle mx-auto">Industries and product categories we source for clients across the Middle East</p>
+        </div>
+        <div class="row g-4">
+            {% for item in portfolio_items %}
+            <div class="col-md-6 col-lg-4">
+                <div class="img-card">
+                    <img src="{{ item.image|default:'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80' }}" alt="{{ item.title }}">
+                    <div class="img-overlay">
+                        <h5 class="fw-bold mb-1">{{ item.title }}</h5>
+                        <p class="text-white-50 small mb-0">{{ item.description }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'portfolio_page' %}" class="btn btn-outline-dark">View Full Portfolio</a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<section class="section-padding feature-section">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Testimonials</span>
+            <h2 class="section-title">What Our Clients Say</h2>
+            <p class="section-subtitle mx-auto">Real feedback from businesses that trust us with their China sourcing</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <p class="testimonial-text">"Mudassir LLC helped us find a reliable electronics manufacturer in Shenzhen that we never would have found on our own. They visited the factory, checked certifications, and negotiated prices better than we could have."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">AR</div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Omar Al-Rashid</h6>
+                            <p class="small text-secondary mb-0">Owner, Dubai Electronics Trading</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <p class="testimonial-text">"We've been sourcing construction materials through them for two years. Their quality inspections caught defective batches twice before shipping — saving us thousands. Highly recommended for any UAE importer."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">FA</div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Faisal Al-Mansouri</h6>
+                            <p class="small text-secondary mb-0">Procurement Manager, Gulf Build Materials</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="testimonial-card">
+                    <i class="bi bi-quote quote-icon"></i>
+                    <p class="testimonial-text">"Being physically in China makes all the difference. When our order had issues, they were at the factory the same day to resolve it. That level of access is worth every dirham we pay in sourcing fees."</p>
+                    <div class="testimonial-author">
+                        <div class="author-avatar">AD</div>
+                        <div>
+                            <h6 class="fw-bold mb-0">Amina Diallo</h6>
+                            <p class="small text-secondary mb-0">CEO, Saharan Home Goods</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-3">Ready to Source from China?</h2>
+                <p class="text-white-50 fs-5 mb-4">
+                    Join businesses across the UAE and Middle East who rely on {{ settings.company_name|default:"LogiManager" }} for reliable China sourcing. Get a free quote today and start buying smarter.
+                </p>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    {% if portal_customer %}
+                    <a href="{% url 'portal_dashboard' %}" class="btn btn-primary btn-lg">My Dashboard</a>
+                    <a href="{% url 'portal_orders' %}" class="btn btn-outline-light btn-lg">My Orders</a>
+                    {% else %}
+                    <a href="{% url 'portal_register' %}" class="btn btn-primary btn-lg">Get Started</a>
+                    <a href="{% url 'portal_login' %}" class="btn btn-outline-light btn-lg">Customer Login</a>
+                    {% endif %}
+                </div>
+                {% if settings.company_phone %}
+                <p class="text-white-50 mt-4 mb-0">
+                    <i class="bi bi-telephone-fill me-2"></i>{{ settings.company_phone }}
+                </p>
+                {% endif %}
+                {% if settings.company_address %}
+                <p class="text-white-50 small mt-2 mb-0">
+                    <i class="bi bi-geo-alt-fill me-2"></i>{{ settings.company_address }}
+                </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.getElementById('heroLeadForm').addEventListener('submit', function() {
+    if (typeof fbq === 'function') {
+      fbq('track', 'Lead', {
+        content_name: 'Homepage Lead Form',
+        content_category: 'Sourcing Quote'
+      });
+    }
+  });
+</script>
+{% endblock %}

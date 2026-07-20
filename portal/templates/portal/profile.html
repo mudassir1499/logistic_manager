@@ -1,0 +1,141 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}My Profile — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">My Profile</h4>
+                <p class="text-secondary mb-0 small">Update your account information.</p>
+            </div>
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body text-center p-4">
+                        <div class="avatar-sm mx-auto mb-3" style="width:80px;height:80px;font-size:2rem;">{{ customer.name|first|upper|default:"?" }}</div>
+                        <h5 class="fw-bold mb-1">{{ customer.name }}</h5>
+                        <p class="text-secondary small mb-2">{{ customer.email }}</p>
+                        <p class="text-secondary small mb-0">{{ customer.phone|default:"" }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body p-4">
+                        <form id="profileForm" method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Full Name</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-person"></i></span>
+                                    <input type="text" name="name" class="form-control" value="{{ customer.name }}" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Email</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-envelope"></i></span>
+                                    <input type="email" class="form-control" value="{{ customer.email }}" disabled readonly>
+                                </div>
+                                <div class="form-text">Contact admin to change your email.</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Phone</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-telephone"></i></span>
+                                    <input type="text" name="phone" class="form-control" value="{{ customer.phone }}">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-medium">Address</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
+                                    <textarea name="address" class="form-control" rows="3">{{ customer.address }}</textarea>
+                                </div>
+                            </div>
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">New Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="bi bi-lock"></i></span>
+                                    <input type="password" name="new_password" class="form-control" placeholder="Leave blank to keep current password">
+                                    <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
+                                        <i class="bi bi-eye"></i>
+                                    </button>
+                                </div>
+                                <div class="form-text">Only fill this if you want to change your password.</div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-primary btn-lg" id="saveBtn">
+                                    <span class="btn-text"><i class="bi bi-check-lg me-2"></i>Save Changes</span>
+                                    <span class="spinner-border spinner-border-sm d-none" role="status"></span>
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="alert d-none mt-3 alert-permanent" id="profileAlert" role="alert"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('profileForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const btn = document.getElementById('saveBtn');
+    const alertDiv = document.getElementById('profileAlert');
+    btn.disabled = true;
+    btn.querySelector('.btn-text').classList.add('d-none');
+    btn.querySelector('.spinner-border').classList.remove('d-none');
+    alertDiv.classList.add('d-none');
+    try {
+        const formData = new FormData(this);
+        const response = await fetch(window.location.pathname, {
+            method: 'POST',
+            body: formData,
+            headers: { 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value }
+        });
+        const data = await response.json();
+        alertDiv.textContent = data.message || (data.success ? 'Saved!' : 'Failed.');
+        alertDiv.classList.remove('d-none', 'alert-success', 'alert-danger');
+        alertDiv.classList.add(data.success ? 'alert-success' : 'alert-danger');
+        if (data.success) {
+            document.querySelector('input[name="new_password"]').value = '';
+        }
+    } catch (err) {
+        alertDiv.textContent = 'An error occurred. Please try again.';
+        alertDiv.classList.remove('d-none', 'alert-success', 'alert-danger');
+        alertDiv.classList.add('alert-danger');
+    } finally {
+        btn.disabled = false;
+        btn.querySelector('.btn-text').classList.remove('d-none');
+        btn.querySelector('.spinner-border').classList.add('d-none');
+    }
+});
+
+document.querySelector('.toggle-password').addEventListener('click', function() {
+    const input = document.querySelector('input[name="new_password"]');
+    const icon = this.querySelector('i');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.classList.replace('bi-eye', 'bi-eye-slash');
+    } else {
+        input.type = 'password';
+        icon.classList.replace('bi-eye-slash', 'bi-eye');
+    }
+});
+</script>
+{% endblock %}

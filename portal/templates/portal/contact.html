@@ -1,0 +1,148 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Contact Us — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block content %}
+
+<section class="contact-hero">
+    <div class="container py-5 text-center">
+        <span class="section-label">Get in Touch</span>
+        <h1 class="hero-title">Contact Us</h1>
+        <p class="hero-subtitle">Ready to source products from China? We are here to help.</p>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">Reach Out</span>
+            <h2 class="section-title">Contact Information</h2>
+            <p class="section-subtitle mx-auto">Multiple ways to connect with our team in China</p>
+        </div>
+        <div class="row g-4 justify-content-center">
+            {% if settings.company_address %}
+            <div class="col-md-4">
+                <div class="contact-info-card">
+                    <div class="contact-icon">
+                        <i class="bi bi-geo-alt"></i>
+                    </div>
+                    <div class="text-start">
+                        <h5 class="fw-bold mb-2">Location</h5>
+                        <p class="text-secondary mb-0 small">{{ settings.company_address }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            {% if settings.company_phone %}
+            <div class="col-md-4">
+                <div class="contact-info-card">
+                    <div class="contact-icon">
+                        <i class="bi bi-telephone"></i>
+                    </div>
+                    <div class="text-start">
+                        <h5 class="fw-bold mb-2">Phone / WhatsApp</h5>
+                        <p class="text-secondary mb-0 small">{{ settings.company_phone }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+            <div class="col-md-4">
+                <div class="contact-info-card">
+                    <div class="contact-icon">
+                        <i class="bi bi-clock"></i>
+                    </div>
+                    <div class="text-start">
+                        <h5 class="fw-bold mb-2">Business Hours</h5>
+                        <p class="text-secondary mb-0 small">Monday – Saturday<br>9:00 AM – 6:00 PM (China Time)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding feature-section">
+    <div class="container">
+        <div class="row g-5 justify-content-center">
+            <div class="col-lg-6">
+                <div class="contact-form-card">
+                    <div class="text-center mb-4">
+                        <span class="section-label">Get In Touch</span>
+                        <h3 class="section-title">Send Us a Message</h3>
+                    </div>
+                    <form method="post" action="{% url 'contact_page' %}" id="contactForm">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label class="fw-medium mb-2">Name</label>
+                            <input type="text" name="name" class="form-control" required placeholder="Your full name">
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-medium mb-2">Email</label>
+                            <input type="email" name="email" class="form-control" required placeholder="your@email.com">
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-medium mb-2">Phone</label>
+                            <input type="tel" name="phone" class="form-control" placeholder="Your phone number">
+                        </div>
+                        <div class="mb-3">
+                            <label class="fw-medium mb-2">Subject</label>
+                            <input type="text" name="subject" class="form-control" required placeholder="What product are you looking for?">
+                        </div>
+                        <div class="mb-4">
+                            <label class="fw-medium mb-2">Message</label>
+                            <textarea name="message" rows="5" class="form-control" required placeholder="Tell us about the product you want to source, quantity, target price, and destination..."></textarea>
+                        </div>
+                        <div class="text-center">
+                            <button type="submit" class="btn btn-primary">Send Message</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="contact-form-card h-100">
+                    <div class="text-center mb-4">
+                        <span class="section-label">Business Hours</span>
+                        <h3 class="section-title">When to Reach Us</h3>
+                    </div>
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between py-3 border-bottom">
+                            <span class="fw-medium">Monday – Friday</span>
+                            <span class="text-secondary">9:00 AM – 6:00 PM</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-3 border-bottom">
+                            <span class="fw-medium">Saturday</span>
+                            <span class="text-secondary">9:00 AM – 2:00 PM</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-3">
+                            <span class="fw-medium">Sunday</span>
+                            <span class="text-secondary">Closed</span>
+                        </div>
+                    </div>
+                    <div class="map-placeholder mt-4">
+                        <i class="bi bi-map fs-1 mb-2"></i>
+                        <p class="text-secondary mb-0">Map embed placeholder</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Ready to Source from China?</h2>
+        <p class="text-white-50 mb-4">Create your account and start managing your sourcing requests with {{ settings.company_name|default:"LogiManager" }} today.</p>
+        <a href="{% url 'portal_register' %}" class="btn btn-primary btn-lg">Get Started</a>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('contactForm').addEventListener('submit', function() {
+        if (typeof fbq === 'function') fbq('track', 'Contact');
+    });
+</script>
+{% endblock %}

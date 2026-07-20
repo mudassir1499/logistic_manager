@@ -1,0 +1,440 @@
+{% extends 'base.html' %}
+
+{% block title %}Shipping Calculator — Logistic Manager{% endblock %}
+{% block nav_shipping %}active{% endblock %}
+{% block page_title %}Shipping Calculator{% endblock %}
+
+{% block topbar_actions %}
+<div class="d-flex gap-2 flex-wrap">
+  
+  <button type="button" class="btn-ghost" onclick="exportShippingQuotations()">
+      <i class="bi bi-download me-1"></i> Export Quotations
+  </button>
+  
+  <label class="btn-ghost mb-0" style="cursor:pointer;">
+      <i class="bi bi-upload me-1"></i> Import Quotations
+      <input type="file" id="shippingQuotationImportInput" accept="application/json" hidden onchange="importShippingQuotations(event)">
+  </label>
+  <a href="/settings/" class="btn-ghost">
+      <i class="bi bi-gear me-1"></i> Back to Settings
+  </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% if shipping_companies %}
+
+<div class="row g-4">
+  {% for sc in shipping_companies %}
+  <div class="col-lg-6">
+    <div class="glass-card" style="border:1px solid var(--border-color);">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <i class="bi bi-truck" style="color:var(--accent-3);font-size:18px;"></i>
+        <div>
+          <div style="font-weight:700;font-size:15px;">{{ sc.name }}</div>
+          {% if sc.website %}<a href="{{ sc.website }}" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--text-secondary);">{{ sc.website }}</a>{% endif %}
+        </div>
+      </div>
+      
+      <form class="company-rates-form" data-company-id="{{ sc.id }}" data-company-name="{{ sc.name|escapejs }}">
+        
+        <div class="row g-2 mb-2">
+          <div class="col-12"><div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Standard Cargo</div></div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">Air Rate per KG</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="air_rate" class="form-control" step="0.01" min="0" value="{{ sc.air_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">Sea Rate per CBM</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="sea_rate" class="form-control" step="0.01" min="0" value="{{ sc.sea_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">KSA Air Rate per KG</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="ksa_air_rate" class="form-control" step="0.01" min="0" value="{{ sc.ksa_air_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">KSA Sea Rate per CBM</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="ksa_sea_rate" class="form-control" step="0.01" min="0" value="{{ sc.ksa_sea_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+        </div>
+        <hr style="border-color:var(--border-color);margin:10px 0;">
+        
+        <div class="row g-2 mb-3">
+          <div class="col-12"><div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">No Brand Battery</div></div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">Air Rate per KG</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="nbb_air_rate" class="form-control" step="0.01" min="0" value="{{ sc.nbb_air_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">Sea Rate per CBM</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="nbb_sea_rate" class="form-control" step="0.01" min="0" value="{{ sc.nbb_sea_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">KSA Air Rate per KG</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="nbb_ksa_air_rate" class="form-control" step="0.01" min="0" value="{{ sc.nbb_ksa_air_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <label class="form-label" style="font-size:11px;">KSA Sea Rate per CBM</label>
+            <div class="input-group input-group-sm">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">{{ settings.currency }}</span>
+              <input type="number" name="nbb_ksa_sea_rate" class="form-control" step="0.01" min="0" value="{{ sc.nbb_ksa_sea_rate }}" placeholder="0 = unused">
+            </div>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn-glow btn-sm flex-grow-1"><i class="bi bi-floppy-fill me-1"></i> Save Rates for {{ sc.name }}</button>
+          <button type="button" class="btn-ghost btn-sm" onclick="downloadSheet({{ sc.id }}, '{{ sc.name|escapejs }}')"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
+          <label class="btn-ghost btn-sm mb-0" style="cursor:pointer;">
+            <i class="bi bi-upload me-1"></i> Import
+            <input type="file" accept=".xlsx,.xlsm,.xls" hidden onchange="uploadSheet({{ sc.id }}, this)">
+          </label>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-4 mt-2">
+  <div class="col-lg-6">
+    <div class="glass-card">
+      <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-calculator me-2"></i>Rate Calculator</h5>
+      <div class="mb-3">
+        <label class="form-label" style="font-size:12px;">Shipping Company</label>
+        <select id="calcCompanySelect" class="form-select" onchange="recalcShippingEstimate()">
+          {% for sc in shipping_companies %}
+          <option value="{{ sc.id }}">{{ sc.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Total Weight (KG)</label>
+        <input type="number" id="calcWeight" class="form-control" min="0" step="0.001" value="0" placeholder="Enter weight" oninput="recalcShippingEstimate()">
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-4">
+          <label class="form-label">Carton Length (CM)</label>
+          <input type="number" id="calcCartonLength" class="form-control" min="0" step="0.01" value="0" placeholder="0" oninput="recalcShippingEstimate()">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Carton Width (CM)</label>
+          <input type="number" id="calcCartonWidth" class="form-control" min="0" step="0.01" value="0" placeholder="0" oninput="recalcShippingEstimate()">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Carton Height (CM)</label>
+          <input type="number" id="calcCartonHeight" class="form-control" min="0" step="0.01" value="0" placeholder="0" oninput="recalcShippingEstimate()">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6">
+          <label class="form-label">Carton Quantity</label>
+          <input type="number" id="calcCartonQty" class="form-control" min="0" step="1" value="1" placeholder="1" oninput="recalcShippingEstimate()">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Total CBM</label>
+          <input type="number" id="calcTotalCbm" class="form-control" min="0" step="0.001" value="0" readonly style="background:var(--bg-input);opacity:0.8;">
+        </div>
+      </div>
+      <div class="row g-2 mb-3">
+        <div class="col-md-6 d-flex align-items-end">
+          <div class="small text-secondary">Sea rates are calculated from CBM; air rates from weight.</div>
+        </div>
+      </div>
+      
+      <div style="border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;background:var(--bg-input);margin-bottom:16px;">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">Standard Cargo</div>
+        <div class="row g-2">
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">UAE Air</div><div id="calcStdAir" style="font-weight:700;">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">UAE Sea</div><div id="calcStdSea" style="font-weight:700;">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">KSA Air</div><div id="calcStdKsaAir" style="font-weight:700;">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">KSA Sea</div><div id="calcStdKsaSea" style="font-weight:700;">{{ settings.currency }} 0.00</div></div>
+        </div>
+      </div>
+      
+      <div style="border:1px solid var(--border-color);border-radius:var(--radius-sm);padding:14px;background:var(--bg-input);">
+        <div style="font-size:12px;color:var(--text-secondary);margin-bottom:10px;">No Brand Battery</div>
+        <div class="row g-2">
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">UAE Air</div><div id="calcNbbAir" style="font-weight:700;color:var(--accent-3);">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">UAE Sea</div><div id="calcNbbSea" style="font-weight:700;color:var(--accent-3);">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">KSA Air</div><div id="calcNbbKsaAir" style="font-weight:700;color:var(--accent-3);">{{ settings.currency }} 0.00</div></div>
+          <div class="col-6"><div style="font-size:12px;color:var(--text-secondary);">KSA Sea</div><div id="calcNbbKsaSea" style="font-weight:700;color:var(--accent-3);">{{ settings.currency }} 0.00</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="glass-card mt-4">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <div>
+      <h5 class="mb-1" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-list-check me-2"></i>Shipping Rate Quotations</h5>
+      <div class="small text-secondary">Export the current company quotations, edit the JSON file, and import it again to restore the rates.</div>
+    </div>
+    <div class="small text-secondary">Supports round-trip import/export</div>
+  </div>
+  <textarea id="shippingQuotationData" class="form-control" rows="10" style="font-family:var(--font-mono);font-size:12px;white-space:pre;overflow:auto;">{{ shipping_quotation_json }}</textarea>
+  <div class="d-flex gap-2 flex-wrap mt-3">
+    <button type="button" class="btn-glow btn-sm" onclick="copyShippingQuotations()"><i class="bi bi-clipboard me-1"></i> Copy JSON</button>
+    <button type="button" class="btn-ghost btn-sm" onclick="downloadShippingQuotations()"><i class="bi bi-download me-1"></i> Download JSON</button>
+    <button type="button" class="btn-ghost btn-sm" onclick="refreshQuotationEditor()"><i class="bi bi-arrow-clockwise me-1"></i> Refresh From Rates</button>
+  </div>
+</div>
+
+{% else %}
+
+<div class="glass-card" style="text-align:center;padding:40px 20px;color:var(--text-secondary);">
+  <i class="bi bi-building-check" style="font-size:40px;display:block;margin-bottom:12px;"></i>
+  <div style="font-size:16px;font-weight:600;margin-bottom:8px;">No Shipping Companies Added</div>
+  <div class="mb-3">Add shipping companies in Settings to configure per-company rates.</div>
+  <a href="/settings/" class="btn-glow"><i class="bi bi-gear me-1"></i> Go to Settings</a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// CALC_COMPANIES is a JavaScript array of company objects with their rate data.
+// It's passed from Django using the |safe filter (prevents HTML escaping of JSON).
+var CALC_COMPANIES = {{ shipping_companies_json|safe }};
+var CALC_CURRENCY = '{{ settings.currency }}';
+
+// Get the rates for the currently selected company in the calculator.
+function getCalcRates() {
+    var sel = document.getElementById('calcCompanySelect');
+    var companyId = sel ? parseInt(sel.value) : 0;
+    for (var i = 0; i < CALC_COMPANIES.length; i++) {
+        if (CALC_COMPANIES[i].id === companyId && CALC_COMPANIES[i].rates) {
+            return {
+                standard: CALC_COMPANIES[i].rates.standard,
+                battery: CALC_COMPANIES[i].rates.no_brand_battery
+            };
+        }
+    }
+    return { standard: {air:0,sea:0,ksa_air:0,ksa_sea:0}, battery: {air:0,sea:0,ksa_air:0,ksa_sea:0} };
+}
+
+// Calculate and display shipping estimates based on the user's inputs.
+// CBM = (Length × Width × Height) / 1,000,000 (converts cm³ to m³)
+// Air cost = Weight × Rate per KG
+// Sea cost = CBM × Rate per CBM
+function recalcShippingEstimate() {
+    var weight = parseFloat(document.getElementById('calcWeight').value) || 0;
+    var length = parseFloat(document.getElementById('calcCartonLength').value) || 0;
+    var width  = parseFloat(document.getElementById('calcCartonWidth').value) || 0;
+    var height = parseFloat(document.getElementById('calcCartonHeight').value) || 0;
+    var qty    = parseFloat(document.getElementById('calcCartonQty').value) || 0;
+    var maps   = getCalcRates();
+    var totalCbm = (length > 0 && width > 0 && height > 0 && qty > 0)
+        ? ((length * width * height) / 1000000) * qty : 0;
+    document.getElementById('calcTotalCbm').value = totalCbm.toFixed(3);
+    document.getElementById('calcStdAir').textContent    = CALC_CURRENCY + ' ' + (weight * (maps.standard.air || 0)).toFixed(2);
+    document.getElementById('calcStdSea').textContent    = CALC_CURRENCY + ' ' + (totalCbm * (maps.standard.sea || 0)).toFixed(2);
+    document.getElementById('calcStdKsaAir').textContent = CALC_CURRENCY + ' ' + (weight * (maps.standard.ksa_air || 0)).toFixed(2);
+    document.getElementById('calcStdKsaSea').textContent = CALC_CURRENCY + ' ' + (totalCbm * (maps.standard.ksa_sea || 0)).toFixed(2);
+    document.getElementById('calcNbbAir').textContent    = CALC_CURRENCY + ' ' + (weight * (maps.battery.air || 0)).toFixed(2);
+    document.getElementById('calcNbbSea').textContent    = CALC_CURRENCY + ' ' + (totalCbm * (maps.battery.sea || 0)).toFixed(2);
+    document.getElementById('calcNbbKsaAir').textContent = CALC_CURRENCY + ' ' + (weight * (maps.battery.ksa_air || 0)).toFixed(2);
+    document.getElementById('calcNbbKsaSea').textContent = CALC_CURRENCY + ' ' + (totalCbm * (maps.battery.ksa_sea || 0)).toFixed(2);
+}
+
+recalcShippingEstimate();  // Run once on page load
+
+// Refresh the JSON editor with the current in-memory data.
+function refreshQuotationEditor() {
+    document.getElementById('shippingQuotationData').value = JSON.stringify(CALC_COMPANIES.map(function(sc) {
+        return {
+            company_id: sc.id,
+            company_name: sc.name,
+            website: sc.website || '',
+            rates: sc.rates
+        };
+    }), null, 2);
+    showToast('Quotation data refreshed', 'success');
+}
+
+function downloadShippingQuotations() {
+    var data = document.getElementById('shippingQuotationData').value || '[]';
+    var blob = new Blob([data], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'shipping-rate-quotations.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+function exportShippingQuotations() {
+    refreshQuotationEditor();
+    downloadShippingQuotations();
+}
+
+function copyShippingQuotations() {
+    var data = document.getElementById('shippingQuotationData').value || '[]';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(data).then(function() {
+            showToast('Quotation JSON copied to clipboard', 'success');
+        }).catch(function() {
+            showToast('Unable to copy quotation JSON', 'error');
+        });
+    } else {
+        showToast('Clipboard not supported in this browser', 'error');
+    }
+}
+
+function importShippingQuotations(event) {
+    var file = event.target.files && event.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function() {
+        try {
+            var payload = JSON.parse(reader.result);
+            if (!Array.isArray(payload)) {
+                throw new Error('Invalid JSON format');
+            }
+            payload.forEach(function(row) {
+                var companyId = parseInt(row.company_id, 10);
+                var company = null;
+                for (var i = 0; i < CALC_COMPANIES.length; i++) {
+                    if (CALC_COMPANIES[i].id === companyId) {
+                        company = CALC_COMPANIES[i];
+                        break;
+                    }
+                }
+                if (!company || !row.rates) return;
+                company.website = row.website || company.website || '';
+                company.rates = company.rates || { standard: {air:0,sea:0,ksa_air:0,ksa_sea:0}, no_brand_battery: {air:0,sea:0,ksa_air:0,ksa_sea:0} };
+                var fields = [
+                    ['standard', 'air'], ['standard', 'sea'], ['standard', 'ksa_air'], ['standard', 'ksa_sea'],
+                    ['no_brand_battery', 'air'], ['no_brand_battery', 'sea'], ['no_brand_battery', 'ksa_air'], ['no_brand_battery', 'ksa_sea']
+                ];
+                fields.forEach(function(pair) {
+                    var group = pair[0];
+                    var key = pair[1];
+                    var value = row.rates[group] && row.rates[group][key];
+                    company.rates[group][key] = parseFloat(value) || 0;
+                });
+                // Update the visible form fields for this company
+                var form = document.querySelector('.company-rates-form[data-company-id="' + companyId + '"]');
+                if (form) {
+                    form.querySelector('[name="air_rate"]').value = company.rates.standard.air;
+                    form.querySelector('[name="sea_rate"]').value = company.rates.standard.sea;
+                    form.querySelector('[name="ksa_air_rate"]').value = company.rates.standard.ksa_air;
+                    form.querySelector('[name="ksa_sea_rate"]').value = company.rates.standard.ksa_sea;
+                    form.querySelector('[name="nbb_air_rate"]').value = company.rates.no_brand_battery.air;
+                    form.querySelector('[name="nbb_sea_rate"]').value = company.rates.no_brand_battery.sea;
+                    form.querySelector('[name="nbb_ksa_air_rate"]').value = company.rates.no_brand_battery.ksa_air;
+                    form.querySelector('[name="nbb_ksa_sea_rate"]').value = company.rates.no_brand_battery.ksa_sea;
+                }
+            });
+            document.getElementById('shippingQuotationData').value = JSON.stringify(payload, null, 2);
+            recalcShippingEstimate();
+            showToast('Quotation rates imported into the form', 'success');
+        } catch (err) {
+            showToast('Invalid quotation JSON file', 'error');
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
+
+function downloadSheet(id, name) {
+    fetch('/settings/shipping-companies/' + id + '/sheet/download/')
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            if (!res.success || !res.url) {
+                showToast(res.message || 'Unable to download sheet', 'error');
+                return;
+            }
+            var a = document.createElement('a');
+            a.href = res.url;
+            a.target = '_blank';
+            a.rel = 'noopener noreferrer';
+            a.download = (name || 'shipping_company') + '_rates.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+}
+
+function uploadSheet(id, input) {
+    if (!input.files || !input.files[0]) return;
+    var fd = new FormData();
+    fd.append('sheet', input.files[0]);
+    fetch('/settings/shipping-companies/' + id + '/sheet/upload/', { method: 'POST', body: fd })
+        .then(function(r) { return r.json(); })
+        .then(function(res) {
+            showToast(res.message || (res.success ? 'Uploaded' : 'Error'), res.success ? 'success' : 'error');
+            input.value = '';
+        });
+}
+
+// ── Per-company rate form submission handling ──────────────────────
+document.querySelectorAll('.company-rates-form').forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        var companyId   = this.getAttribute('data-company-id');
+        var companyName = this.getAttribute('data-company-name');
+        var btn = this.querySelector('button[type=submit]');
+        var fd  = new FormData(this);
+        var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+        if (csrf) fd.append('csrfmiddlewaretoken', csrf[1]);
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Saving...';
+        fetch('/settings/shipping-companies/' + companyId + '/save-rates/', { method: 'POST', body: fd })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Save Rates for ' + companyName;
+                showToast(data.success ? data.message : (data.message || 'Error saving rates'), data.success ? 'success' : 'error');
+                if (data.success) {
+                    // Update in-memory rates so the calculator reflects saved values immediately
+                    var formData = new FormData(form);
+                    for (var j = 0; j < CALC_COMPANIES.length; j++) {
+                        if (CALC_COMPANIES[j].id === parseInt(companyId)) {
+                            CALC_COMPANIES[j].rates.standard.air       = parseFloat(formData.get('air_rate')) || 0;
+                            CALC_COMPANIES[j].rates.standard.sea       = parseFloat(formData.get('sea_rate')) || 0;
+                            CALC_COMPANIES[j].rates.standard.ksa_air   = parseFloat(formData.get('ksa_air_rate')) || 0;
+                            CALC_COMPANIES[j].rates.standard.ksa_sea   = parseFloat(formData.get('ksa_sea_rate')) || 0;
+                            CALC_COMPANIES[j].rates.no_brand_battery.air       = parseFloat(formData.get('nbb_air_rate')) || 0;
+                            CALC_COMPANIES[j].rates.no_brand_battery.sea       = parseFloat(formData.get('nbb_sea_rate')) || 0;
+                            CALC_COMPANIES[j].rates.no_brand_battery.ksa_air   = parseFloat(formData.get('nbb_ksa_air_rate')) || 0;
+                            CALC_COMPANIES[j].rates.no_brand_battery.ksa_sea   = parseFloat(formData.get('nbb_ksa_sea_rate')) || 0;
+                            break;
+                        }
+                    }
+                    recalcShippingEstimate();
+                }
+            })
+            .catch(function() {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-floppy-fill me-1"></i> Save Rates for ' + companyName;
+                showToast('Network error', 'error');
+            });
+    });
+});
+</script>
+{% endblock %}

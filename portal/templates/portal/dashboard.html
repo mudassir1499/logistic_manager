@@ -1,0 +1,176 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Dashboard — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">Welcome back, {{ customer.name }}!</h4>
+                <p class="text-secondary mb-0 small">Here's a summary of your account.</p>
+            </div>
+            <a href="{% url 'portal_profile' %}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-person-gear me-1"></i>Profile
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6 col-lg-3">
+                <div class="dashboard-stat-card">
+                    <div class="stat-icon-wrap red">
+                        <i class="bi bi-cart-check"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ order_count }}</div>
+                        <div class="stat-label">Total Orders</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="dashboard-stat-card">
+                    <div class="stat-icon-wrap green">
+                        <i class="bi bi-box-seam"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ product_count }}</div>
+                        <div class="stat-label">Assigned Products</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="dashboard-stat-card">
+                    <div class="stat-icon-wrap amber">
+                        <i class="bi bi-clipboard-check"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ pending_requests }}</div>
+                        <div class="stat-label">Pending Requests</div>
+                    </div>
+                </div>
+            </div>
+            {% for currency, balance in balances.items %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="dashboard-stat-card">
+                    <div class="stat-icon-wrap {% if balance > 0 %}green{% else %}red{% endif %}">
+                        <i class="bi bi-journal-text"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value">{{ balance|floatformat:2 }}</div>
+                        <div class="stat-label">Balance ({{ currency }})</div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="dashboard-stat-card">
+                    <div class="stat-icon-wrap amber">
+                        <i class="bi bi-journal-text"></i>
+                    </div>
+                    <div>
+                        <div class="stat-value">0.00</div>
+                        <div class="stat-label">Balance</div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="row g-4">
+            <div class="col-lg-8">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header d-flex align-items-center justify-content-between py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Orders</h5>
+                        <a href="{% url 'portal_orders' %}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body p-0">
+                        {% if recent_orders %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead>
+                                    <tr>
+                                        <th class="ps-4">Order #</th>
+                                        <th>Date</th>
+                                        <th>Total</th>
+                                        <th>Status</th>
+                                        <th>Payment</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for order in recent_orders %}
+                                    <tr>
+                                        <td class="ps-4">
+                                            <a href="{% url 'portal_order_detail' order.id %}" class="fw-medium text-decoration-none">#{{ order.id }}</a>
+                                        </td>
+                                        <td class="text-secondary small">{{ order.date|date:"M d, Y" }}</td>
+                                        <td class="fw-medium">{{ order.total }} {{ settings.currency }}</td>
+                                        <td>
+                                            {% if order.status == 'confirmed' %}
+                                            <span class="status-badge confirmed">Confirmed</span>
+                                            {% else %}
+                                            <span class="status-badge pending">{{ order.status|title }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if order.payment_status == 'paid' %}
+                                            <span class="status-badge paid">Paid</span>
+                                            {% elif order.payment_status == 'partial' %}
+                                            <span class="status-badge partial">Partial</span>
+                                            {% else %}
+                                            <span class="status-badge unpaid">Unpaid</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox fs-1 text-muted"></i>
+                            <p class="text-secondary mt-2 mb-0">No orders yet.</p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card shadow-sm border-0">
+                    <div class="card-header py-3">
+                        <h5 class="fw-bold mb-0"><i class="bi bi-lightning-charge me-2 text-warning"></i>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-grid gap-2">
+                            <a href="{% url 'portal_products' %}" class="btn btn-outline-primary">
+                                <i class="bi bi-box-seam me-2"></i>Browse Products
+                            </a>
+                            <a href="{% url 'request_quote' %}" class="btn btn-outline-info">
+                                <i class="bi bi-clipboard-check me-2"></i>Request Quote
+                            </a>
+                            <a href="{% url 'portal_amazon_products' %}" class="btn btn-outline-warning">
+                                <i class="bi bi-shop me-2"></i>Amazon Products
+                            </a>
+                            <a href="{% url 'portal_noon_products' %}" class="btn btn-outline-secondary" style="border-color:#6c5ce7;color:#6c5ce7;">
+                                <i class="bi bi-shop me-2"></i>Noon Products
+                            </a>
+                            <a href="{% url 'portal_orders' %}" class="btn btn-outline-success">
+                                <i class="bi bi-cart me-2"></i>My Orders
+                            </a>
+                            <a href="{% url 'portal_ledger' %}" class="btn btn-outline-warning">
+                                <i class="bi bi-journal-text me-2"></i>My Ledger
+                            </a>
+                            <a href="{% url 'portal_profile' %}" class="btn btn-outline-dark">
+                                <i class="bi bi-person-gear me-2"></i>Edit Profile
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

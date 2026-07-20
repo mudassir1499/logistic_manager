@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Ticket #{{ ticket.id }}{% endblock %}
+{% block page_title %}Ticket #{{ ticket.id }}{% endblock %}
+{% block nav_support %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in d-flex justify-content-between align-items-start flex-wrap gap-2">
+  <div>
+    <h1 class="page-title mb-1">#{{ ticket.id }} — {{ ticket.subject }}</h1>
+    <div class="small text-secondary">
+      From <strong>{{ ticket.customer.name|default:ticket.created_by.username }}</strong>
+      · <span class="text-capitalize">{{ ticket.get_category_display }}</span>
+      · <span class="badge bg-secondary text-uppercase">{{ ticket.get_priority_display }}</span>
+      · <span class="badge bg-info text-dark">{{ ticket.get_status_display }}</span>
+    </div>
+  </div>
+  <a href="{% url 'support_queue' %}" class="btn btn-outline-secondary btn-sm">Back to queue</a>
+</div>
+
+{% if messages %}{% for m in messages %}
+  <div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>
+{% endfor %}{% endif %}
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card mb-3">
+      <div class="card-body">
+        {% for msg in thread %}
+        <div class="mb-3 pb-3 {% if not forloop.last %}border-bottom{% endif %} {% if msg.is_internal %}bg-warning-subtle p-2 rounded{% endif %}">
+          <div class="d-flex justify-content-between">
+            <strong class="small">
+              {{ msg.author.username|default:"System" }}
+              {% if msg.is_internal %}<span class="badge bg-warning text-dark ms-1">Internal note</span>{% endif %}
+            </strong>
+            <span class="small text-secondary">{{ msg.created_at|date:"M d, Y H:i" }}</span>
+          </div>
+          <div class="mt-1" style="white-space: pre-wrap;">{{ msg.body }}</div>
+          {% for att in msg.attachments.all %}
+          <div class="small mt-1"><i class="bi bi-paperclip"></i>
+            <a href="{{ att.file.url }}" target="_blank">{{ att.file.name|cut:"support_attachments/" }}</a>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-body">
+        <form method="post" enctype="multipart/form-data">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="reply">
+          <label class="form-label small fw-semibold">Reply</label>
+          <textarea name="body" class="form-control mb-2" rows="4" required></textarea>
+          <input type="file" name="attachments" class="form-control mb-2" multiple>
+          <div class="form-check mb-2">
+            <input type="checkbox" class="form-check-input" id="is_internal" name="is_internal">
+            <label class="form-check-label small" for="is_internal">Internal note (not visible to the customer)</label>
+          </div>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-reply me-1"></i>Post Reply</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card mb-3">
+      <div class="card-body">
+        <h6 class="fw-bold small text-uppercase text-secondary">Status</h6>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="status">
+          <select name="status" class="form-select form-select-sm">
+            {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if ticket.status == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-primary">Set</button>
+        </form>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-body">
+        <h6 class="fw-bold small text-uppercase text-secondary">Assignment</h6>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="assign">
+          <select name="assigned_to" class="form-select form-select-sm">
+            <option value="">Unassigned</option>
+            {% for agent in agents %}
+            <option value="{{ agent.id }}" {% if ticket.assigned_to_id == agent.id %}selected{% endif %}>{{ agent.username }}</option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-outline-primary">Set</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

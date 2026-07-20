@@ -1,0 +1,85 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}My Orders — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">My Orders</h4>
+                <p class="text-secondary mb-0 small">Track and view all your orders.</p>
+            </div>
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-body p-0">
+                {% if orders %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Order #</th>
+                                <th>Date</th>
+                                <th>Items</th>
+                                <th>Total</th>
+                                <th>Shipping</th>
+                                <th>Grand Total</th>
+                                <th>Status</th>
+                                <th>Payment</th>
+                                <th class="pe-4">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for order in orders %}
+                            <tr>
+                                <td class="ps-4 fw-medium">#{{ order.id }}</td>
+                                <td class="text-secondary small">{{ order.date|date:"M d, Y" }}</td>
+                                <td>{{ order.items.count }}</td>
+                                <td class="fw-medium">{{ order.total }}</td>
+                                <td class="text-secondary">{{ order.shipping_cost }}</td>
+                                <td class="fw-bold">{{ order.total }}</td>
+                                <td>
+                                    {% if order.status == 'confirmed' %}
+                                    <span class="status-badge confirmed">Confirmed</span>
+                                    {% else %}
+                                    <span class="status-badge pending">{{ order.status|title }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if order.payment_status == 'paid' %}
+                                    <span class="status-badge paid">Paid</span>
+                                    {% elif order.payment_status == 'partial' %}
+                                    <span class="status-badge partial">Partial</span>
+                                    {% else %}
+                                    <span class="status-badge unpaid">Unpaid</span>
+                                    {% endif %}
+                                </td>
+                                <td class="pe-4">
+                                    <a href="{% url 'portal_order_detail' order.id %}" class="btn btn-sm btn-primary">
+                                        <i class="bi bi-eye"></i> View
+                                    </a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <p class="text-secondary mt-2 mb-0">No orders found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% include "portal/includes/pagination.html" with page_obj=page_obj %}
+{% endblock %}

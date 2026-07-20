@@ -1,0 +1,105 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}My Ledger — {{ customer.name }}{% endblock %}
+
+{% block content %}
+
+<section class="py-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between mb-4">
+            <div>
+                <h4 class="fw-bold mb-1">My Ledger</h4>
+                <p class="text-secondary mb-0 small">View your transaction history and balances.</p>
+            </div>
+            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
+            </a>
+        </div>
+
+        <div class="row g-3 mb-4">
+            {% for currency, balance in balances.items %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="balance-icon {% if balance >= 0 %}bg-success bg-opacity-10 text-success{% else %}bg-danger bg-opacity-10 text-danger{% endif %}">
+                            <i class="bi bi-currency-exchange"></i>
+                        </div>
+                        <div>
+                            <div class="text-secondary small">Balance ({{ currency }})</div>
+                            <div class="fw-bold fs-4 {% if balance >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                {{ balance|floatformat:2 }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-sm-6 col-lg-3">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body d-flex align-items-center gap-3">
+                        <div class="balance-icon bg-success bg-opacity-10 text-success">
+                            <i class="bi bi-currency-exchange"></i>
+                        </div>
+                        <div>
+                            <div class="text-secondary small">Balance</div>
+                            <div class="fw-bold fs-4 text-success">0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="card-header py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-list-ul me-2 text-primary"></i>Transaction History</h5>
+            </div>
+            <div class="card-body p-0">
+                {% if entries_with_running %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">Date</th>
+                                <th>Type</th>
+                                <th>Description</th>
+                                <th>Amount</th>
+                                <th>Currency</th>
+                                <th class="pe-4">Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in entries_with_running %}
+                            <tr>
+                                <td class="ps-4 text-secondary small">{{ row.entry.date|date:"M d, Y H:i" }}</td>
+                                <td>
+                                    {% if row.entry.entry_type == 'credit' %}
+                                    <span class="status-badge paid">Credit</span>
+                                    {% else %}
+                                    <span class="status-badge unpaid">Debit</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ row.entry.description|default:"—" }}</td>
+                                <td class="fw-medium {% if row.entry.entry_type == 'credit' %}text-success{% else %}text-danger{% endif %}">
+                                    {% if row.entry.entry_type == 'credit' %}+{% else %}-{% endif %}{{ row.entry.amount }}
+                                </td>
+                                <td><span class="badge bg-light text-dark">{{ row.entry.currency }}</span></td>
+                                <td class="pe-4 fw-bold">{{ row.running|floatformat:2 }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5">
+                    <i class="bi bi-inbox fs-1 text-muted"></i>
+                    <p class="text-secondary mt-2 mb-0">No ledger entries found.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

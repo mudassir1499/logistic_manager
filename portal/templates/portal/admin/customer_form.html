@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{% if customer %}Edit{% else %}Add{% endif %} Customer — Admin{% endblock %}
+{% block nav_customers %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        
+        <i class="bi bi-{% if customer %}pencil-square{% else %}person-plus{% endif %} me-2"></i>
+        
+        {% if customer %}Edit {{ customer.name }}{% else %}Add New Customer{% endif %}
+    </h1>
+    <p class="text-secondary">{% if customer %}Update customer details and portal access{% else %}Create a new customer account{% endif %}</p>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body p-4">
+                
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                            
+                            <input type="text" name="name" class="form-control" value="{{ customer.name|default:'' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone <span class="text-danger">*</span></label>
+                            <input type="text" name="phone" class="form-control" value="{{ customer.phone|default:'' }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            
+                            <input type="email" name="email" class="form-control" value="{{ customer.email|default:'' }}" placeholder="Required for portal access">
+                            
+                        </div>
+                        <div class="col-md-6">
+                            
+                            <label class="form-label">Password {% if customer %}(leave blank to keep current){% endif %}</label>
+                            <input type="password" name="password" class="form-control" placeholder="{% if customer %}Set new password{% else %}Required for portal access{% endif %}">
+                            
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Address</label>
+                            <textarea name="address" class="form-control" rows="2">{{ customer.address|default:'' }}</textarea>
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                
+                                <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if not customer or customer.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="isActive">Active (can log in to portal)</label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 mt-4">
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-lg me-1"></i>{% if customer %}Save Changes{% else %}Create Customer{% endif %}
+                        </button>
+                        <a href="{% url 'admin_customer_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

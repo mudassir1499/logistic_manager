@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ customer.name }} — Products{% endblock %}
+
+{% block nav_customers %}active{% endblock %}
+{% block page_title %}{{ customer.name }}'s Products{% endblock %}
+
+{% block topbar_actions %}
+
+<a href="/customers/" class="btn-ghost">
+    <i class="bi bi-arrow-left me-1"></i> Back to Customers
+</a>
+
+<a href="/customers/{{ customer.id }}/quotation/" class="btn-glow" style="background:var(--gradient-success);" title="Download Quotation Excel">
+    <i class="bi bi-file-earmark-excel me-1"></i> Export Quotation
+</a>
+{% endblock %}  
+
+{% block content %}
+
+<div class="glass-card mb-4" style="padding:16px 24px;">
+    <div class="d-flex align-items-center gap-4 flex-wrap">
+        
+        <div style="width:52px;height:52px;border-radius:50%;background:var(--gradient-primary);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700;flex-shrink:0;">
+            {{ customer.name|first|upper }}
+        </div>
+        <div>
+            <div style="font-size:18px;font-weight:700;color:var(--text-primary);">{{ customer.name }}</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-top:2px;">
+                <i class="bi bi-telephone me-1" style="color:var(--accent-3);"></i>{{ customer.phone }}
+                
+                {% if customer.address %}
+                &nbsp;·&nbsp; <i class="bi bi-geo-alt me-1" style="color:var(--info);"></i>{{ customer.address }}
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="ms-auto">
+            <span id="assignedCountBadge" style="font-size:13px;font-weight:700;padding:6px 16px;border-radius:20px;background:rgba(245,166,35,0.10);color:var(--accent-3);border:1px solid rgba(245,166,35,0.25);">
+                {{ assigned|length }} product{{ assigned|length|pluralize }} assigned
+            </span>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+
+    
+    
+    <div class="col-lg-6">
+        <div class="glass-card h-100" style="padding:0;">
+            
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;">
+                <h6 style="margin:0;font-weight:700;color:var(--text-primary);"><i class="bi bi-check-circle-fill me-2" style="color:var(--success);"></i>Assigned Products</h6>
+                <span id="leftCount" style="font-size:12px;color:var(--text-secondary);">{{ assigned|length }} items</span>
+            </div>
+            
+            <div style="padding:12px;">
+                <div class="search-bar mb-3">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="assignedSearch" class="form-control" placeholder="Search assigned..."
+                        style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+                </div>
+            </div>
+            
+            <div id="assignedList" style="max-height:520px;overflow-y:auto;padding:0 12px 12px;">
+                
+                {% for cp in assigned %}
+                <div class="assigned-row" id="assigned-row-{{ cp.product.id }}"
+                     data-name="{{ cp.product.name|lower }}"
+                     style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);margin-bottom:8px;background:var(--bg-input);">
+                    
+                    {% with cp.product.images.first as img %}
+                    {% if img %}
+                    <img src="{{ img.image.url }}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="">
+                    {% else %}
+                    
+                    <div style="width:44px;height:44px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📦</div>
+                    {% endif %}
+                    {% endwith %}  
+                    <div style="flex:1;min-width:0;">
+                        
+                        <div style="font-weight:600;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ cp.product.name }}</div>
+                        
+                        <div style="font-size:12px;color:var(--text-secondary);">Price: <strong style="color:var(--accent-3);">{{ cp.product.price }}</strong> &nbsp;·&nbsp; MOQ: {{ cp.product.moq }}</div>
+                    </div>
+                    
+                    <button onclick="removeProduct({{ cp.product.id }}, '{{ cp.product.name|escapejs }}')"
+                        class="btn-danger btn-sm" style="flex-shrink:0;" title="Remove">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                
+                {% empty %}
+                <div id="assignedEmpty" style="text-align:center;padding:48px 20px;color:var(--text-secondary);">
+                    <i class="bi bi-box-seam" style="font-size:36px;display:block;margin-bottom:10px;opacity:0.4;"></i>
+                    No products assigned yet.<br>Pick products from the right panel.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    
+    
+    <div class="col-lg-6">
+        <div class="glass-card h-100" style="padding:0;">
+            <div style="padding:16px 20px;border-bottom:1px solid var(--border-color);display:flex;align-items:center;justify-content:space-between;">
+                <h6 style="margin:0;font-weight:700;color:var(--text-primary);"><i class="bi bi-plus-circle-fill me-2" style="color:var(--accent-3);"></i>Add Products</h6>
+                <span id="rightCount" style="font-size:12px;color:var(--text-secondary);">{{ available|length }} available</span>
+            </div>
+            <div style="padding:12px;">
+                <div class="search-bar mb-3">
+                    <i class="bi bi-search"></i>
+                    <input type="text" id="availableSearch" class="form-control" placeholder="Search products..."
+                        style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
+                </div>
+            </div>
+            <div id="availableList" style="max-height:520px;overflow-y:auto;padding:0 12px 12px;">
+                {% for product in available %}
+                <div class="available-row" id="available-row-{{ product.id }}"
+                     data-name="{{ product.name|lower }}"
+                     style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border-color);margin-bottom:8px;background:var(--bg-input);">
+                    {% with product.images.first as img %}
+                    {% if img %}
+                    <img src="{{ img.image.url }}" style="width:44px;height:44px;object-fit:cover;border-radius:8px;flex-shrink:0;" alt="">
+                    {% else %}
+                    <div style="width:44px;height:44px;border-radius:8px;background:var(--bg-card);border:1px solid var(--border-color);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">📦</div>
+                    {% endif %}
+                    {% endwith %}  
+                    <div style="flex:1;min-width:0;">
+                        <div style="font-weight:600;font-size:14px;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ product.name }}</div>
+                        <div style="font-size:12px;color:var(--text-secondary);">Price: <strong style="color:var(--accent-3);">{{ product.price }}</strong> &nbsp;·&nbsp; MOQ: {{ product.moq }}</div>
+                    </div>
+                    
+                    <button onclick="assignProduct({{ product.id }}, '{{ product.name|escapejs }}')"
+                        id="assign-btn-{{ product.id }}"
+                        class="btn-glow btn-sm" style="flex-shrink:0;font-size:12px;padding:5px 12px;" title="Assign">
+                        <i class="bi bi-plus-lg me-1"></i> Add
+                    </button>
+                </div>
+                {% empty %}
+                <div style="text-align:center;padding:48px 20px;color:var(--text-secondary);">
+                    <i class="bi bi-check-all" style="font-size:36px;display:block;margin-bottom:10px;color:var(--success);opacity:0.6;"></i>
+                    All products are already assigned!
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}  
+
+{% block extra_js %}
+<script>
+// CUSTOMER_ID is used in all AJAX URLs below to know which customer we're modifying.
+// It's injected directly from the template context variable {{ customer.id }}.
+var CUSTOMER_ID = {{ customer.id }};
+
+// Cookie helper for CSRF token (required by Django for all POST requests)
+function getCookie(name) {
+    var v = document.cookie.match('(^|;) ?' + name + '=([^;]*)(;|$)');
+    return v ? v[2] : null;
+}
+
+// Toast notification helper: Shows a temporary message at the bottom of the screen
+// NOTE: Uses the global showToast from portal.js, not a custom implementation.
+// The portal.js showToast creates proper Bootstrap toasts in the toastContainer.
+
+// ── ASSIGN PRODUCT ──
+// Sends a POST request to assign a product to this customer.
+// On success, the product row is visually moved from the Available list
+// to the Assigned list, and the counts are updated.
+function assignProduct(productId, productName) {
+    var btn = document.getElementById('assign-btn-' + productId);
+    btn.disabled = true;  // Prevent double-clicking while the request is in flight
+    btn.innerHTML = '<i class="bi bi-hourglass-split"></i>';  // Loading spinner icon
+
+    var fd = new FormData();
+    fd.append('product_id', productId);  // Tell the backend which product to assign
+
+    fetch('/customers/' + CUSTOMER_ID + '/assign-product/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },  // Django CSRF header
+        body: fd
+    })
+    .then(function(r) { return r.json(); })  // Parse the JSON response
+    .then(function(res) {
+        if (!res.success) { showToast(res.message, 'error'); btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add'; return; }
+        showToast(res.message, 'success');
+        // Move the row from Available list to Assigned list by DOM manipulation
+        var avRow = document.getElementById('available-row-' + productId);
+        var assignedList = document.getElementById('assignedList');
+        var newRow = avRow.cloneNode(true);  // Deep clone the HTML element
+        newRow.id = 'assigned-row-' + productId;
+        newRow.className = 'assigned-row';
+        // Replace the "Add" button with a "Remove" button
+        var addBtn = newRow.querySelector('button');
+        addBtn.id = '';
+        addBtn.className = 'btn-danger btn-sm';
+        addBtn.title = 'Remove';
+        addBtn.setAttribute('onclick', 'removeProduct(' + productId + ', \'' + productName.replace(/'/g,"\\'") + '\')');
+        addBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
+        // Remove the "empty" message if it was showing
+        var emptyEl = document.getElementById('assignedEmpty');
+        if (emptyEl) emptyEl.remove();
+        assignedList.prepend(newRow);  // Add to the top of the assigned list
+        avRow.remove();  // Remove from the available list
+        updateCounts();  // Update the numeric badges
+    })
+    .catch(function() { showToast('Network error', 'error'); btn.disabled = false; btn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add'; });
+}
+
+// ── REMOVE PRODUCT ──
+// Sends a POST request to remove a product from this customer's catalog.
+// On success, the product row is visually moved from Assigned back to Available.
+function removeProduct(productId, productName) {
+    fetch('/customers/' + CUSTOMER_ID + '/remove-product/' + productId + '/', {
+        method: 'POST',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        if (!res.success) { showToast(res.message, 'error'); return; }
+        showToast('"' + productName + '" removed.', 'success');
+        // Move the row from Assigned list back to Available list
+        var asRow = document.getElementById('assigned-row-' + productId);
+        var availableList = document.getElementById('availableList');
+        var newRow = asRow.cloneNode(true);
+        newRow.id = 'available-row-' + productId;
+        newRow.className = 'available-row';
+        // Replace the "Remove" button with an "Add" button
+        var removeBtn = newRow.querySelector('button');
+        removeBtn.id = 'assign-btn-' + productId;
+        removeBtn.className = 'btn-glow btn-sm';
+        removeBtn.title = 'Assign';
+        removeBtn.style.cssText = 'flex-shrink:0;font-size:12px;padding:5px 12px;';
+        removeBtn.setAttribute('onclick', 'assignProduct(' + productId + ', \'' + productName.replace(/'/g,"\\'") + '\')');
+        removeBtn.innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add';
+        asRow.remove();
+        availableList.appendChild(newRow);
+        updateCounts();
+    })
+    .catch(function() { showToast('Network error', 'error'); });
+}
+
+// ── COUNT BADGES ──
+// Updates the numeric counters showing how many products are assigned vs available.
+// Called after every assign/remove operation to keep the UI in sync.
+function updateCounts() {
+    var aCount = document.querySelectorAll('#assignedList .assigned-row').length;
+    var vCount = document.querySelectorAll('#availableList .available-row').length;
+    document.getElementById('leftCount').textContent  = aCount + ' item' + (aCount !== 1 ? 's' : '');
+    document.getElementById('rightCount').textContent = vCount + ' available';
+    document.getElementById('assignedCountBadge').textContent = aCount + ' product' + (aCount !== 1 ? 's' : '') + ' assigned';
+}
+
+// ── LIVE SEARCH ──
+// Filters product rows in real-time as the user types in either search box.
+// Uses the data-name attribute (lowercase product name) for case-insensitive matching.
+function liveSearch(inputId, listId, rowClass) {
+    document.getElementById(inputId).addEventListener('input', function() {
+        var q = this.value.toLowerCase().trim();  // Normalize input for comparison
+        document.querySelectorAll('#' + listId + ' .' + rowClass).forEach(function(row) {
+            // Show the row if search is empty OR if the product name contains the query
+            row.style.display = (!q || row.dataset.name.includes(q)) ? '' : 'none';
+        });
+    });
+}
+// Wire up both search boxes
+liveSearch('assignedSearch',  'assignedList',  'assigned-row');
+liveSearch('availableSearch', 'availableList', 'available-row');
+</script>
+{% endblock %}  

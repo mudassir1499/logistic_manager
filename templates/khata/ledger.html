@@ -8,33 +8,35 @@
 <button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addEntryModal">
     <i class="bi bi-plus-circle"></i> Add Entry
 </button>
-{% endblock %}
+{% endblock %}  
 
 {% block content %}
-<!-- Customer Filter & Balance -->
+
 <div class="row g-4 mb-4">
     <div class="col-md-6">
         <div class="glass-card form-glass">
             <label class="form-label">Select Customer</label>
+            
             <select class="form-select" id="customerFilter" onchange="filterByCustomer()">
                 <option value="">All Customers</option>
                 {% for customer in customers %}
+                
                 <option value="{{ customer.id }}" {% if selected_customer and selected_customer.id == customer.id %}selected{% endif %}>{{ customer.name }}</option>
-                {% endfor %}
+                {% endfor %}  
             </select>
         </div>
     </div>
     <div class="col-md-6">
         <div class="glass-card text-center">
             <div style="font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:8px">Running Balance</div>
+            
             <div class="balance-display {% if balance >= 0 %}balance-positive{% else %}balance-negative{% endif %}">
-                AED {{ balance }}
+                {{ balance }}
             </div>
         </div>
     </div>
 </div>
 
-<!-- Ledger Table -->
 <div class="glass-card">
     <table class="table-glass" id="ledgerTable">
         <thead>
@@ -43,12 +45,14 @@
                 <th>Customer</th>
                 <th>Type</th>
                 <th>Description</th>
-                <th>Amount (AED)</th>
+                <th>Currency</th>
+                <th>Amount</th>
                 <th style="width:80px">Delete</th>
             </tr>
         </thead>
         <tbody>
             {% for entry in entries %}
+            
             <tr class="{% if entry.entry_type == 'credit' %}row-credit{% else %}row-debit{% endif %}">
                 <td style="color:var(--text-secondary)">{{ entry.date|date:"M d, Y H:i" }}</td>
                 <td style="font-weight:600">{{ entry.customer.name }}</td>
@@ -57,9 +61,10 @@
                     <span class="badge-glass badge-success"><i class="bi bi-arrow-down-circle me-1"></i>Credit</span>
                     {% else %}
                     <span class="badge-glass badge-danger"><i class="bi bi-arrow-up-circle me-1"></i>Debit</span>
-                    {% endif %}
+                    {% endif %}  
                 </td>
                 <td style="color:var(--text-secondary);font-size:13px">{{ entry.description|default:"-" }}</td>
+                <td><span class="badge-glass badge-info" style="font-size:12px;">{{ entry.currency }}</span></td>
                 <td style="font-weight:700;font-size:16px;{% if entry.entry_type == 'credit' %}color:var(--success){% else %}color:var(--danger){% endif %}">
                     {% if entry.entry_type == 'credit' %}+{% else %}-{% endif %}{{ entry.amount }}
                 </td>
@@ -69,7 +74,7 @@
                     </button>
                 </td>
             </tr>
-            {% empty %}
+            {% empty %}  
             <tr>
                 <td colspan="6">
                     <div class="empty-state">
@@ -78,12 +83,11 @@
                     </div>
                 </td>
             </tr>
-            {% endfor %}
+            {% endfor %}  
         </tbody>
     </table>
 </div>
 
-<!-- Add Entry Modal -->
 <div class="modal fade" id="addEntryModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">
     <div class="modal-content">
@@ -99,7 +103,7 @@
               <option value="">Select customer...</option>
               {% for customer in customers %}
               <option value="{{ customer.id }}">{{ customer.name }}</option>
-              {% endfor %}
+              {% endfor %}  
             </select>
           </div>
           <div class="mb-3">
@@ -116,7 +120,15 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">Amount (AED)</label>
+            <label class="form-label">Currency</label>
+            <select name="currency" class="form-select">
+              {% for code, label in currencies %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}  
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Amount</label>
             <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
           </div>
           <div class="mb-3">
@@ -129,10 +141,13 @@
     </div>
   </div>
 </div>
-{% endblock %}
+{% endblock %}  
 
 {% block extra_js %}
 <script>
+// Customer filter: When the dropdown changes, navigate to the filtered view.
+// If a customer is selected, the URL becomes /khata/?customer=ID
+// If "All Customers" is selected, the URL is just /khata/
 function filterByCustomer() {
     var customerId = document.getElementById('customerFilter').value;
     if (customerId) {
@@ -142,9 +157,10 @@ function filterByCustomer() {
     }
 }
 
+// Wire up AJAX form submission for adding entries.
 ajaxSubmit('addEntryForm', '/khata/add/', function() {
     bootstrap.Modal.getInstance(document.getElementById('addEntryModal')).hide();
     setTimeout(function() { location.reload(); }, 500);
 });
 </script>
-{% endblock %}
+{% endblock %}  

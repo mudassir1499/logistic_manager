@@ -1,0 +1,60 @@
+# -----------------------------------------------------------------------------
+# Secrets — never commit these
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------------------------------------------------------------
+# Databases
+# -----------------------------------------------------------------------------
+# db.sqlite3 holds real customer, order and ledger data. Keep it off GitHub.
+db.sqlite3
+db.sqlite3-journal
+*.sql
+*.dump
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# -----------------------------------------------------------------------------
+# Django
+# -----------------------------------------------------------------------------
+# Uploaded files belong on the server, not in version control.
+media/
+# collectstatic output — regenerated on deploy.
+public_html/static/
+staticfiles/
+*.log
+
+# -----------------------------------------------------------------------------
+# Editors / OS
+# -----------------------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------------------------------------------------------------
+# Scratch / working files
+# -----------------------------------------------------------------------------
+*.png
+!static/**/*.png
+!media/**/*.png
+tmp_*.py
+apply_changes.py
+
+# Playwright MCP session logs — local debugging artifacts, not source.
+.playwright-mcp/
+
+# Local database backups (e.g. db.sqlite3.backup-YYYYMMDD-HHMMSS) hold live data.
+db.sqlite3.backup*
+*.backup
