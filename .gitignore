@@ -31,6 +31,9 @@ env/
 media/
 # collectstatic output — regenerated on deploy.
 public_html/static/
+# The same build output under its other name. Without this line 809 generated
+# files show up as untracked and land in the next `git add .`.
+public_html/static_collected/
 staticfiles/
 *.log
 
@@ -49,6 +52,11 @@ desktop.ini
 *.png
 !static/**/*.png
 !media/**/*.png
+# The browser extension's toolbar icons. manifest.json names all four, and
+# Chrome REFUSES to load an unpacked extension whose manifest points at files
+# that are not there — so without this line a fresh clone gets an extension that
+# cannot be installed at all, and nothing says why.
+!extension/icons/*.png
 tmp_*.py
 apply_changes.py
 
@@ -58,3 +66,22 @@ apply_changes.py
 # Local database backups (e.g. db.sqlite3.backup-YYYYMMDD-HHMMSS) hold live data.
 db.sqlite3.backup*
 *.backup
+
+# Data transfer dump — contains real customer data, never commit.
+transfer.json
+
+# Passenger's restart trigger folder and an empty leftover folder.
+tmp/
+public/
+
+# Packed copy of extension/ for sharing. Rebuild it from the folder instead;
+# a committed zip goes stale the moment a file in extension/ changes.
+extension.zip
+
+# Local Claude Code tooling (dev-server launch config, permissions).
+.claude/
+
+# A saved 1688 listing used as the extension's test fixture. Kept on disk (see
+# extension/README.md) but never published: a saved page carries the login ids
+# of the account that saved it, and it is someone else's copyrighted page.
+extension/samplepage.html

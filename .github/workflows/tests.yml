@@ -1,0 +1,41 @@
+# Runs the Django test suite on every push and pull request.
+#
+# Uses SQLite (DB_NAME left empty), so no database server is needed. The
+# `makemigrations --check` step fails the build when a model and its migrations
+# disagree - the exact problem that once broke sign-up and 189 tests.
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_DEBUG: "1"
+      DJANGO_SECURE_SSL: "0"
+      DB_NAME: ""
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # WeasyPrint (PDF invoices and reports) needs Pango at runtime.
+      - name: Install system libraries
+        run: sudo apt-get update && sudo apt-get install -y libpango-1.0-0 libpangoft2-1.0-0
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Models and migrations agree
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Django system checks
+        run: python manage.py check
+
+      - name: Run tests
+        run: python manage.py test --parallel 1
