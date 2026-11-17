@@ -1,0 +1,43 @@
+{% comment %}
+Free-form product specification editor, shared by the Add and Edit product forms.
+
+Context:
+    editor_id   unique DOM id for this instance, e.g. "addProductAttrs". Both forms
+                live in the same document, so every id here must be namespaced or
+                the two editors write into each other.
+
+Rows post as two parallel arrays, attr_name[] and attr_value[], matched by
+position — see products.views._save_attributes. Row order is display order.
+
+A form that submits NO attr_name[] input at all leaves existing attributes
+untouched (that is what _save_attributes checks for), which is why the hidden
+sentinel below is always present: it guarantees the key exists even when the
+operator deleted every row, so "delete them all" is a saveable state rather than
+a silent no-op.
+{% endcomment %}
+
+<div class="mb-3 mlk-attrs" id="{{ editor_id }}">
+  <label class="form-label d-flex align-items-center justify-content-between">
+    <span>
+      Specifications
+      <span style="color:var(--text-secondary);font-size:11px">
+        optional &mdash; shown to customers on the product page
+      </span>
+    </span>
+    <button type="button" class="btn-ghost btn-sm mlk-attr-add"
+            style="font-size:12px;padding:4px 10px;">
+      <i class="bi bi-plus-lg"></i> Add row
+    </button>
+  </label>
+
+  {# Guarantees attr_name[] is submitted even with zero rows. See note above. #}
+  <input type="hidden" name="attr_name[]" value="">
+  <input type="hidden" name="attr_value[]" value="">
+
+  <div class="mlk-attr-rows"></div>
+
+  <div style="color:var(--text-secondary);font-size:11px;margin-top:4px;">
+    e.g. <strong>Model</strong> &rarr; ST-128PlusMax, <strong>Material</strong> &rarr; Stainless steel.
+    Rows missing a name or a value are ignored.
+  </div>
+</div>

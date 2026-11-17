@@ -150,20 +150,68 @@
             font-size: 14px; font-weight: 700; color: #b45309; background: #fff;
             outline: none; text-align: center;
         }
-        .markup-input-wrap input:focus { border-color: #f59e0b; box-shadow: 0 0 0 2px #fde68a66; }
+        .markup-input-wrap input:focus { border-color: #C2410C; box-shadow: 0 0 0 2px rgba(176,132,33,0.40); }
         .markup-input-wrap span { font-size: 14px; font-weight: 700; color: #b45309; }
         .markup-reset { font-size: 12px; color: #999; cursor: pointer; text-decoration: underline; border: none; background: none; padding: 0; }
         .markup-preview { font-size: 11px; color: #b45309; margin-left: auto; }
 
         /* Print optimizations */
+        .prices-bar { display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+                      margin: 0 0 18px; padding: 10px 14px; border:1px solid #e5e5e5;
+                      border-radius: 10px; background:#fafafa; font-size:13px; }
+        .prices-bar label { font-weight:700; color:#444; }
+        .prices-bar a { display:inline-flex; align-items:center; gap:6px; padding:6px 14px;
+                        border:1px solid #C84B31; border-radius:20px; color:#C84B31;
+                        text-decoration:none; font-weight:700; font-size:12.5px; }
+        .prices-bar a:hover { background:#C84B31; color:#fff; }
+        .prices-bar .note { color:#888; font-weight:500; }
+
         @media print {
             body { background: #fff; padding: 0; }
             .catalogue-wrapper { box-shadow: none; border-radius: 0; padding: 24px 32px; }
             .print-bar { display: none !important; }  /* Hide controls */
             .fx-bar { display: none !important; }
             .markup-bar { display: none !important; }
+            .prices-bar { display: none !important; }
             .products-grid { grid-template-columns: repeat(3, 1fr); }
             .price-converted { display: block !important; }  /* Always show converted prices in print */
+        }
+
+        /* --- Category headings -------------------------------------------
+           The rule and the count are what make this scannable on paper: a
+           buyer flicking through a printed catalogue is looking for a section,
+           not a product. */
+        .category-heading {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin: 30px 0 14px;
+            padding-bottom: 7px;
+            border-bottom: 2px solid #B08421;
+            font-size: 17px;
+            font-weight: 700;
+            letter-spacing: .01em;
+            color: #16243D;
+        }
+        .category-heading:first-of-type { margin-top: 8px; }
+        .category-count {
+            font-size: 12px;
+            font-weight: 600;
+            color: #5F6B80;
+        }
+        .category-count::before { content: '('; }
+        .category-count::after  { content: ' items)'; }
+
+        @media print {
+            /* A heading stranded at the foot of a page, with its products
+               overleaf, is the one break that makes a printed catalogue hard
+               to follow. break-after keeps it with what it introduces. */
+            .category-heading {
+                break-after: avoid;
+                page-break-after: avoid;
+                color: #000;
+            }
+            .products-grid { break-before: avoid; }
         }
     </style>
 </head>
@@ -187,11 +235,33 @@
         </div>
         <div class="catalogue-badge">
             <div class="catalogue-title">Catalogue</div>
-            <div class="catalogue-date">{% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency }}{% endif %} &nbsp;·&nbsp; {{ products|length }} product{{ products|length|pluralize }}</div>
+            {% comment %}States the scope when only some categories were
+               exported. A partial catalogue that presents itself as the full
+               range is how a buyer concludes you do not stock something you
+               do.{% endcomment %}
+            {% if selection_label %}
+            <div style="font-size:13px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#C84B31;margin-top:2px;">{{ selection_label }}</div>
+            {% endif %}
+            <div class="catalogue-date">{% if show_prices %}{% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency_symbol }}{% endif %} &nbsp;·&nbsp; {% endif %}{{ products|length }} product{{ products|length|pluralize }}</div>
         </div>
     </div>
 
     
+    {% comment %}Switching rebuilds the page from the server rather than
+       toggling a class, so a price-free catalogue genuinely has no prices in
+       it. The link keeps whichever categories were selected.
+    {% endcomment %}
+    <div class="prices-bar">
+        <label>Prices:</label>
+        {% if show_prices %}
+        <span class="note">Shown on every product.</span>
+        <a href="{{ prices_toggle_url }}">&#128274; Print without prices</a>
+        {% else %}
+        <span class="note">Hidden — this catalogue carries no prices at all.</span>
+        <a href="{{ prices_toggle_url }}">&#128176; Show prices</a>
+        {% endif %}
+    </div>
+
     {% if fx_enabled %}
     <div class="fx-bar" id="fxBar">
         <label><i>&#8644;</i> Currency:</label>
@@ -205,6 +275,7 @@
 
     
     
+    {% if show_prices %}
     <div class="markup-bar" id="markupBar">
         <label>&#43; Price Markup:</label>
         <div class="markup-input-wrap">
@@ -215,16 +286,35 @@
         <button class="markup-reset" onclick="resetMarkup()">Reset</button>
         <span class="markup-preview" id="markupPreview"></span>
     </div>
+    {% endif %}
 
     
     
+    {% comment %}Grouped by category.
+
+       The queryset has always been ordered by category__name, so the products
+       were ALREADY arriving in category order - the page just never said where
+       one category ended and the next began, and a buyer reading a printed
+       catalogue had no way to find the section they wanted.
+
+       {% regroup %} only compares adjacent rows, which is why the ordering in
+       product_catalogue() is load-bearing rather than cosmetic: sort the
+       queryset differently and the same category comes out as several separate
+       headings.
+    {% endcomment %}
     {% if products %}
+    {% regroup products by category_display as category_groups %}
+    {% for group in category_groups %}
+    <h2 class="category-heading">{{ group.grouper }}
+        <span class="category-count">{{ group.list|length }}</span>
+    </h2>
     <div class="products-grid">
-        {% for product in products %}
+        {% for product in group.list %}
         <div class="product-card">
-            {% with product.images.first as img %}
+            {% with product.images.all|first as img %}
             {% if img %}
-            <img class="product-img" src="{{ img.image.url }}" alt="{{ product.name }}">
+            <img class="product-img" src="{{ img.src }}" alt="{{ product.name }}"
+                 onerror="this.style.visibility='hidden'">
             {% else %}
             <div class="product-img-placeholder">📦</div>
             {% endif %}
@@ -239,23 +329,30 @@
                     {% endif %}
                 </div>
                 
+                {% comment %}Omitted entirely when prices are off - not hidden
+                   with CSS. A saved or forwarded catalogue must not carry the
+                   figures in its source. See _catalogue_show_prices.
+                {% endcomment %}
+                {% if show_prices %}
                 <div class="product-price" data-base-price="{{ product.price }}" data-conv-price="{{ product.price_converted|default:'' }}">
-                    <span class="price-to"><span class="product-currency">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency }}{% endif %}</span> <span class="price-val">{{ product.price }}</span></span>
+                    <span class="price-to"><span class="product-currency">{% if fx_enabled %}{{ fx_to }}{% else %}{{ settings.currency_symbol }}{% endif %}</span> <span class="price-val">{{ product.price }}</span></span>
                     {% if fx_enabled and product.price_converted %}
                     <span class="price-from" style="display:none;"><span class="product-currency">{{ fx_from }}</span> <span class="price-val">{{ product.price_converted }}</span></span>
                     {% endif %}
                 </div>
+                {% endif %}
             </div>
         </div>
         {% endfor %}
     </div>
+    {% endfor %}
     {% else %}
     <div style="text-align:center;padding:60px;color:#aaa;font-size:16px;">No published products yet.</div>
     {% endif %}
 
     
     <div class="catalogue-footer">
-        {{ settings.company_name }}{% if settings.company_phone %} &nbsp;·&nbsp; {{ settings.company_phone }}{% endif %} &nbsp;·&nbsp; All prices in {% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency }}{% endif %}
+        {{ settings.company_name }}{% if settings.company_phone %} &nbsp;·&nbsp; {{ settings.company_phone }}{% endif %}{% if show_prices %} &nbsp;·&nbsp; All prices in {% if fx_enabled %}{{ fx_from }} / {{ fx_to }}{% else %}{{ settings.currency_symbol }}{% endif %}{% else %} &nbsp;·&nbsp; Prices on request{% endif %}
     </div>
 </div>
 

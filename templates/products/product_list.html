@@ -5,12 +5,23 @@
 {% block page_title %}Products{% endblock %}
 
 {% block topbar_actions %}
-<a href="/products/catalogue/" target="_blank" class="btn-ghost" style="margin-right:8px;">
-    <i class="bi bi-printer"></i> Print Catalogue
+{% comment %}One entry point for both catalogue outputs, because they now share a
+   category selection. Two separate buttons that each fired immediately left
+   nowhere to put "which categories?" without duplicating the picker.
+{% endcomment %}
+<button class="btn-ghost" style="margin-right:8px;" data-bs-toggle="modal" data-bs-target="#catalogueExportModal">
+    <i class="bi bi-journal-arrow-down"></i> Catalogue
+</button>
+<a href="/products/categories/" class="btn-ghost" style="margin-right:8px;">
+    <i class="bi bi-tags"></i> Categories
 </a>
-<a href="/products/catalogue-export/" class="btn-ghost" style="margin-right:8px;">
-    <i class="bi bi-file-earmark-excel"></i> Export Excel
-</a>
+{% comment %}In the topbar as well as the bulk bar: the bulk bar only appears once
+   something is ticked, so "raise every price" was unreachable without first
+   selecting products you did not need to select.
+{% endcomment %}
+<button class="btn-ghost" style="margin-right:8px;" data-bs-toggle="modal" data-bs-target="#bulkMarginModal">
+    <i class="bi bi-percent"></i> Adjust Prices
+</button>
 <button class="btn-ghost" style="margin-right:8px;" data-bs-toggle="modal" data-bs-target="#bulkUploadModal">
     <i class="bi bi-upload"></i> Bulk Upload
 </button>
@@ -118,26 +129,49 @@
     border-radius: 8px;
     line-height: 1.5;
 }
-.product-badge.draft { background: #f59e0b; color: #fff; }
-.product-badge.private { background: #a78bfa; color: #fff; }
+.product-badge.draft { background: #C2410C; color: #fff; }
+.product-badge.private { background: #B08421; color: #fff; }
 .product-badge.amazon { background: #ff9900; color: #fff; }
 .product-badge.noon { background: #6c5ce7; color: #fff; }
-.product-badge.complete { background: rgba(74, 222, 128, 0.15); color: #4ade80; border: 1px solid rgba(74, 222, 128, 0.25); }
-.product-badge.incomplete { background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.25); }
-.product-card-shipping { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; min-height: 30px; }
-.shipping-chip {
-    background: var(--bg-input);
+.product-badge.complete { background: rgba(74, 222, 128, 0.15); color: #157F4A; border: 1px solid rgba(74, 222, 128, 0.25); }
+.product-badge.incomplete { background: rgba(194, 65, 12, 0.12); color: #C2410C; border: 1px solid rgba(194, 65, 12, 0.25); }
+/* The .product-card-shipping / .shipping-chip rules were removed along with the
+   air/sea chips they styled. The landed-cost calculation still runs and is
+   shown in full in the product detail modal. */
+
+/* Link back to the supplier's listing (normally the 1688 offer page), so a
+   buyer can message them about a reorder without hunting for the product
+   again. Full width and quiet: useful, but not competing with the action row
+   underneath it. */
+.product-card-supplier {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    margin-bottom: 6px;
+    padding: 4px 6px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    padding: 3px 4px;
-    font-size: 9px;
-    line-height: 1.25;
-    text-align: center;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
+.product-card-supplier:hover {
+    border-color: #B08421;
+    color: #B08421;
+}
+.product-card-supplier i { font-size: 11px; flex-shrink: 0; }
+
 .product-card-actions { display: flex; gap: 2px; flex-wrap: nowrap; }
 .product-card-actions .btn-sm { padding: 2px 5px; font-size: 11px; line-height: 1.2; }
 .product-card-actions .btn-sm i { font-size: 11px; }
-#productsGrid, #privateProductsGrid { --bs-gutter-x: 0.5rem; --bs-gutter-y: 0.5rem; }
+#productsGrid { --bs-gutter-x: 0.5rem; --bs-gutter-y: 0.5rem; }
 .detail-spec-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -159,11 +193,33 @@
     padding: 10px 12px;
     min-height: 72px;
 }
-.detail-shipping-box.air { border-color: rgba(255, 140, 0, 0.25); }
-.detail-shipping-box.sea { border-color: rgba(56, 189, 248, 0.25); }
-.detail-shipping-box.ksa-air { border-color: rgba(167, 139, 250, 0.25); }
-.detail-shipping-box.ksa-sea { border-color: rgba(52, 211, 153, 0.25); }
-.detail-shipping-title { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+/* The four shipping lanes are told apart by a colour chip plus the ✈/⛵ glyph in
+   the label — the label text itself stays ink. Two reasons: at 11px bold these
+   are small text and would need 4.5:1, which the lane colours do not reach; and
+   the two that COULD be darkened that far (blue and violet) collapse into each
+   other under deuteranopia (ΔE 4.9). Ink text plus a chip keeps every lane
+   readable and never leans on colour alone to carry the identity. */
+.detail-shipping-box.air     { border-color: rgba(176, 132, 33, 0.30); --lane: #B08421; }
+.detail-shipping-box.sea     { border-color: rgba(42, 120, 214, 0.30); --lane: #2a78d6; }
+.detail-shipping-box.ksa-air { border-color: rgba(74, 58, 167, 0.30);  --lane: #4a3aa7; }
+.detail-shipping-box.ksa-sea { border-color: rgba(213, 81, 129, 0.30); --lane: #d55181; }
+.detail-shipping-title {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 6px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.detail-shipping-title::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 2px;
+    background: var(--lane, var(--text-muted));
+    flex-shrink: 0;
+}
 .detail-images { display: flex; flex-wrap: wrap; gap: 8px; }
 .detail-images img {
     width: 88px;
@@ -181,139 +237,893 @@
     border: 1px solid var(--border-color);
     background: var(--bg-input);
 }
+
+/* ==========================================================================
+   TOOLBAR
+   ==========================================================================
+   One card holding every list control, instead of a 162px-tall Bootstrap grid
+   whose largest occupants were four shipping-rate boxes that filter nothing.
+   Rows wrap independently so a narrow screen stacks them rather than clipping
+   the last chip off the edge.
+   ========================================================================== */
+.plist-toolbar {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.plist-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.plist-row-filters,
+.plist-row-tags {
+    padding-top: 8px;
+    border-top: 1px solid var(--border-color);
+}
+.plist-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+}
+.plist-sep {
+    width: 1px;
+    align-self: stretch;
+    background: var(--border-color);
+    margin: 2px 4px;
+}
+@media (max-width: 700px) { .plist-sep { display: none; } }
+
+/* ---------------------------------------------------------------------------
+   TOUCH TARGETS
+   ---------------------------------------------------------------------------
+   The bulk-select checkboxes rendered at the browser default of 13x13. Every
+   bulk action on this page starts by ticking them, and at that size on a phone
+   a mis-tap does not miss - it selects the neighbouring product.
+
+   `pointer: coarse` is the right test. A width breakpoint would shrink the
+   target back on a landscape tablet (wide, still a finger) and grow it on a
+   narrow desktop window (narrow, still a mouse).
+   ------------------------------------------------------------------------ */
+@media (pointer: coarse) {
+    /* Written as `.prow-check input` / `.product-card-check input` to match the
+       specificity of the rules that set these to 13px and 16px further up this
+       stylesheet (0,2,0). A plain `.product-row-check` selector is 0,1,0 and
+       silently loses to them - the padding below applied while the size did
+       not, which is a confusing half-fix rather than no fix. */
+    .prow-check input,
+    .product-card-check input,
+    .product-row-check,
+    /* The header "select everything on this page" box. Same bulk-selection
+       workflow as the row boxes, so it gets the same treatment - it was 16px
+       in a 20px-tall strip. */
+    #selectAllProducts {
+        width: 22px;
+        height: 22px;
+    }
+
+    /* Give the select-all its own vertical room; its row is otherwise only as
+       tall as the small label beside it. */
+    #selectAllProducts {
+        margin: 10px 6px;
+    }
+
+    /* Padding on the container, not the input: it widens the hit area to about
+       44px without changing how the tick looks. */
+    .prow-check,
+    .product-card-check {
+        padding: 12px;
+    }
+
+    /* Row actions sit in a tight cluster; give them room to be hit apart. */
+    .plist-chip,
+    .plist-select,
+    .prow-actions .btn-ghost,
+    .prow-actions .btn-sm {
+        min-height: 36px;
+    }
+}
+
+.plist-search {
+    position: relative;
+    flex: 1 1 240px;
+    min-width: 0;          /* or the flex item refuses to shrink below its input */
+    display: flex;
+    align-items: center;
+}
+.plist-search > i {
+    position: absolute;
+    left: 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+    pointer-events: none;
+}
+.plist-search input {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 7px 34px 7px 34px;
+    font-size: 13px;
+}
+.plist-search input:focus {
+    outline: none;
+    border-color: var(--accent-3);
+    box-shadow: 0 0 0 3px rgba(63, 63, 66, 0.10);
+}
+.plist-search-clear {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: 0;
+    color: var(--text-muted);
+    font-size: 11px;
+    line-height: 1;
+    padding: 4px;
+    cursor: pointer;
+}
+.plist-search-clear:hover { color: var(--text-primary); }
+
+.plist-select {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    font-size: 12.5px;
+    max-width: 100%;
+}
+.plist-clear {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-decoration: none;
+    white-space: nowrap;
+}
+.plist-clear:hover { color: #B3261E; }
+
+/* --- layout toggle ------------------------------------------------------- */
+.plist-viewtoggle {
+    display: inline-flex;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+}
+.plist-viewtoggle button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg-card);
+    border: 0;
+    color: var(--text-secondary);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 12px;
+    cursor: pointer;
+}
+.plist-viewtoggle button + button { border-left: 1px solid var(--border-color); }
+.plist-viewtoggle button:hover { background: var(--bg-input); }
+.plist-viewtoggle button.is-on {
+    background: var(--text-primary);
+    color: #fff;
+}
+@media (max-width: 560px) { .plist-viewtoggle button span { display: none; } }
+
+/* --- chips ---------------------------------------------------------------
+   The state is a class, not nine lines of cssText rewritten on every click —
+   which is how the old bar ended up with chip colours that had drifted from
+   the stylesheet. `is-on` inverts; everything else is an outline.
+   ------------------------------------------------------------------------- */
+.plist-chips { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.plist-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    line-height: 1.35;
+}
+.plist-chip:hover { border-color: var(--text-secondary); color: var(--text-primary); }
+.plist-chip.is-on {
+    background: var(--text-primary);
+    border-color: var(--text-primary);
+    color: #fff;
+}
+.plist-chip-n {
+    font-size: 11px;
+    font-weight: 700;
+    opacity: 0.72;
+    font-variant-numeric: tabular-nums;
+}
+.plist-chip-private        { color: #8A661A; border-color: rgba(176,132,33,.45); }
+.plist-chip-private.is-on  { background: #8A661A; border-color: #8A661A; color: #fff; }
+.plist-chip-draft          { color: #C2410C; border-color: rgba(194,65,12,.45); }
+.plist-chip-draft.is-on    { background: #C2410C; border-color: #C2410C; color: #fff; }
+.plist-chip-ok             { color: #157F4A; border-color: rgba(21,127,74,.45); }
+.plist-chip-ok.is-on       { background: #157F4A; border-color: #157F4A; color: #fff; }
+.plist-chip-warn           { color: #C2410C; border-color: rgba(194,65,12,.45); }
+.plist-chip-warn.is-on     { background: #C2410C; border-color: #C2410C; color: #fff; }
+/* Marketplace colours are the brands' own, so they stay as they are. Both are
+   darkened for the resting state because #ff9900 on white is 1.9:1. */
+.plist-chip-amazon         { color: #8A5200; border-color: rgba(255,153,0,.55); }
+.plist-chip-amazon.is-on   { background: #8A5200; border-color: #8A5200; color: #fff; }
+.plist-chip-noon           { color: #4a3aa7; border-color: rgba(108,92,231,.55); }
+.plist-chip-noon.is-on     { background: #4a3aa7; border-color: #4a3aa7; color: #fff; }
+.plist-chip-ghost          { color: var(--text-muted); border-style: dashed; }
+
+/* --- landed-cost preview, folded away ------------------------------------ */
+.plist-rates {
+    border-top: 1px solid var(--border-color);
+    padding-top: 8px;
+}
+.plist-rates > summary {
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.plist-rates > summary::-webkit-details-marker { display: none; }
+.plist-rates > summary::before {
+    content: '\F285';                 /* bi-chevron-right */
+    font-family: 'bootstrap-icons';
+    font-size: 10px;
+    transition: transform .15s ease;
+}
+.plist-rates[open] > summary::before { transform: rotate(90deg); }
+.plist-rates-hint { font-weight: 400; color: var(--text-muted); font-size: 11px; }
+.plist-fx { margin-left: auto; font-weight: 400; font-size: 11px; color: var(--text-muted); }
+.plist-fx strong { color: var(--text-primary); }
+.plist-rates-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 12px 0 4px;
+}
+.plist-rates-body label { display: flex; flex-direction: column; gap: 4px; }
+.plist-rates-body label span {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.plist-rates-body input {
+    width: 118px;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    font-size: 12.5px;
+}
+.plist-rates-note {
+    flex-basis: 100%;
+    margin: 0;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.plist-rates-note a { color: var(--accent-3); font-weight: 600; }
+
+/* ==========================================================================
+   TAG CHIPS
+   ==========================================================================
+   The chip never uses the tag colour as its background. Half the palette is
+   too light to carry white text and the other half too dark to carry ink, so
+   a filled chip would need per-colour rules to stay legible. A tinted ground
+   with a solid dot at full saturation keeps the hue recognisable and the text
+   readable, whatever colour somebody picks — and the NAME is always present,
+   so the colour is never the only thing carrying the meaning.
+   ========================================================================== */
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    max-width: 100%;
+    background: color-mix(in srgb, var(--tag, #475569) 11%, transparent);
+    border: 1px solid color-mix(in srgb, var(--tag, #475569) 32%, transparent);
+    color: color-mix(in srgb, var(--tag, #475569) 78%, #101014);
+    border-radius: 20px;
+    padding: 2px 9px;
+    font-size: 11px;
+    font-weight: 600;
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.tag-chip::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--tag, #475569);
+    flex-shrink: 0;
+}
+.tag-chip-more {
+    --tag: #6A6A6C;
+    cursor: help;
+}
+.tag-chip-more::before { display: none; }
+.tag-chip-n { font-weight: 700; opacity: .65; font-variant-numeric: tabular-nums; }
+.tag-chip-btn { cursor: pointer; }
+.tag-chip-btn:hover { border-color: var(--tag, #475569); }
+.tag-chip-btn.is-on {
+    background: var(--tag, #475569);
+    border-color: var(--tag, #475569);
+    color: #fff;
+}
+.tag-chip-btn.is-on::before { background: rgba(255,255,255,.85); }
+
+.product-card-tags {
+    display: flex;
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+/* ==========================================================================
+   BULK BAR
+   ========================================================================== */
+.plist-bulkbar {
+    padding: 12px 16px;
+    background: rgba(59, 130, 246, 0.08);
+    border: 1px solid rgba(59, 130, 246, 0.25);
+    border-radius: var(--radius-sm);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+}
+.plist-bulkbar-offer { font-size: 12.5px; margin-bottom: 8px; }
+.plist-bulkbar-offer a { font-weight: 700; }
+.plist-bulkbar-offer #filteredScopeActive { color: #157F4A; font-weight: 700; }
+.plist-bulkbar-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.plist-bulkbar-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: #1d4ed8;
+    white-space: nowrap;
+}
+.plist-bulkbar-clear { margin-left: auto; color: var(--text-secondary); }
+
+/* ==========================================================================
+   SELECT-ALL ROW
+   ========================================================================== */
+.plist-selectrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.plist-selectall { display: flex; align-items: center; gap: 8px; }
+.plist-selectall input { width: 16px; height: 16px; cursor: pointer; }
+.plist-selectall label {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin: 0;
+    cursor: pointer;
+}
+.plist-count { font-size: 12px; color: var(--text-secondary); }
+.plist-count strong { color: var(--text-primary); text-transform: capitalize; }
+.plist-empty { padding: 48px 24px; color: var(--text-secondary); }
+.plist-empty i { font-size: 40px; display: block; margin-bottom: 12px; opacity: .4; }
+.plist-empty p { margin: 0 0 12px; }
+
+/* ==========================================================================
+   LIST VIEW
+   ==========================================================================
+   Nine columns will not fit a phone, so the table scrolls inside its own
+   container rather than widening the page. Deliberately NOT the .table-stack
+   treatment used elsewhere in the back-office: stacking each row into a card
+   would destroy the single vertical column of checkboxes, which is the one
+   thing this view exists to provide.
+   ========================================================================== */
+.plist-tablewrap {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card);
+}
+.plist-table {
+    width: 100%;
+    min-width: 900px;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+.plist-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--bg-input);
+    color: var(--text-secondary);
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    text-align: left;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+}
+.plist-table tbody tr { border-bottom: 1px solid var(--border-color); }
+.plist-table tbody tr:last-child { border-bottom: 0; }
+.plist-table tbody tr:hover { background: var(--bg-input); }
+.plist-table td { padding: 5px 10px; vertical-align: middle; }
+
+.prow-check { width: 34px; }
+.prow-check input { width: 16px; height: 16px; cursor: pointer; display: block; }
+.prow-media { width: 48px; }
+.prow-img, .prow-img-placeholder {
+    width: 38px;
+    height: 38px;
+    border-radius: 5px;
+    object-fit: cover;
+    border: 1px solid var(--border-color);
+    background: var(--bg-input);
+}
+.prow-img-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 15px;
+}
+.prow-name { min-width: 220px; max-width: 380px; }
+.prow-title {
+    background: none;
+    border: 0;
+    padding: 0;
+    text-align: left;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: block;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.prow-title:hover { color: var(--accent-3); text-decoration: underline; }
+.prow-sub {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+    font-size: 11px;
+    color: var(--text-muted);
+}
+.prow-sku { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.prow-supplier { color: var(--text-muted); text-decoration: none; }
+.prow-supplier:hover { color: #8A661A; }
+.prow-cat { min-width: 120px; font-size: 12px; color: var(--text-secondary); }
+.prow-tags { min-width: 150px; max-width: 260px; }
+.prow-tags .tag-chip { margin: 1px 2px 1px 0; }
+.prow-empty { color: var(--text-muted); }
+.prow-price {
+    text-align: right;
+    font-weight: 700;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+.prow-from { font-size: 10px; font-weight: 400; color: var(--text-muted); }
+.prow-moq {
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.prow-status { white-space: nowrap; }
+.prow-status .product-badge { margin: 0 1px; }
+.prow-actions { white-space: nowrap; text-align: right; }
+.prow-actions .btn-sm { padding: 3px 6px; font-size: 11px; line-height: 1.2; }
+
+/* ==========================================================================
+   TAG DIALOGS
+   ========================================================================== */
+.bulk-tag-scope {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    background: var(--bg-input);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    margin-bottom: 12px;
+}
+.bulk-tag-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-bottom: 14px;
+}
+.tag-pick { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; margin: 0; }
+.tag-pick input { width: 15px; height: 15px; cursor: pointer; }
+.bulk-tag-empty { font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; }
+.bulk-tag-new { display: flex; flex-direction: column; gap: 5px; }
+.bulk-tag-new span { font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.bulk-tag-new em { font-weight: 400; color: var(--text-muted); font-style: normal; }
+.bulk-tag-new input {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: 13px;
+}
+.bulk-tag-footer { display: flex; align-items: center; gap: 8px; }
+.bulk-tag-spacer { flex: 1; }
+
+.manage-tags-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.manage-tags-table th {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .04em;
+    color: var(--text-secondary);
+    text-align: left;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border-color);
+}
+.manage-tags-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-color); }
+.manage-tags-table .mt-name,
+.manage-tags-table .mt-colour {
+    width: 100%;
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    border-radius: var(--radius-sm);
+    padding: 5px 8px;
+    font-size: 12.5px;
+}
+.manage-tags-table .mt-count {
+    text-align: right;
+    color: var(--text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+.manage-tags-table .mt-actions { white-space: nowrap; text-align: right; }
+.manage-tags-table .mt-empty { color: var(--text-muted); text-align: center; padding: 20px; }
 </style>
 
-<div class="row mb-3 g-3 align-items-end">
-    <div class="col-md-4">
-        {% comment %} Submits to the server so the search covers the whole catalogue rather than
-           only the 24 cards on the current page. {% endcomment %}
-        <form method="get" action="" class="search-bar-form">
-            <div class="search-bar">
-                <i class="bi bi-search"></i>
-                <input type="text" id="productSearch" name="q" value="{{ query }}"
-                       class="form-control" placeholder="Search products by name or SKU..."
-                       aria-label="Search products"
-                       style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);padding-left:40px;border-radius:var(--radius-sm);">
-                {% if query %}
-                <a href="?" class="search-clear" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
-                {% endif %}
-            </div>
-        </form>
+{% comment %}
+  ONE FORM OWNS THE LIST STATE
+  ----------------------------
+  Search, visibility, category, subcategory, tags and page size are all fields
+  of #listControls. Every control submits this same form, so changing any one of
+  them preserves the rest — the previous bar had the search in its own <form>,
+  which meant searching silently dropped whatever category you had chosen.
+
+  Tags and visibility ride as hidden inputs because they are set by clicking a
+  chip rather than by a <select>. The helpers that write them (setVisibility,
+  toggleTagFilter) live with the other list JS at the bottom of this file.
+{% endcomment %}
+<form method="get" id="listControls" class="plist-toolbar">
+  <input type="hidden" name="visibility" id="visibilityInput" value="{{ visibility }}">
+  <span id="tagFilterInputs">
+    {% for slug in filter_tags %}<input type="hidden" name="tag" value="{{ slug }}">{% endfor %}
+  </span>
+
+  {# --- Row 1: search, layout, page size ------------------------------------ #}
+  <div class="plist-row">
+    <div class="plist-search">
+      <i class="bi bi-search"></i>
+      <input type="text" id="productSearch" name="q" value="{{ query }}"
+             placeholder="Search products by name or SKU..." aria-label="Search products">
+      {% if query %}
+      <button type="button" class="plist-search-clear" title="Clear search"
+              aria-label="Clear search" onclick="clearProductSearch()"><i class="bi bi-x-lg"></i></button>
+      {% endif %}
     </div>
-    <div class="col-auto d-flex align-items-end gap-2">
-        <button id="filterAll" onclick="filterByDetails('all')" class="btn-glow" style="font-size:12px;padding:6px 14px;border-radius:20px;">All</button>
-        <button id="filterComplete" onclick="filterByDetails('complete')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#4ade80;border-color:#4ade80;"><i class="bi bi-check-circle me-1"></i>Full Details</button>
-        <button id="filterIncomplete" onclick="filterByDetails('incomplete')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#f59e0b;border-color:#f59e0b;"><i class="bi bi-exclamation-circle me-1"></i>Missing Details</button>
-        <button id="filterAmazon" onclick="filterBySource('amazon')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#ff9900;border-color:#ff9900;">Amazon</button>
-        <button id="filterNoon" onclick="filterBySource('noon')" class="btn-ghost" style="font-size:12px;padding:6px 14px;border-radius:20px;color:#6c5ce7;border-color:#6c5ce7;">Noon</button>
+
+    {% comment %}Grid is for recognising a product; list is for working through
+       one. Both are genuinely better at their own job, so the choice is the
+       operator's and it is remembered in localStorage rather than reset on every
+       page load.{% endcomment %}
+    <div class="plist-viewtoggle" role="group" aria-label="Layout">
+      <button type="button" id="viewGridBtn" onclick="setProductView('grid')"
+              title="Grid view" aria-pressed="true">
+        <i class="bi bi-grid-3x3-gap-fill"></i><span>Grid</span>
+      </button>
+      <button type="button" id="viewListBtn" onclick="setProductView('list')"
+              title="List view — denser, shows SKU and tags" aria-pressed="false">
+        <i class="bi bi-list-ul"></i><span>List</span>
+      </button>
     </div>
-    <div class="col-auto">
-        <label class="form-label mb-1" style="font-size:11px;color:var(--accent-3);font-weight:600;"><i class="bi bi-airplane me-1"></i>Air Rate (per KG)</label>
-        <input type="number" id="airRateInput" class="form-control form-control-sm" style="width:120px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ air_rate }}" oninput="recalcPrices()">
+
+    <label class="plist-label" for="perPageSelect">Show</label>
+    <select name="per_page" id="perPageSelect" class="plist-select" onchange="this.form.submit()">
+      <option value="24"  {% if per_page == '24' %}selected{% endif %}>24</option>
+      <option value="60"  {% if per_page == '60' %}selected{% endif %}>60</option>
+      <option value="120" {% if per_page == '120' %}selected{% endif %}>120</option>
+      <option value="all" {% if show_all %}selected{% endif %}>All ({{ total_count }})</option>
+    </select>
+
+    {% if filters_active %}
+    <a href="{% url 'product_list' %}" class="plist-clear">
+      <i class="bi bi-x-circle me-1"></i>Clear filters
+    </a>
+    {% endif %}
+  </div>
+
+  {# --- Row 2: visibility, category, source/completeness -------------------- #}
+  <div class="plist-row plist-row-filters">
+    {% comment %}Visibility used to be structure — private products lived in a
+       separate collapsed grid. As a filter it behaves like every other one, and
+       a selection can finally span it. Counts are computed before this filter is
+       applied, so "Private 6" is visible while you are looking at the public
+       list, which is exactly when you need to know it is there.{% endcomment %}
+    <div class="plist-chips" role="group" aria-label="Visibility">
+      <button type="button" onclick="setVisibility('all')"
+              class="plist-chip {% if visibility == 'all' %}is-on{% endif %}">
+        All <span class="plist-chip-n">{{ visible_counts.all }}</span>
+      </button>
+      <button type="button" onclick="setVisibility('public')"
+              class="plist-chip {% if visibility == 'public' %}is-on{% endif %}"
+              title="Published and not private — what a customer can actually see">
+        <i class="bi bi-globe2"></i> Public <span class="plist-chip-n">{{ visible_counts.public }}</span>
+      </button>
+      <button type="button" onclick="setVisibility('private')"
+              class="plist-chip plist-chip-private {% if visibility == 'private' %}is-on{% endif %}"
+              title="Hidden from the catalogue, visible only to assigned customers">
+        <i class="bi bi-lock-fill"></i> Private <span class="plist-chip-n">{{ visible_counts.private }}</span>
+      </button>
+      <button type="button" onclick="setVisibility('draft')"
+              class="plist-chip plist-chip-draft {% if visibility == 'draft' %}is-on{% endif %}"
+              title="Unfinished — not shown to customers">
+        <i class="bi bi-file-earmark"></i> Drafts <span class="plist-chip-n">{{ visible_counts.draft }}</span>
+      </button>
     </div>
-    <div class="col-auto">
-        <label class="form-label mb-1" style="font-size:11px;color:#38bdf8;font-weight:600;"><i class="bi bi-water me-1"></i>Sea Rate (per CBM)</label>
-        <input type="number" id="seaRateInput" class="form-control form-control-sm" style="width:130px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ sea_rate }}" oninput="recalcPrices()">
+
+    <span class="plist-sep" aria-hidden="true"></span>
+
+    <select name="category" id="listCategory" class="plist-select"
+            aria-label="Category" onchange="onListCategoryChange()">
+      <option value="">All categories</option>
+      {% for c in categories %}
+      <option value="{{ c.slug }}" {% if filter_category == c.slug %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+
+    {% comment %}Subcategory options for every category are rendered up front and
+       hidden/shown in the browser — the same trick the add/edit forms use, so
+       changing category does not cost a round trip. A subcategory implies its
+       parent, so the view takes it alone.{% endcomment %}
+    <select name="subcategory" id="listSubcategory" class="plist-select"
+            aria-label="Subcategory"
+            style="{% if not filter_category %}display:none;{% endif %}"
+            onchange="this.form.submit()">
+      <option value="">All subcategories</option>
+      {% for c in categories %}{% for s in c.subcategories.all %}
+      <option value="{{ s.slug }}" data-parent="{{ c.slug }}"
+              {% if filter_subcategory == s.slug %}selected{% endif %}>{{ s.name }}</option>
+      {% endfor %}{% endfor %}
+    </select>
+
+    <span class="plist-sep" aria-hidden="true"></span>
+
+    {% comment %}These four stay client-side: they hide cards already on the page
+       rather than re-querying. That is a deliberate difference from the chips
+       above — completeness and source are things you flick between while looking
+       at one page, not a filter you want in the URL.{% endcomment %}
+    <div class="plist-chips" role="group" aria-label="Detail and source">
+      <button type="button" id="filterAll" onclick="filterByDetails('all')" class="plist-chip is-on">All</button>
+      <button type="button" id="filterComplete" onclick="filterByDetails('complete')" class="plist-chip plist-chip-ok"><i class="bi bi-check-circle"></i> Full details</button>
+      <button type="button" id="filterIncomplete" onclick="filterByDetails('incomplete')" class="plist-chip plist-chip-warn"><i class="bi bi-exclamation-circle"></i> Missing</button>
+      <button type="button" id="filterAmazon" onclick="filterBySource('amazon')" class="plist-chip plist-chip-amazon">Amazon</button>
+      <button type="button" id="filterNoon" onclick="filterBySource('noon')" class="plist-chip plist-chip-noon">Noon</button>
     </div>
-    <div class="col-auto">
-        <label class="form-label mb-1" style="font-size:11px;color:#a78bfa;font-weight:600;"><i class="bi bi-airplane-fill me-1"></i>KSA Air (per KG)</label>
-        <input type="number" id="ksaAirRateInput" class="form-control form-control-sm" style="width:120px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ ksa_air_rate }}" oninput="recalcPrices()">
+  </div>
+
+  {# --- Row 3: tags --------------------------------------------------------- #}
+  {% if all_tags %}
+  <div class="plist-row plist-row-tags">
+    <span class="plist-label"><i class="bi bi-tag-fill me-1"></i>Tags</span>
+    <div class="plist-chips plist-tagfilter">
+      {% for tag in all_tags %}
+      {% comment %}Several tags mean "carries all of these" — see the view. The
+         chip shows how many products carry it so an empty tag is obvious.{% endcomment %}
+      <button type="button" onclick="toggleTagFilter('{{ tag.slug|escapejs }}')"
+              class="tag-chip tag-chip-btn {% if tag.slug in filter_tags %}is-on{% endif %}"
+              style="--tag:{{ tag.colour }};"
+              title="{{ tag.product_count }} product{{ tag.product_count|pluralize }}">
+        {{ tag.name }} <span class="tag-chip-n">{{ tag.product_count }}</span>
+      </button>
+      {% endfor %}
+      <button type="button" class="plist-chip plist-chip-ghost" data-bs-toggle="modal"
+              data-bs-target="#manageTagsModal" title="Rename, recolour or delete tags">
+        <i class="bi bi-sliders"></i> Manage
+      </button>
     </div>
-    <div class="col-auto">
-        <label class="form-label mb-1" style="font-size:11px;color:#34d399;font-weight:600;"><i class="bi bi-water me-1"></i>KSA Sea (per CBM)</label>
-        <input type="number" id="ksaSeaRateInput" class="form-control form-control-sm" style="width:130px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.01" min="0" value="{{ ksa_sea_rate }}" oninput="recalcPrices()">
+  </div>
+  {% endif %}
+
+  {# --- Landed-cost preview, folded away ------------------------------------ #}
+  {% comment %}These are not filters, and they used to sit in the filter bar
+     taking 162px above every page of results. They change nothing in the
+     database — they only recalculate the landed figures shown on the cards — so
+     they fold shut by default and open when somebody is actually costing.
+  {% endcomment %}
+  <details class="plist-rates">
+    <summary>
+      <i class="bi bi-calculator me-1"></i>Landed-cost preview
+      <span class="plist-rates-hint">changes nothing — display only</span>
+      {% if fx_enabled %}
+      <span class="plist-fx">1 {{ fx_from }} = <strong>{{ fx_rate }} {{ fx_to }}</strong></span>
+      {% endif %}
+    </summary>
+    <div class="plist-rates-body">
+      <label><span><i class="bi bi-airplane"></i> Air rate / KG</span>
+        <input type="number" id="airRateInput" step="0.01" min="0" value="{{ air_rate }}" oninput="recalcPrices()"></label>
+      <label><span><i class="bi bi-water"></i> Sea rate / CBM</span>
+        <input type="number" id="seaRateInput" step="0.01" min="0" value="{{ sea_rate }}" oninput="recalcPrices()"></label>
+      <label><span><i class="bi bi-airplane-fill"></i> KSA air / KG</span>
+        <input type="number" id="ksaAirRateInput" step="0.01" min="0" value="{{ ksa_air_rate }}" oninput="recalcPrices()"></label>
+      <label><span><i class="bi bi-water"></i> KSA sea / CBM</span>
+        <input type="number" id="ksaSeaRateInput" step="0.01" min="0" value="{{ ksa_sea_rate }}" oninput="recalcPrices()"></label>
+      {% comment %}Labelled "preview" because it was once called "Margin %" —
+         identical wording to the action that DOES rewrite prices — so typing a
+         number here and expecting the catalogue to change was the obvious
+         reading.{% endcomment %}
+      <label><span><i class="bi bi-percent"></i> Preview margin %</span>
+        <input type="number" id="marginInput" step="0.5" min="0" max="999" value="0" oninput="recalcPrices()"
+               title="Preview only. Use Adjust Prices to change stored prices."></label>
+      <p class="plist-rates-note">
+        Preview only —
+        <a href="#" data-bs-toggle="modal" data-bs-target="#bulkMarginModal">Adjust Prices</a>
+        is what writes to the catalogue.
+      </p>
     </div>
-    <div class="col-auto">
-        <label class="form-label mb-1" style="font-size:11px;color:#4ade80;font-weight:600;"><i class="bi bi-percent me-1"></i>Margin %</label>
-        <input type="number" id="marginInput" class="form-control form-control-sm" style="width:90px;background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);" step="0.5" min="0" max="999" value="0" oninput="recalcPrices()">
-    </div>
-    {% if fx_enabled %}
-    <div class="col-auto" style="padding-bottom:6px;">
-        <span style="font-size:11px;color:var(--text-secondary);">Rate: 1 {{ fx_from }} = <strong style="color:var(--accent-3)">{{ fx_rate }} {{ fx_to }}</strong></span>
+  </details>
+</form>
+
+{# --- Bulk action bar ------------------------------------------------------- #}
+<div id="bulkActionsBar" class="plist-bulkbar mb-3" style="display:none;">
+    {% comment %}Shown when the selection covers the page but the filter matches
+       more. Without it "select all" silently means "select these 24", and a bulk
+       action quietly does a fraction of what was intended.
+    {% endcomment %}
+    {% if is_partial_page %}
+    <div id="selectAllMatchingRow" class="plist-bulkbar-offer" style="display:none;">
+      All <strong>{{ page_obj.object_list|length }}</strong> on this page are selected.
+      <a href="#" onclick="useFilteredScope(event)">
+        Select all {{ total_count }} matching the current filter
+      </a>
+      <span id="filteredScopeActive" style="display:none;">
+        — acting on all {{ total_count }}. <a href="#" onclick="clearFilteredScope(event)">Undo</a>
+      </span>
     </div>
     {% endif %}
-</div>
-
-<div id="bulkActionsBar" class="mb-3" style="display:none;padding:12px 16px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);">
-    <div class="d-flex align-items-center flex-wrap gap-2">
-        <span id="bulkSelectedProductsCount" style="font-size:13px;font-weight:700;color:#60a5fa;white-space:nowrap;">0 selected</span>
-        <span style="color:var(--border-color);">|</span>
+    <div class="plist-bulkbar-actions">
+        <span id="bulkSelectedProductsCount" class="plist-bulkbar-count">0 selected</span>
+        <span class="plist-sep" aria-hidden="true"></span>
+        {% comment %}Tags first: it is the action this bar is reached for most,
+           and the only one that is freely reversible on any scope.{% endcomment %}
+        <button type="button" class="btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#bulkTagModal"
+                title="Add or remove tags on every selected product">
+            <i class="bi bi-tag-fill me-1" style="color:#7c3aed;"></i> Tags
+        </button>
+        <button type="button" class="btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#bulkCategoryModal"
+                title="Set the category for every selected product">
+            <i class="bi bi-diagram-3-fill me-1" style="color:#60a5fa;"></i> Set Category
+        </button>
+        <button type="button" class="btn-ghost btn-sm" data-bs-toggle="modal" data-bs-target="#bulkMarginModal"
+                title="Raise or lower the price of every selected product by a percentage">
+            <i class="bi bi-percent me-1" style="color:#157F4A;"></i> Adjust Prices
+        </button>
         <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('save_prices')" title="Save calculated air &amp; sea prices">
             <i class="bi bi-floppy me-1"></i> Save Prices
         </button>
         <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('publish')" title="Remove draft status">
-            <i class="bi bi-check-circle me-1" style="color:#4ade80;"></i> Publish
+            <i class="bi bi-check-circle me-1" style="color:#157F4A;"></i> Publish
         </button>
         <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('draft')" title="Mark as draft">
-            <i class="bi bi-file-earmark me-1" style="color:#f59e0b;"></i> Mark Draft
+            <i class="bi bi-file-earmark me-1" style="color:#C2410C;"></i> Mark Draft
         </button>
-        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('private')" title="Move to private section">
-            <i class="bi bi-lock me-1" style="color:#a78bfa;"></i> Move to Private
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('private')" title="Hide from the public catalogue">
+            <i class="bi bi-lock me-1" style="color:#8A661A;"></i> Make Private
         </button>
-        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('public')" title="Restore to public list">
-            <i class="bi bi-unlock me-1" style="color:#a78bfa;"></i> Restore Public
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkAction('public')" title="Show in the public catalogue">
+            <i class="bi bi-unlock me-1" style="color:#8A661A;"></i> Make Public
         </button>
         <button type="button" class="btn-danger btn-sm" onclick="runBulkAction('delete')">
             <i class="bi bi-trash me-1"></i> Delete
         </button>
-        <button type="button" class="btn-ghost btn-sm ms-auto" onclick="clearProductSelection()" style="color:var(--text-secondary);">
+        <button type="button" class="btn-ghost btn-sm plist-bulkbar-clear" onclick="clearProductSelection()">
             <i class="bi bi-x-lg me-1"></i> Clear
         </button>
     </div>
 </div>
 
-<div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <div class="d-flex align-items-center gap-2">
-        <input type="checkbox" id="selectAllProducts" onchange="toggleSelectAllProducts('productsGrid', this.checked)" title="Select all visible" style="width:16px;height:16px;cursor:pointer;">
-        <label for="selectAllProducts" style="font-size:13px;color:var(--text-secondary);margin:0;cursor:pointer;">Select all visible</label>
+{# --- Select-all + result count -------------------------------------------- #}
+{% comment %}One select-all now, because there is one list. It used to be two —
+   one per grid — which is the clearest symptom of the split this screen had:
+   there was no control anywhere that meant "every product on this page".
+{% endcomment %}
+<div class="plist-selectrow">
+    <div class="plist-selectall">
+        <input type="checkbox" id="selectAllProducts" onchange="toggleSelectAllProducts(this.checked)"
+               title="Select everything on this page">
+        <label for="selectAllProducts">Select all on this page</label>
     </div>
-    {% comment %} Spell out exactly what is on screen — the header count, the filtered count and
-       the private count were three different numbers with no explanation. {% endcomment %}
-    <span style="font-size:12px;color:var(--text-secondary);">
-        Showing {{ page_obj|length }} of {{ public_count }} public{% if private_count %} · {{ private_count }} private{% endif %}{% if query %} · matching “{{ query }}”{% endif %}
+    <span class="plist-count">
+        Showing {{ page_obj|length }} of {{ total_count }}
+        {% if visibility != 'all' %}<strong>{{ visibility }}</strong>{% endif %}
+        product{{ total_count|pluralize }}{% if query %} matching &ldquo;{{ query }}&rdquo;{% endif %}
     </span>
 </div>
+
+{# --- Grid view ------------------------------------------------------------- #}
 <div class="row g-2" id="productsGrid">
     {% for product in page_obj %}
-    {% include "products/_product_card.html" with product=product is_private=False %}
+    {% include "products/_product_card.html" with product=product %}
     {% empty %}
     <div class="col-12">
-        <div class="glass-card text-center" style="padding:48px 24px;color:var(--text-secondary);">
-            <i class="bi bi-box-seam" style="font-size:40px;display:block;margin-bottom:12px;opacity:0.4;"></i>
-            No products yet. Click <strong>Add Product</strong> to get started.
+        <div class="glass-card text-center plist-empty">
+            <i class="bi bi-box-seam"></i>
+            {% if filters_active %}
+            <p>No products match these filters.</p>
+            <a href="{% url 'product_list' %}" class="btn-ghost btn-sm">Clear filters</a>
+            {% else %}
+            <p>No products yet. Click <strong>Add Product</strong> to get started.</p>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
 </div>
 
-{% if private_products %}
-<div class="mt-4">
-    <button class="btn-ghost w-100 text-start d-flex align-items-center justify-content-between px-3 py-2"
-        style="border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-card);"
-        type="button" data-bs-toggle="collapse" data-bs-target="#privateProductsCollapse" aria-expanded="false">
-        <span style="font-size:14px;font-weight:600;color:var(--text-secondary);">
-            <i class="bi bi-lock-fill me-2" style="color:#a78bfa"></i>Private Products
-            <span style="font-size:12px;background:rgba(167,139,250,0.15);color:#a78bfa;border-radius:10px;padding:2px 8px;margin-left:6px;">{{ private_products|length }}</span>
-        </span>
-        <i class="bi bi-chevron-down" style="color:var(--text-secondary);font-size:12px;"></i>
-    </button>
-    <div class="collapse" id="privateProductsCollapse">
-        <div class="mt-3">
-            <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <input type="checkbox" id="selectAllPrivateProducts" onchange="toggleSelectAllProducts('privateProductsGrid', this.checked)" title="Select all visible" style="width:16px;height:16px;cursor:pointer;">
-                    <label for="selectAllPrivateProducts" style="font-size:13px;color:var(--text-secondary);margin:0;cursor:pointer;">Select all visible</label>
-                </div>
-            </div>
-            <div class="row g-2" id="privateProductsGrid">
-                {% for product in private_products %}
-                {% include "products/_product_card.html" with product=product is_private=True %}
-                {% endfor %}
-            </div>
-        </div>
-    </div>
+{# --- List view ------------------------------------------------------------- #}
+{% comment %}Nine columns do not fit a phone, so the table scrolls sideways
+   inside its own container rather than widening the page. This is NOT the
+   .table-stack treatment used elsewhere in the back-office: stacking a row into
+   a card would undo the one thing this view exists for, which is a single
+   vertical column of checkboxes. On a narrow screen the grid is the better
+   layout anyway, and the toggle is right there.
+{% endcomment %}
+<div id="productsListWrap" class="plist-tablewrap" style="display:none;">
+  <table class="plist-table">
+    <thead>
+      <tr>
+        <th class="prow-check"><span class="visually-hidden">Select</span></th>
+        <th class="prow-media"><span class="visually-hidden">Image</span></th>
+        <th>Product</th>
+        <th>Category</th>
+        <th>Tags</th>
+        <th class="prow-price">Price</th>
+        <th class="prow-moq">MOQ</th>
+        <th>Status</th>
+        <th class="prow-actions"><span class="visually-hidden">Actions</span></th>
+      </tr>
+    </thead>
+    <tbody id="productsList">
+      {% for product in page_obj %}
+      {% include "products/_product_row.html" with product=product %}
+      {% endfor %}
+    </tbody>
+  </table>
 </div>
-{% endif %}
 
 <div class="modal fade" id="bulkUploadModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl">
@@ -348,7 +1158,7 @@
         <div id="bulkStep1">
           
           <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding:14px 16px;background:rgba(29,78,216,0.08);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius-sm);">
-            <i class="bi bi-info-circle-fill" style="color:#3b82f6;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+            <i class="bi bi-info-circle-fill" style="color:#44546A;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
             <div style="flex:1;font-size:13px;color:var(--text-secondary);line-height:1.6;">
               Required columns: <code style="color:#f9a8d4;">name</code>, <code style="color:#f9a8d4;">price</code>, <code style="color:#f9a8d4;">moq</code> &nbsp;·&nbsp;
               Optional: <code>weight</code>, <code>carton_length</code>, <code>carton_width</code>, <code>carton_height</code>, <code>carton_qty</code><br>
@@ -363,11 +1173,11 @@
           <div id="bulkDropZone"
                style="border:2px dashed var(--border-color);border-radius:var(--radius-sm);padding:60px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s,transform 0.15s;"
                onclick="document.getElementById('bulkCsvInput').click()">
-            <div style="width:72px;height:72px;border-radius:50%;background:rgba(255,140,0,0.1);border:1px solid rgba(255,140,0,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-              <i class="bi bi-file-earmark-spreadsheet" style="font-size:34px;color:var(--accent-3);"></i>
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(176,132,33,0.10);border:1px solid rgba(176,132,33,0.30);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-file-earmark-spreadsheet" style="font-size:34px;color:var(--accent-gold);"></i>
             </div>
             <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop your spreadsheet here</p>
-            <p style="font-size:12px;color:var(--text-secondary);margin:0;">or click to browse &nbsp;·&nbsp; <span style="color:var(--accent-3);">.xlsx</span> or <span style="color:var(--accent-3);">.csv</span></p>
+            <p style="font-size:12px;color:var(--text-secondary);margin:0;">or click to browse &nbsp;·&nbsp; <span style="color:var(--accent-gold-text);">.xlsx</span> or <span style="color:var(--accent-gold-text);">.csv</span></p>
             <input type="file" id="bulkCsvInput" accept=".csv,.xlsx" style="display:none;" onchange="handleBulkFileSelect(this)">
           </div>
         </div>
@@ -378,10 +1188,10 @@
           
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:12px;flex-wrap:wrap;">
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-              <span id="bulkValidCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(74,222,128,0.12);color:#4ade80;border:1px solid rgba(74,222,128,0.25);">0 valid</span>
+              <span id="bulkValidCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(74,222,128,0.12);color:#157F4A;border:1px solid rgba(74,222,128,0.25);">0 valid</span>
               <span id="bulkSelectedCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(59,130,246,0.12);color:#60a5fa;border:1px solid rgba(59,130,246,0.25);">0 selected</span>
-              <span id="bulkErrorCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);display:none;">0 errors</span>
-              <span id="bulkImgCount"    style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);">0 images</span>
+              <span id="bulkErrorCount"  style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(179,38,30,0.12);color:#B3261E;border:1px solid rgba(179,38,30,0.25);display:none;">0 errors</span>
+              <span id="bulkImgCount"    style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(176, 132, 33,0.12);color:#8A661A;border:1px solid rgba(176, 132, 33,0.25);">0 images</span>
             </div>
             <button class="btn-ghost btn-sm" onclick="resetBulkUpload()" style="font-size:12px;">
               <i class="bi bi-arrow-left me-1"></i> Change File
@@ -414,17 +1224,17 @@
           </div>
 
           
-          <div style="margin-top:18px;padding:16px;background:rgba(167,139,250,0.05);border:1px solid rgba(167,139,250,0.2);border-radius:var(--radius-sm);">
+          <div style="margin-top:18px;padding:16px;background:rgba(176, 132, 33,0.05);border:1px solid rgba(176, 132, 33,0.2);border-radius:var(--radius-sm);">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
               <div>
-                <span style="font-size:13px;font-weight:700;color:#a78bfa;"><i class="bi bi-images me-2"></i>Product Images <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></span>
+                <span style="font-size:13px;font-weight:700;color:#8A661A;"><i class="bi bi-images me-2"></i>Product Images <span style="font-weight:400;color:var(--text-secondary);">(optional)</span></span>
               </div>
               <span style="font-size:11px;color:var(--text-secondary);">Name each image after its product &nbsp;·&nbsp; e.g. <code>Red Widget.jpg</code></span>
             </div>
             <div id="bulkImgDropZone"
-                 style="border:1px dashed rgba(167,139,250,0.4);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:background 0.2s,border-color 0.2s;"
+                 style="border:1px dashed rgba(176, 132, 33,0.4);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;transition:background 0.2s,border-color 0.2s;"
                  onclick="document.getElementById('bulkImgInput').click()">
-              <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:#a78bfa;display:block;margin-bottom:6px;"></i>
+              <i class="bi bi-cloud-arrow-up" style="font-size:28px;color:#8A661A;display:block;margin-bottom:6px;"></i>
               <p style="font-size:13px;color:var(--text-secondary);margin:0;">Drop images here or click to browse &nbsp;·&nbsp; multiple files supported</p>
               <input type="file" id="bulkImgInput" accept="image/*" multiple style="display:none;" onchange="handleBulkImages(this.files)">
             </div>
@@ -440,10 +1250,10 @@
 
           
           <div id="photoDropZone"
-               style="border:2px dashed rgba(167,139,250,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
+               style="border:2px dashed rgba(176, 132, 33,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
                onclick="document.getElementById('photoInput').click()">
-            <div style="width:72px;height:72px;border-radius:50%;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-              <i class="bi bi-images" style="font-size:34px;color:#a78bfa;"></i>
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(176, 132, 33,0.1);border:1px solid rgba(176, 132, 33,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-images" style="font-size:34px;color:#8A661A;"></i>
             </div>
             <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop product photos here</p>
             <p style="font-size:12px;color:var(--text-secondary);margin:0 0 4px;">One photo = one product &nbsp;·&nbsp; name is auto-filled from the filename</p>
@@ -454,7 +1264,7 @@
           
           <div id="photoTableSection" style="display:none;margin-top:20px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
-              <span id="photoCountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(167,139,250,0.12);color:#a78bfa;border:1px solid rgba(167,139,250,0.25);">0 photos</span>
+              <span id="photoCountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(176, 132, 33,0.12);color:#8A661A;border:1px solid rgba(176, 132, 33,0.25);">0 photos</span>
               <button class="btn-ghost btn-sm" onclick="clearPhotos()" style="font-size:12px;color:var(--text-secondary);">
                 <i class="bi bi-x-circle me-1"></i> Clear All
               </button>
@@ -487,7 +1297,7 @@
 
           
           <div style="display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;padding:14px 16px;background:rgba(220,38,38,0.07);border:1px solid rgba(220,38,38,0.25);border-radius:var(--radius-sm);">
-            <i class="bi bi-bag-check-fill" style="color:#ef4444;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
+            <i class="bi bi-bag-check-fill" style="color:#B3261E;font-size:18px;flex-shrink:0;margin-top:1px;"></i>
             <div style="flex:1;font-size:13px;color:var(--text-secondary);line-height:1.7;">
               Export your cart from <strong style="color:#fff;">1688.com</strong> or <strong style="color:#fff;">aiprice.com</strong> as a CSV, then upload it here.<br>
               Product names, <strong style="color:#fff;">¥ RMB prices</strong>, MOQ and product images will be imported automatically.
@@ -496,21 +1306,21 @@
 
           
           <div id="alibaba1688DropZone"
-               style="border:2px dashed rgba(239,68,68,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
+               style="border:2px dashed rgba(179,38,30,0.4);border-radius:var(--radius-sm);padding:50px 24px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;"
                onclick="document.getElementById('alibaba1688Input').click()">
-            <div style="width:72px;height:72px;border-radius:50%;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
-              <i class="bi bi-bag" style="font-size:34px;color:#ef4444;"></i>
+            <div style="width:72px;height:72px;border-radius:50%;background:rgba(179,38,30,0.1);border:1px solid rgba(179,38,30,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+              <i class="bi bi-bag" style="font-size:34px;color:#B3261E;"></i>
             </div>
             <p style="font-size:15px;font-weight:700;color:var(--text-primary);margin:0 0 6px;">Drop your 1688 CSV here</p>
             <p style="font-size:12px;color:var(--text-secondary);margin:0 0 4px;">Exported from 1688.com cart or aiprice.com</p>
-            <p id="alibaba1688FileName" style="font-size:12px;color:#ef4444;margin:8px 0 0;display:none;font-weight:600;"></p>
+            <p id="alibaba1688FileName" style="font-size:12px;color:#B3261E;margin:8px 0 0;display:none;font-weight:600;"></p>
             <input type="file" id="alibaba1688Input" accept=".csv" style="display:none;" onchange="handle1688FileSelect(this)">
           </div>
 
           
           <div id="alibaba1688PreviewSection" style="display:none;margin-top:20px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
-              <span id="alibaba1688CountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);">0 products</span>
+              <span id="alibaba1688CountBadge" style="font-size:13px;font-weight:700;padding:5px 12px;border-radius:20px;background:rgba(179,38,30,0.12);color:#B3261E;border:1px solid rgba(179,38,30,0.25);">0 products</span>
               <button class="btn-ghost btn-sm" onclick="clear1688()" style="font-size:12px;color:var(--text-secondary);">
                 <i class="bi bi-x-circle me-1"></i> Clear
               </button>
@@ -546,7 +1356,7 @@
         <button type="button" id="photoUploadBtn" class="btn-glow" onclick="submitPhotoUpload()" style="display:none;background:linear-gradient(135deg,#C84B31,#C84B31);">
           <i class="bi bi-cloud-upload me-1"></i> <span id="photoUploadBtnText">Create Products</span>
         </button>
-        <button type="button" id="alibaba1688UploadBtn" class="btn-glow" onclick="submit1688Upload()" style="display:none;background:linear-gradient(135deg,#dc2626,#b91c1c);">
+        <button type="button" id="alibaba1688UploadBtn" class="btn-glow" onclick="submit1688Upload()" style="display:none;background:linear-gradient(135deg,#B3261E,#b91c1c);">
           <i class="bi bi-bag-check me-1"></i> <span id="alibaba1688UploadBtnText">Import Products</span>
         </button>
       </div>
@@ -600,22 +1410,39 @@
                 <div class="detail-spec-value" id="detailSku">—</div>
               </div>
             </div>
+
+            {% comment %}Variations of this product — the colours, kit sizes and
+               section counts one 1688 listing sells. Hidden entirely when the
+               product has none, which is most of them.
+            {% endcomment %}
+            <div id="detailVariantsBlock" style="display:none;margin-bottom:16px;">
+              <h6 style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;">
+                Variations <span id="detailVariantsCount" style="font-weight:400;"></span>
+              </h6>
+              <div id="detailVariantsList" style="max-height:230px;overflow-y:auto;border:1px solid var(--border-color);border-radius:10px;"></div>
+            </div>
+
+            <div id="detailAttributesBlock" style="display:none;margin-bottom:16px;">
+              <h6 style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;">Specifications</h6>
+              <div id="detailAttributesList" class="detail-spec-grid"></div>
+            </div>
+
             <h6 style="font-size:13px;font-weight:700;color:var(--text-secondary);margin-bottom:10px;">Landed Prices</h6>
             <div class="detail-shipping-grid">
               <div class="detail-shipping-box air">
-                <div class="detail-shipping-title" style="color:var(--accent-3);">✈ Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div class="detail-shipping-title">✈ Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
                 <div id="detail-air-cell"></div>
               </div>
               <div class="detail-shipping-box sea">
-                <div class="detail-shipping-title" style="color:#38bdf8;">⛵ Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div class="detail-shipping-title">⛵ Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
                 <div id="detail-sea-cell"></div>
               </div>
               <div class="detail-shipping-box ksa-air">
-                <div class="detail-shipping-title" style="color:#a78bfa;">✈ KSA Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div class="detail-shipping-title">✈ KSA Air{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
                 <div id="detail-ksa-air-cell"></div>
               </div>
               <div class="detail-shipping-box ksa-sea">
-                <div class="detail-shipping-title" style="color:#34d399;">⛵ KSA Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
+                <div class="detail-shipping-title">⛵ KSA Sea{% if fx_enabled %} / {{ fx_from }}{% endif %}</div>
                 <div id="detail-ksa-sea-cell"></div>
               </div>
             </div>
@@ -624,7 +1451,7 @@
       </div>
       <div class="modal-footer" style="border-top:1px solid var(--border-color);flex-wrap:wrap;gap:8px;">
         <button type="button" class="btn-ghost btn-sm" id="detailEditBtn"><i class="bi bi-pencil me-1"></i> Edit</button>
-        <a href="#" class="btn-ghost btn-sm" id="detailQuoteBtn" style="color:#38bdf8;"><i class="bi bi-send me-1"></i> Quote</a>
+        <a href="#" class="btn-ghost btn-sm" id="detailQuoteBtn"><i class="bi bi-send me-1"></i> Quote</a>
         <button type="button" class="btn-ghost btn-sm" id="detailSaveBtn" disabled><i class="bi bi-floppy me-1"></i> Save Prices</button>
         <button type="button" class="btn-ghost btn-sm" id="detailPrivateBtn"><i class="bi bi-lock me-1"></i> Private</button>
         <button type="button" class="btn-danger btn-sm" id="detailDeleteBtn"><i class="bi bi-trash me-1"></i> Delete</button>
@@ -686,6 +1513,34 @@
           </div>
           <div class="row g-3 mb-3">
             <div class="col-md-6">
+              <label class="form-label">Category</label>
+              {% comment %}Every subcategory of every category is rendered into the
+                 second select up front, tagged with data-category. The JS in
+                 initCategorySelects() hides the ones that do not belong to the
+                 chosen category, so switching category needs no server round
+                 trip. Leaving both blank is fine — the server then infers the
+                 category from the product name.{% endcomment %}
+              <select name="category" class="form-select category-select" data-target="addProductSubcategory">
+                <option value="">Auto-detect from name</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Sub Category</label>
+              <select name="subcategory" id="addProductSubcategory" class="form-select subcategory-select">
+                <option value="">— none —</option>
+                {% for category in categories %}
+                  {% for sub in category.subcategories.all %}
+                <option value="{{ sub.id }}" data-category="{{ category.id }}">{{ sub.name }}</option>
+                  {% endfor %}
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
               <label class="form-label">Product Source</label>
               <select name="source" class="form-select">
                 <option value="general" selected>General</option>
@@ -698,14 +1553,26 @@
               <input type="file" name="images" class="form-control" multiple accept="image/*">
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">Supplier listing URL
+              <span style="color:var(--text-secondary);font-size:11px">optional &mdash; staff only</span>
+            </label>
+            <input type="url" name="source_url" class="form-control"
+                   placeholder="https://detail.1688.com/offer/123456.html">
+            <div style="color:var(--text-secondary);font-size:11px;margin-top:3px;">
+              Adds a &ldquo;Contact supplier&rdquo; button to the product card. Never shown to customers.
+            </div>
+          </div>
+          {% include "products/_attributes_editor.html" with editor_id="addProductAttrs" %}
+
           <div class="mb-3 d-flex align-items-center gap-2">
             <input type="checkbox" name="ready_to_ship" id="addProductReadyToShip" value="1" class="form-check-input" style="width:18px;height:18px;">
-            <label for="addProductReadyToShip" class="form-label mb-0" style="color:#4ade80;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
+            <label for="addProductReadyToShip" class="form-label mb-0" style="color:#157F4A;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
           </div>
           <input type="hidden" name="is_draft" id="addProductIsDraft" value="0">
           <div class="d-flex gap-2">
             <button type="submit" class="btn-glow flex-fill" onclick="document.getElementById('addProductIsDraft').value='0'"><i class="bi bi-check-lg me-1"></i> Add Product</button>
-            <button type="submit" class="btn-ghost flex-fill" onclick="document.getElementById('addProductIsDraft').value='1'" style="border:1px solid #f59e0b;color:#f59e0b;"><i class="bi bi-file-earmark me-1"></i> Save as Draft</button>
+            <button type="submit" class="btn-ghost flex-fill" onclick="document.getElementById('addProductIsDraft').value='1'" style="border:1px solid #C2410C;color:#C2410C;"><i class="bi bi-file-earmark me-1"></i> Save as Draft</button>
           </div>
         </form>
       </div>
@@ -766,6 +1633,28 @@
           
           <div class="row g-3 mb-3">
             <div class="col-md-6">
+              <label class="form-label">Category</label>
+              <select name="category" id="editProductCategory" class="form-select category-select" data-target="editProductSubcategory">
+                <option value="">Auto-detect from name</option>
+                {% for category in categories %}
+                <option value="{{ category.id }}">{{ category.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Sub Category</label>
+              <select name="subcategory" id="editProductSubcategory" class="form-select subcategory-select">
+                <option value="">— none —</option>
+                {% for category in categories %}
+                  {% for sub in category.subcategories.all %}
+                <option value="{{ sub.id }}" data-category="{{ category.id }}">{{ sub.name }}</option>
+                  {% endfor %}
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
               <label class="form-label">Product Source</label>
               <select name="source" id="editProductSource" class="form-select">
                 <option value="general">General</option>
@@ -778,14 +1667,59 @@
               <input type="file" name="images" id="editProductNewImages" class="form-control" multiple accept="image/*">
             </div>
           </div>
+          <div class="mb-3">
+            <label class="form-label">Supplier listing URL
+              <span style="color:var(--text-secondary);font-size:11px">optional &mdash; staff only</span>
+            </label>
+            <input type="url" name="source_url" id="editProductSourceUrl" class="form-control"
+                   placeholder="https://detail.1688.com/offer/123456.html">
+          </div>
           <div class="mb-3" id="editProductImagesContainer"></div>
+
+          {% comment %}Variations editor. Only on the EDIT form — a product's
+             variations come from the sourcing extension or a spreadsheet, and
+             asking someone to type seventeen of them into the Add dialog by hand
+             is not a workflow anyone wants. Editing prices afterwards is.
+          {% endcomment %}
+          <div class="mb-3 mlk-variants" id="editProductVariants">
+            <label class="form-label d-flex align-items-center justify-content-between">
+              <span>
+                Variations
+                <span style="color:var(--text-secondary);font-size:11px">
+                  each is a separate option customers pick from
+                </span>
+              </span>
+              <button type="button" class="btn-ghost btn-sm mlk-variant-add"
+                      style="font-size:12px;padding:4px 10px;">
+                <i class="bi bi-plus-lg"></i> Add variation
+              </button>
+            </label>
+
+            {% comment %}Guarantees variant_name[] is submitted even with zero rows,
+               so "remove them all" is a saveable state rather than a no-op.
+            {% endcomment %}
+            <input type="hidden" name="variant_name[]" value="">
+            <input type="hidden" name="variant_price[]" value="">
+            <input type="hidden" name="variant_stock[]" value="">
+            <input type="hidden" name="variant_id[]" value="">
+
+            <div class="mlk-variant-rows"></div>
+
+            <div style="color:var(--text-secondary);font-size:11px;margin-top:4px;">
+              Removing a variation that already appears on an order retires it
+              instead of deleting it, so the order history stays readable.
+            </div>
+          </div>
+
+          {% include "products/_attributes_editor.html" with editor_id="editProductAttrs" %}
+
           <div class="mb-3 d-flex align-items-center gap-2">
             <input type="checkbox" name="ready_to_ship" id="editProductReadyToShip" value="1" class="form-check-input" style="width:18px;height:18px;">
-            <label for="editProductReadyToShip" class="form-label mb-0" style="color:#4ade80;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
+            <label for="editProductReadyToShip" class="form-label mb-0" style="color:#157F4A;font-size:13px;"><i class="bi bi-truck me-1"></i> Ready to Ship (requires labels at checkout)</label>
           </div>
           <div class="mb-3 d-flex align-items-center gap-2">
             <input type="checkbox" name="is_draft_toggle" id="editProductIsDraftToggle" class="form-check-input" style="width:18px;height:18px;" onchange="document.getElementById('editProductIsDraftHidden').value=this.checked?'1':'0'">
-            <label for="editProductIsDraftToggle" class="form-label mb-0" style="color:#f59e0b;font-size:13px;"><i class="bi bi-file-earmark me-1"></i> Mark as Draft</label>
+            <label for="editProductIsDraftToggle" class="form-label mb-0" style="color:#C2410C;font-size:13px;"><i class="bi bi-file-earmark me-1"></i> Mark as Draft</label>
             <input type="hidden" name="is_draft" id="editProductIsDraftHidden" value="0">
           </div>
           <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Changes</button>
@@ -795,15 +1729,392 @@
   </div>
 </div>
 
+{% comment %}Bulk: set the category on every selected product.{% endcomment %}
+{% comment %}
+  BULK TAGS
+  ---------
+  Two actions, not a save. "Save" over a mixed selection — some products already
+  carrying the tag, some not — has to guess whether an unticked box means "leave
+  alone" or "take it off", and either reading is wrong half the time. Add adds;
+  remove removes; a tag nobody named is never touched.
+{% endcomment %}
+<div class="modal fade" id="bulkTagModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tag-fill me-2" style="color:#7c3aed;"></i>Tags</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="bulk-tag-scope" id="bulkTagScopeNote">Applies to the selected products.</p>
+
+        {% if all_tags %}
+        <div class="bulk-tag-picker" id="bulkTagPicker">
+          {% for tag in all_tags %}
+          <label class="tag-pick">
+            <input type="checkbox" value="{{ tag.id }}" class="bulk-tag-check">
+            <span class="tag-chip" style="--tag:{{ tag.colour }};">{{ tag.name }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="bulk-tag-empty">No tags yet — type one below to create it.</p>
+        {% endif %}
+
+        {% comment %}Creating a tag from here rather than sending somebody to a
+           separate screen first. Tagging happens in the middle of another job:
+           you are looking at forty products and you realise they need a label.
+           A detour to define it is how the label ends up never applied.{% endcomment %}
+        <label class="bulk-tag-new">
+          <span>Or create new tags <em>(comma-separated)</em></span>
+          <input type="text" id="bulkNewTags" placeholder="e.g. Needs photos, Ramadan 2026"
+                 autocomplete="off">
+        </label>
+      </div>
+      <div class="modal-footer bulk-tag-footer">
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkTags('clear_tags')"
+                title="Strip every tag from the selected products">
+          <i class="bi bi-eraser me-1"></i> Clear all tags
+        </button>
+        <span class="bulk-tag-spacer"></span>
+        <button type="button" class="btn-ghost btn-sm" onclick="runBulkTags('remove_tags')">
+          <i class="bi bi-dash-circle me-1"></i> Remove
+        </button>
+        <button type="button" class="btn-glow btn-sm" onclick="runBulkTags('add_tags')">
+          <i class="bi bi-plus-circle me-1"></i> Add tags
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+  TAG MANAGER
+  -----------
+  Rename, recolour, delete. Deleting a tag removes it from every product that
+  carries it but touches nothing else — the products themselves are untouched,
+  which is what makes tags safe to experiment with.
+{% endcomment %}
+<div class="modal fade" id="manageTagsModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-sliders me-2"></i>Manage tags</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <table class="manage-tags-table">
+          <thead>
+            <tr><th>Tag</th><th>Colour</th><th class="mt-count">Products</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for tag in all_tags %}
+            <tr data-tag-id="{{ tag.id }}">
+              <td><input type="text" class="mt-name" value="{{ tag.name }}" maxlength="60" aria-label="Tag name"></td>
+              <td>
+                <select class="mt-colour" aria-label="Tag colour">
+                  {% for value, label in tag.COLOUR_CHOICES %}
+                  <option value="{{ value }}" {% if tag.colour == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+              <td class="mt-count">{{ tag.product_count }}</td>
+              <td class="mt-actions">
+                <button type="button" class="btn-ghost btn-sm" onclick="saveTag(this)" title="Save changes">
+                  <i class="bi bi-check-lg"></i>
+                </button>
+                <button type="button" class="btn-danger btn-sm" onclick="deleteTag(this, '{{ tag.name|escapejs }}', {{ tag.product_count }})" title="Delete tag">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="mt-empty">No tags yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="bulkCategoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-tags me-2"></i>Set Category</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size:13px;color:var(--text-secondary);">
+          Applies to <strong id="bulkCatCount">0</strong> selected product(s).
+          Choosing a subcategory sets its parent category too.
+        </p>
+        <div class="mb-3">
+          <label class="form-label">Category</label>
+          <select id="bulkCatCategory" class="form-select">
+            <option value="">— none —</option>
+            {% for c in categories %}
+            <option value="{{ c.slug }}">{{ c.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Subcategory <span style="color:var(--text-secondary);font-size:11px">optional</span></label>
+          <select id="bulkCatSubcategory" class="form-select"><option value="">— none —</option></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-glow" onclick="submitBulkCategory()">
+          <i class="bi bi-check-lg me-1"></i> Apply
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% comment %}Bulk: raise prices by a percentage.
+
+   This overwrites the stored price, which is the supplier's cost. The dialog says
+   so in plain words and shows a worked example on the selection's own numbers,
+   because "20%" reads as harmless until you see it turn 33.60 into 40.32 with no
+   way back to 33.60.
+{% endcomment %}
+<div class="modal fade" id="bulkMarginModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-percent me-2"></i>Adjust Prices</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        {% comment %}Scope first, because it is the choice that decides how much
+           damage the percentage below does. "All products" is what you want when
+           setting a catalogue-wide markup and is unreachable from the bulk bar,
+           which only exists once something is ticked.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="form-label">Apply to</label>
+          <div class="d-flex flex-column gap-2">
+            <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+              <input type="radio" name="bulkMarginScope" value="selected" checked onchange="previewBulkMargin()">
+              <span>Selected products (<strong id="bulkMarginSelCount">0</strong>)</span>
+            </label>
+            <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+              <input type="radio" name="bulkMarginScope" value="category" onchange="previewBulkMargin()">
+              <span>By category</span>
+            </label>
+            <label class="d-flex align-items-center gap-2" style="cursor:pointer;">
+              <input type="radio" name="bulkMarginScope" value="all" onchange="previewBulkMargin()">
+              <span>All products in the catalogue
+                (<strong>{{ catalogue_count }}</strong>, including private and drafts)</span>
+            </label>
+          </div>
+
+          {% comment %}Only meaningful for the category scope, so it stays hidden
+             otherwise rather than sitting there greyed out.{% endcomment %}
+          <div id="bulkMarginCatBox" style="display:none;margin-top:10px;">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <span style="font-size:12px;color:var(--text-secondary);">Pick one or more</span>
+              <div class="d-flex gap-2">
+                <button type="button" class="btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;"
+                        onclick="setAllMarginCats(true)">All</button>
+                <button type="button" class="btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;"
+                        onclick="setAllMarginCats(false)">None</button>
+              </div>
+            </div>
+            <div style="max-height:190px;overflow-y:auto;border:1px solid var(--border-color);border-radius:9px;padding:6px 10px;">
+              {% for c in categories %}
+              <label class="d-flex align-items-center gap-2 py-1" style="cursor:pointer;font-size:13px;">
+                <input type="checkbox" class="margin-cat" value="{{ c.slug }}" onchange="previewBulkMargin()">
+                <span style="flex:1 1 auto;">{{ c.name }}</span>
+                <span style="font-size:11px;color:var(--text-secondary);">{{ c.products.count }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        {% comment %}Private products are the negotiated or customer-exclusive
+           ones. A blanket percentage should not quietly reprice a figure that was
+           agreed with somebody, so this defaults to ON.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="d-flex align-items-center gap-2" style="cursor:pointer;font-size:13px;">
+            <input type="checkbox" id="bulkMarginSkipPrivate" checked onchange="previewBulkMargin()">
+            <span>Leave private products unchanged</span>
+          </label>
+        </div>
+
+        {% comment %}Direction is a toggle, not a minus sign typed into the number
+           box. A missed "-" would move every price the wrong way, and the whole
+           operation is irreversible — worth two radio buttons to make impossible.
+        {% endcomment %}
+        <div class="mb-3">
+          <label class="form-label">Direction</label>
+          <div class="d-flex gap-2">
+            <label class="flex-fill d-flex align-items-center gap-2 justify-content-center"
+                   style="cursor:pointer;border:1px solid var(--border-color);border-radius:8px;padding:9px;">
+              <input type="radio" name="bulkMarginDir" value="up" checked onchange="previewBulkMargin()">
+              <span style="color:#157F4A;font-weight:600;"><i class="bi bi-arrow-up"></i> Increase</span>
+            </label>
+            <label class="flex-fill d-flex align-items-center gap-2 justify-content-center"
+                   style="cursor:pointer;border:1px solid var(--border-color);border-radius:8px;padding:9px;">
+              <input type="radio" name="bulkMarginDir" value="down" onchange="previewBulkMargin()">
+              <span style="color:#B3261E;font-weight:600;"><i class="bi bi-arrow-down"></i> Decrease</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Percentage</label>
+          <input type="number" id="bulkMarginValue" class="form-control" step="0.5" min="0.01" max="1000"
+                 placeholder="e.g. 20" oninput="previewBulkMargin()">
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:4px;">
+            Decrease is capped at 99% — a price can never reach zero.
+          </div>
+        </div>
+
+        <div id="bulkMarginPreview"
+             style="font-size:12.5px;background:var(--bg-input);border:1px solid var(--border-color);
+                    border-radius:8px;padding:10px 12px;margin-bottom:12px;display:none;"></div>
+
+        <div style="font-size:12px;background:rgba(179,38,30,0.10);border:1px solid rgba(179,38,30,0.35);
+                    border-radius:8px;padding:10px 12px;color:#B3261E;">
+          <strong><i class="bi bi-exclamation-triangle me-1"></i>This overwrites the price and cannot be undone.</strong>
+          <div style="margin-top:5px;color:var(--text-primary);">
+            After this runs, the previous figure is gone. Percentages do not
+            cancel out: &minus;20% does <strong>not</strong> undo +20%, because the
+            second one applies to the already-changed number (100 &rarr; 120 &rarr; 96).
+            Every run is written to the audit log.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a href="/products/price-history/" class="btn-ghost me-auto" style="font-size:12px;">
+          <i class="bi bi-clock-history me-1"></i> History
+        </a>
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-danger" onclick="submitBulkMargin()">
+          <i class="bi bi-percent me-1"></i> Apply
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{% include "includes/pagination.html" with page_obj=page_obj %}
+{% comment %}Catalogue export: pick categories, pick a format.
+
+   Both outputs read the same ?category=/?subcategory= parameters, so this dialog
+   just builds a query string and points one of two URLs at it. Nothing ticked
+   means everything, which matches what the two old buttons did.
+{% endcomment %}
+<div class="modal fade" id="catalogueExportModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-journal-arrow-down me-2"></i>Catalogue</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <label class="form-label mb-0">Categories</label>
+          <div class="d-flex gap-2">
+            <button type="button" class="btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;"
+                    onclick="setAllCatalogueCats(true)">All</button>
+            <button type="button" class="btn-ghost btn-sm" style="font-size:11px;padding:3px 9px;"
+                    onclick="setAllCatalogueCats(false)">None</button>
+          </div>
+        </div>
+
+        <div id="catalogueCatList"
+             style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color);border-radius:9px;padding:6px 10px;">
+          {% for c in categories %}
+          <label class="d-flex align-items-center gap-2 py-1" style="cursor:pointer;font-size:13px;">
+            <input type="checkbox" class="catalogue-cat" value="{{ c.slug }}">
+            <span style="flex:1 1 auto;">{{ c.name }}</span>
+            <span style="font-size:11px;color:var(--text-secondary);">{{ c.products.count }}</span>
+          </label>
+          {% empty %}
+          <div style="font-size:12px;color:var(--text-secondary);padding:8px 0;">
+            No categories yet — <a href="/products/categories/">create some</a>.
+          </div>
+          {% endfor %}
+        </div>
+
+        <div id="catalogueScopeNote" style="font-size:12px;color:var(--text-secondary);margin-top:8px;">
+          Nothing ticked — the export will include every category.
+        </div>
+
+        {% comment %}Prices are dropped on the SERVER when this is ticked, so
+           the printed page and the spreadsheet contain no figures at all —
+           rather than hiding a column somebody can unhide.
+        {% endcomment %}
+        <label class="d-flex align-items-start gap-2 mt-3" style="cursor:pointer;font-size:13px;">
+          <input type="checkbox" id="catalogueNoPrices" style="margin-top:3px;">
+          <span>
+            <strong>Without prices</strong>
+            <span style="display:block;font-size:11.5px;color:var(--text-secondary);">
+              For a distributor who adds their own margin, or a buyer before terms
+              are agreed. The prices are left out of the file entirely.
+            </span>
+          </span>
+        </label>
+
+        {% comment %}The return journey, in the same place as the outward one.
+
+           Re-pricing in Excel and typing the numbers back in was how this was
+           being done, which is where the typos came from. The import takes the
+           sheet this modal produces and applies it - prices, MOQ, weight and
+           carton size - to the products it names.
+        {% endcomment %}
+        <div class="catalogue-import-block" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border-color);">
+          <label class="form-label mb-1" style="font-size:13px;">
+            <i class="bi bi-upload me-1"></i>Update from a filled-in sheet
+          </label>
+          <div style="font-size:11.5px;color:var(--text-secondary);margin-bottom:8px;">
+            Download the Excel above, change the prices, MOQs or carton sizes, then
+            upload it here. Rows are matched on SKU. Existing products are updated;
+            nothing new is created, and a blank cell leaves that value alone.
+          </div>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <input type="file" id="catalogueImportFile" accept=".xlsx"
+                   class="form-control form-control-sm" style="max-width:280px;">
+            <button type="button" class="btn-ghost btn-sm" id="catalogueImportBtn"
+                    onclick="runCatalogueImport()">
+              <i class="bi bi-arrow-repeat me-1"></i><span id="catalogueImportBtnText">Apply changes</span>
+            </button>
+          </div>
+          <div id="catalogueImportResult" style="display:none;margin-top:10px;font-size:12px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-ghost" onclick="runCatalogueExport('/products/catalogue/', true)">
+          <i class="bi bi-printer me-1"></i> Print view
+        </button>
+        <button type="button" class="btn-glow" onclick="runCatalogueExport('/products/catalogue-export/', false)">
+          <i class="bi bi-file-earmark-excel me-1"></i> Download Excel
+        </button>
+      </div>
+    </div>
+  </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 var PRODUCT_CALC_DATA = [
-{% for p in products %}
-  { id: {{ p.id }}, price: {{ p.price }}, weight: {{ p.weight|default:'null' }}, carton_qty: {{ p.carton_qty|default:'null' }}, carton_cbm: {{ p.carton_cbm|default:'null' }}, saved_air: {{ p.price_air|default:'null' }}, saved_sea: {{ p.price_sea|default:'null' }} },
-{% endfor %}
-{% for p in private_products %}
+{% comment %}The rendered page only. This was two loops over two entire
+   querysets, emitting a row for every product in the catalogue including the
+   ones on other pages - recalcPrices only ever writes into cards that exist.
+{% endcomment %}
+{% for p in page_obj %}
   { id: {{ p.id }}, price: {{ p.price }}, weight: {{ p.weight|default:'null' }}, carton_qty: {{ p.carton_qty|default:'null' }}, carton_cbm: {{ p.carton_cbm|default:'null' }}, saved_air: {{ p.price_air|default:'null' }}, saved_sea: {{ p.price_sea|default:'null' }} },
 {% endfor %}
 ];
@@ -829,14 +2140,14 @@ function recalcPrices() {
             h += '<div style="font-size:12px;font-weight:700;color:#fff;background:' + bg + ';border-radius:4px;padding:1px 6px;display:inline-block;margin-top:3px;">' + FX_FROM + ' ' + converted.toFixed(2) + '</div>';
             if (margin > 0) {
                 var sell = converted * (1 + margin / 100);
-                h += '<div style="font-size:11px;color:#4ade80;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + FX_FROM + ' ' + sell.toFixed(2) + '</strong></div>';
+                h += '<div style="font-size:11px;color:#157F4A;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + FX_FROM + ' ' + sell.toFixed(2) + '</strong></div>';
             }
         } else if (margin > 0) {
             var sell = landedVal * (1 + margin / 100);
-            h += '<div style="font-size:11px;color:#4ade80;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + sell.toFixed(2) + '</strong></div>';
+            h += '<div style="font-size:11px;color:#157F4A;margin-top:2px;">&#8679;' + margin + '% &rarr; <strong>' + sell.toFixed(2) + '</strong></div>';
         }
         if (savedVal !== null) {
-            h += '<div style="font-size:10px;color:#4ade80;margin-top:2px;"><i class="bi bi-check-circle-fill"></i> saved: ' + savedVal.toFixed(2) + '</div>';
+            h += '<div style="font-size:10px;color:#157F4A;margin-top:2px;"><i class="bi bi-check-circle-fill"></i> saved: ' + savedVal.toFixed(2) + '</div>';
         }
         return h;
     }
@@ -869,37 +2180,37 @@ function recalcPrices() {
         if (p.weight !== null && p.carton_qty !== null && airRate > 0) {
             var airShip = (p.weight * airRate) / p.carton_qty;
             airVal = p.price + airShip;
-            var airHtml = buildCell(p, airVal, airShip, 'var(--accent-3)', 'rgba(255,140,0,0.2)', p.saved_air);
+            var airHtml = buildCell(p, airVal, airShip, '#B08421', 'rgba(176,132,33,0.18)', p.saved_air);
             setCellContent(detailAir, airHtml);
-            setCellContent(cardAir, buildCardChip('✈ Air', 'var(--accent-3)', airVal, false));
+            setCellContent(cardAir, buildCardChip('✈ Air', '#B08421', airVal, false));
         } else {
             var airMissing = [];
             if (p.weight === null) airMissing.push('weight');
             if (p.carton_qty === null) airMissing.push('qty/ctn');
             if (airRate === 0) airMissing.push('rate');
             setCellContent(detailAir, buildMissing(p, airMissing));
-            setCellContent(cardAir, buildCardChip('✈ Air', 'var(--accent-3)', 0, true));
+            setCellContent(cardAir, buildCardChip('✈ Air', '#B08421', 0, true));
         }
 
         if (p.carton_cbm !== null && p.carton_qty !== null && seaRate > 0) {
             var seaShip = (p.carton_cbm / p.carton_qty) * seaRate;
             seaVal = p.price + seaShip;
-            var seaHtml = buildCell(p, seaVal, seaShip, '#38bdf8', 'rgba(56,189,248,0.2)', p.saved_sea);
+            var seaHtml = buildCell(p, seaVal, seaShip, '#2a78d6', 'rgba(42,120,214,0.18)', p.saved_sea);
             setCellContent(detailSea, seaHtml);
-            setCellContent(cardSea, buildCardChip('⛵ Sea', '#38bdf8', seaVal, false));
+            setCellContent(cardSea, buildCardChip('⛵ Sea', '#2a78d6', seaVal, false));
         } else {
             var seaMissing = [];
             if (p.carton_cbm === null) seaMissing.push('carton dims');
             if (p.carton_qty === null) seaMissing.push('qty/ctn');
             if (seaRate === 0) seaMissing.push('rate');
             setCellContent(detailSea, buildMissing(p, seaMissing));
-            setCellContent(cardSea, buildCardChip('⛵ Sea', '#38bdf8', 0, true));
+            setCellContent(cardSea, buildCardChip('⛵ Sea', '#2a78d6', 0, true));
         }
 
         if (p.weight !== null && p.carton_qty !== null && ksaAirRate > 0) {
             var ksaAirShip = (p.weight * ksaAirRate) / p.carton_qty;
             var ksaAirVal = p.price + ksaAirShip;
-            setCellContent(detailKsaAir, buildCell(p, ksaAirVal, ksaAirShip, '#a78bfa', 'rgba(167,139,250,0.2)', null));
+            setCellContent(detailKsaAir, buildCell(p, ksaAirVal, ksaAirShip, '#4a3aa7', 'rgba(74,58,167,0.18)', null));
         } else {
             var ksaAirMissing = [];
             if (p.weight === null) ksaAirMissing.push('weight');
@@ -911,7 +2222,7 @@ function recalcPrices() {
         if (p.carton_cbm !== null && p.carton_qty !== null && ksaSeaRate > 0) {
             var ksaSeaShip = (p.carton_cbm / p.carton_qty) * ksaSeaRate;
             var ksaSeaVal = p.price + ksaSeaShip;
-            setCellContent(detailKsaSea, buildCell(p, ksaSeaVal, ksaSeaShip, '#34d399', 'rgba(52,211,153,0.2)', null));
+            setCellContent(detailKsaSea, buildCell(p, ksaSeaVal, ksaSeaShip, '#d55181', 'rgba(213,81,129,0.18)', null));
         } else {
             var ksaSeaMissing = [];
             if (p.carton_cbm === null) ksaSeaMissing.push('carton dims');
@@ -952,10 +2263,23 @@ function saveProductPrices(productId, optionalBtn) {
     }).then(function(r) { return r.json(); }).then(function(res) {
         if (res.success) {
             btn.innerHTML = '<i class="bi bi-check-lg"></i>';
-            btn.style.color = '#4ade80';
+            btn.style.color = '#157F4A';
             var p = PRODUCT_CALC_DATA.find(function(x) { return x.id === productId; });
             if (p) { p.saved_air = airVal; p.saved_sea = seaVal; }
             recalcPrices();
+
+// Layout is restored before anything reads the DOM for selection, so
+// updateProductBulkBar counts checkboxes in the container that is actually on
+// screen rather than the one that happened to be markup-first.
+restoreProductView();
+
+// The dialog is populated when it opens rather than on every selection change:
+// the count it quotes has to be the one in force at the moment somebody is
+// looking at it.
+document.addEventListener('DOMContentLoaded', function() {
+    var tagModal = document.getElementById('bulkTagModal');
+    if (tagModal) tagModal.addEventListener('show.bs.modal', syncBulkTagScope);
+});
             setTimeout(function() {
                 btn.innerHTML = originalHtml;
                 btn.style.color = '';
@@ -1000,7 +2324,9 @@ var activeSourceFilter = 'all';
 // Text search is server-side (the input submits a GET form), so this only applies the
 // "full details" and marketplace-source toggles to the cards already on the page.
 function applyProductFilters() {
-    ['productsGrid', 'privateProductsGrid'].forEach(function(containerId) {
+    // Both containers: the hidden layout has to stay filtered too, or switching
+    // to it brings back rows the active filter had removed.
+    ['productsGrid', 'productsList'].forEach(function(containerId) {
         var container = document.getElementById(containerId);
         if (!container) return;
         container.querySelectorAll('[data-product-id]').forEach(function(card) {
@@ -1015,16 +2341,15 @@ function applyProductFilters() {
     updateProductBulkBar();
 }
 
+/* The chips are styled by a class now, not by rewriting cssText on every
+   click. Nine lines of inline style per toggle is how the old bar ended up with
+   colours that drifted from the stylesheet. */
 function filterBySource(source) {
-    activeSourceFilter = source;
-    document.getElementById('filterAmazon').className = source === 'amazon' ? 'btn-glow' : 'btn-ghost';
-    document.getElementById('filterNoon').className   = source === 'noon'   ? 'btn-glow' : 'btn-ghost';
-    document.getElementById('filterAmazon').style.cssText = source === 'amazon'
-        ? 'font-size:12px;padding:6px 14px;border-radius:20px;'
-        : 'font-size:12px;padding:6px 14px;border-radius:20px;color:#ff9900;border-color:#ff9900;';
-    document.getElementById('filterNoon').style.cssText = source === 'noon'
-        ? 'font-size:12px;padding:6px 14px;border-radius:20px;'
-        : 'font-size:12px;padding:6px 14px;border-radius:20px;color:#6c5ce7;border-color:#6c5ce7;';
+    activeSourceFilter = activeSourceFilter === source ? 'all' : source;
+    ['filterAmazon', 'filterNoon'].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('is-on', activeSourceFilter === id.replace('filter', '').toLowerCase());
+    });
     applyProductFilters();
 }
 
@@ -1056,6 +2381,9 @@ function showProductDetail(productId) {
                 : '—';
             document.getElementById('detailCartonSize').textContent = carton;
             document.getElementById('detailSku').textContent = data.sku || '—';
+
+            renderDetailVariants(data.variants);
+            renderDetailAttributes(data.attributes);
 
             var mainImg = document.getElementById('detailMainImage');
             var noImg = document.getElementById('detailNoImage');
@@ -1111,8 +2439,28 @@ document.getElementById('productDetailModal').addEventListener('hidden.bs.modal'
 });
 
 // ===== Product List Bulk Actions =====
-function getVisibleProductCards(containerId) {
-    var container = document.getElementById(containerId);
+/* ---------------------------------------------------------------------------
+   Grid and list are both rendered; only one is shown
+   ---------------------------------------------------------------------------
+   Which means every product's checkbox exists twice in the DOM. Every selection
+   helper below scopes itself to the container currently on screen — without
+   that, getSelectedProductIds returns each id twice and the bar reads "48
+   selected" on a page of 24.
+
+   Rendering both up front is what makes the toggle instant. The alternative,
+   re-fetching the page with a ?view= parameter, costs a round trip every time
+   somebody flicks between them mid-task.
+   --------------------------------------------------------------------------- */
+function activeProductContainer() {
+    var list = document.getElementById('productsListWrap');
+    if (list && list.style.display !== 'none') {
+        return document.getElementById('productsList');
+    }
+    return document.getElementById('productsGrid');
+}
+
+function getVisibleProductCards(container) {
+    if (typeof container === 'string') container = document.getElementById(container);
     if (!container) return [];
     return Array.prototype.filter.call(container.querySelectorAll('[data-product-id]'), function(card) {
         return card.style.display !== 'none';
@@ -1120,11 +2468,203 @@ function getVisibleProductCards(containerId) {
 }
 
 function getSelectedProductIds() {
+    var container = activeProductContainer();
+    if (!container) return [];
     var ids = [];
-    document.querySelectorAll('.product-row-check:checked').forEach(function(cb) {
+    container.querySelectorAll('.product-row-check:checked').forEach(function(cb) {
         ids.push(parseInt(cb.value, 10));
     });
     return ids;
+}
+
+/* --------------------------------------------------------------------------
+   Layout toggle
+   --------------------------------------------------------------------------
+   The choice is remembered, because it is not a preference somebody expresses
+   once — it tracks the job. You browse in grid and you work in list, and being
+   put back into grid on every page load is what stops the list view from being
+   used at all.
+   -------------------------------------------------------------------------- */
+var PRODUCT_VIEW_KEY = 'mlk.products.view';
+
+function setProductView(view, skipStore) {
+    var grid = document.getElementById('productsGrid');
+    var listWrap = document.getElementById('productsListWrap');
+    var gridBtn = document.getElementById('viewGridBtn');
+    var listBtn = document.getElementById('viewListBtn');
+    if (!grid || !listWrap) return;
+
+    // Read the selection out of whichever container is leaving, so switching
+    // layout mid-selection does not silently discard the work.
+    var carried = getSelectedProductIds();
+
+    var wantList = view === 'list';
+    grid.style.display = wantList ? 'none' : '';
+    listWrap.style.display = wantList ? '' : 'none';
+    if (gridBtn) { gridBtn.classList.toggle('is-on', !wantList); gridBtn.setAttribute('aria-pressed', String(!wantList)); }
+    if (listBtn) { listBtn.classList.toggle('is-on', wantList); listBtn.setAttribute('aria-pressed', String(wantList)); }
+
+    var incoming = activeProductContainer();
+    if (incoming) {
+        incoming.querySelectorAll('.product-row-check').forEach(function(cb) {
+            cb.checked = carried.indexOf(parseInt(cb.value, 10)) !== -1;
+        });
+    }
+
+    if (!skipStore) {
+        try { localStorage.setItem(PRODUCT_VIEW_KEY, wantList ? 'list' : 'grid'); } catch (e) {}
+    }
+    updateProductBulkBar();
+}
+
+function restoreProductView() {
+    var saved = 'grid';
+    try { saved = localStorage.getItem(PRODUCT_VIEW_KEY) || 'grid'; } catch (e) {}
+    setProductView(saved, true);
+}
+
+/* --------------------------------------------------------------------------
+   List-state controls
+   --------------------------------------------------------------------------
+   Visibility and tags are hidden fields on #listControls rather than links, so
+   setting one preserves every other filter automatically. Building URLs by hand
+   here is what used to drop the category whenever somebody searched.
+   -------------------------------------------------------------------------- */
+function setVisibility(value) {
+    var input = document.getElementById('visibilityInput');
+    if (!input) return;
+    input.value = value;
+    document.getElementById('listControls').submit();
+}
+
+function toggleTagFilter(slug) {
+    var host = document.getElementById('tagFilterInputs');
+    if (!host) return;
+    var existing = null;
+    host.querySelectorAll('input[name="tag"]').forEach(function(inp) {
+        if (inp.value === slug) existing = inp;
+    });
+    if (existing) {
+        existing.remove();
+    } else {
+        var inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = 'tag';
+        inp.value = slug;
+        host.appendChild(inp);
+    }
+    // Back to page one: page 4 of the old filter is very unlikely to exist under
+    // the new one, and landing on an empty page reads as "the tag matched
+    // nothing".
+    var page = document.querySelector('#listControls input[name="page"]');
+    if (page) page.remove();
+    document.getElementById('listControls').submit();
+}
+
+function clearProductSearch() {
+    var box = document.getElementById('productSearch');
+    if (box) box.value = '';
+    document.getElementById('listControls').submit();
+}
+
+/* ---------------------------------------------------------------------------
+   Acting on a whole filter rather than a page
+   ---------------------------------------------------------------------------
+   Selection is a scan of rendered checkboxes, so it can only ever describe the
+   cards on screen. When the filter matches more than one page, the bar offers to
+   act on the whole matching set instead — the server re-runs the same filter, so
+   nothing depends on the browser having every id.
+   --------------------------------------------------------------------------- */
+var FILTERED_SCOPE = false;
+
+/**
+ * Show only the chosen category's subcategories, then reload.
+ *
+ * The old subcategory is cleared first. The view takes a subcategory over a
+ * category, so carrying a stale one across a category change would filter to a
+ * subcategory of the category just navigated away from.
+ */
+function onListCategoryChange() {
+    var cat = document.getElementById('listCategory');
+    var sub = document.getElementById('listSubcategory');
+    if (sub) {
+        sub.value = '';
+        syncListSubcategories();
+    }
+    if (cat) cat.form.submit();
+}
+
+/** Hide subcategories belonging to other categories; hide the box entirely with no category chosen. */
+function syncListSubcategories() {
+    var cat = document.getElementById('listCategory');
+    var sub = document.getElementById('listSubcategory');
+    if (!cat || !sub) return;
+    var chosen = cat.value;
+    var shown = 0;
+    Array.prototype.slice.call(sub.options).forEach(function (opt) {
+        if (!opt.value) return;                       // the "All subcategories" row
+        var mine = opt.getAttribute('data-parent') === chosen;
+        opt.hidden = !mine;
+        opt.disabled = !mine;
+        if (mine) shown++;
+    });
+    sub.style.display = (chosen && shown) ? '' : 'none';
+}
+
+/** The filters the list is currently showing, read back off the URL. */
+function currentListFilters() {
+    var params = new URLSearchParams(window.location.search);
+    return {
+        q: params.get('q') || '',
+        category_slug: params.get('category') || '',
+        subcategory_slug: params.get('subcategory') || '',
+        // Both must travel. The server rebuilds the acted-on set from these, so
+        // anything missing here means the bulk action covers a DIFFERENT set of
+        // products than the count the operator agreed to.
+        visibility: params.get('visibility') || 'all',
+        tags: params.getAll('tag'),
+    };
+}
+
+/** Set the scope and repaint the offer row. No repaint of the bar — callers do that. */
+function setFilteredScope(on) {
+    FILTERED_SCOPE = on;
+    var offer = document.querySelector('#selectAllMatchingRow a');
+    var active = document.getElementById('filteredScopeActive');
+    if (offer) offer.style.display = on ? 'none' : '';
+    if (active) active.style.display = on ? '' : 'none';
+}
+
+function useFilteredScope(event) {
+    if (event) event.preventDefault();
+    setFilteredScope(true);
+    updateProductBulkBar();
+}
+
+function clearFilteredScope(event) {
+    if (event) event.preventDefault();
+    setFilteredScope(false);
+    updateProductBulkBar();
+}
+
+/**
+ * Show the "select everything matching" offer only once the whole page is ticked.
+ *
+ * Offering it earlier invites acting on hundreds of products when the operator
+ * has ticked three.
+ */
+function syncSelectAllMatchingRow() {
+    var row = document.getElementById('selectAllMatchingRow');
+    if (!row) return;
+    var container = activeProductContainer();
+    if (!container) return;
+    var boxes = container.querySelectorAll('.product-row-check');
+    var ticked = container.querySelectorAll('.product-row-check:checked');
+    var wholePage = boxes.length > 0 && boxes.length === ticked.length;
+    row.style.display = wholePage ? '' : 'none';
+    // Un-ticking anything drops the whole-filter scope: the operator narrowed
+    // the selection, so acting on everything is no longer what they asked for.
+    if (!wholePage && FILTERED_SCOPE) setFilteredScope(false);
 }
 
 function updateProductBulkBar() {
@@ -1132,29 +2672,32 @@ function updateProductBulkBar() {
     var bar = document.getElementById('bulkActionsBar');
     var countEl = document.getElementById('bulkSelectedProductsCount');
     if (!bar || !countEl) return;
+    // Before the label, not after: this is what drops the whole-filter scope when
+    // the selection stops covering the page, and the label has to read the
+    // settled value or it shows the previous one.
+    syncSelectAllMatchingRow();
     if (ids.length) {
         bar.style.display = '';
-        countEl.textContent = ids.length + ' product' + (ids.length !== 1 ? 's' : '') + ' selected';
+        countEl.textContent = FILTERED_SCOPE
+            ? 'All {{ total_count }} matching products'
+            : ids.length + ' product' + (ids.length !== 1 ? 's' : '') + ' selected';
     } else {
         bar.style.display = 'none';
         countEl.textContent = '0 selected';
     }
-    [
-        { id: 'productsGrid', box: 'selectAllProducts' },
-        { id: 'privateProductsGrid', box: 'selectAllPrivateProducts' }
-    ].forEach(function(cfg) {
-        var allBox = document.getElementById(cfg.box);
-        if (!allBox) return;
-        var visible = getVisibleProductCards(cfg.id);
-        var visibleChecks = visible.map(function(card) { return card.querySelector('.product-row-check'); }).filter(Boolean);
+    var allBox = document.getElementById('selectAllProducts');
+    if (allBox) {
+        var visibleChecks = getVisibleProductCards(activeProductContainer())
+            .map(function(card) { return card.querySelector('.product-row-check'); })
+            .filter(Boolean);
         var selectedVisible = visibleChecks.filter(function(cb) { return cb.checked; }).length;
         allBox.checked = visibleChecks.length > 0 && selectedVisible === visibleChecks.length;
         allBox.indeterminate = selectedVisible > 0 && selectedVisible < visibleChecks.length;
-    });
+    }
 }
 
-function toggleSelectAllProducts(containerId, checked) {
-    getVisibleProductCards(containerId).forEach(function(card) {
+function toggleSelectAllProducts(checked) {
+    getVisibleProductCards(activeProductContainer()).forEach(function(card) {
         var cb = card.querySelector('.product-row-check');
         if (cb) cb.checked = checked;
     });
@@ -1162,11 +2705,12 @@ function toggleSelectAllProducts(containerId, checked) {
 }
 
 function clearProductSelection() {
+    // Both containers, not just the visible one: the hidden layout holds its own
+    // copy of every checkbox, and leaving those ticked means the selection comes
+    // back the moment somebody switches layout.
     document.querySelectorAll('.product-row-check').forEach(function(cb) { cb.checked = false; });
-    var allPublic = document.getElementById('selectAllProducts');
-    var allPrivate = document.getElementById('selectAllPrivateProducts');
-    if (allPublic) { allPublic.checked = false; allPublic.indeterminate = false; }
-    if (allPrivate) { allPrivate.checked = false; allPrivate.indeterminate = false; }
+    var all = document.getElementById('selectAllProducts');
+    if (all) { all.checked = false; all.indeterminate = false; }
     updateProductBulkBar();
 }
 
@@ -1185,21 +2729,46 @@ function runBulkAction(action) {
         showToast('Select at least one product', 'error');
         return;
     }
+    // Deleting is the one action never offered filter-wide — a mis-set filter
+    // would take the catalogue with it. It always means the ticked cards.
+    var wide = FILTERED_SCOPE && action !== 'delete';
+    var count = wide ? Number('{{ total_count }}') : ids.length;
+    var noun = count === 1 ? 'product' : 'products';
+
     var label = BULK_ACTION_LABELS[action] || action;
     var msg = action === 'delete'
-        ? 'Delete ' + ids.length + ' product(s)? This cannot be undone.'
-        : label.charAt(0).toUpperCase() + label.slice(1) + ' ' + ids.length + ' product(s)?';
+        ? 'Delete ' + count + ' ' + noun + '? This cannot be undone.'
+        : label.charAt(0).toUpperCase() + label.slice(1) + ' ' + count + ' ' + noun + '?';
+    if (wide) msg += '\n\nThis covers every product matching the current filter, not just this page.';
     if (!confirm(msg)) return;
+
+    var payload = { action: action, ids: ids };
+    if (wide) {
+        payload.scope = 'filtered';
+        var f = currentListFilters();
+        payload.q = f.q;
+        payload.category_slug = f.category_slug;
+        payload.subcategory_slug = f.subcategory_slug;
+        payload.visibility = f.visibility;
+        payload.tags = f.tags;
+    }
 
     fetch('/products/bulk-action/', {
         method: 'POST',
         headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
-        body: JSON.stringify({ action: action, ids: ids })
+        body: JSON.stringify(payload),
+        // Naming the count matters most here: a whole-filter action can be
+        // hundreds of rows and several seconds, and "Working..." gives no clue
+        // whether it caught the page or the filter.
+        loadingMessage: label.charAt(0).toUpperCase() + label.slice(1) + ' ' + count + ' ' + noun + '...'
     })
     .then(function(r) { return r.json(); })
     .then(function(res) {
         if (res.success) {
             showToast(res.message, 'success');
+            // The overlay stays up through the reload rather than flashing off
+            // for half a second while the page is already on its way out.
+            showLoading('Refreshing...');
             setTimeout(function() { location.reload(); }, 600);
         } else {
             showToast(res.message || 'Bulk action failed', 'error');
@@ -1213,14 +2782,11 @@ function runBulkAction(action) {
 // ===== Detail filter =====
 function filterByDetails(mode) {
     activeDetailFilter = mode;
-    document.getElementById('filterAll').className       = mode === 'all'        ? 'btn-glow'  : 'btn-ghost';
-    document.getElementById('filterComplete').className  = mode === 'complete'   ? 'btn-glow'  : 'btn-ghost';
-    document.getElementById('filterIncomplete').className= mode === 'incomplete' ? 'btn-glow'  : 'btn-ghost';
-    document.getElementById('filterAll').style.cssText       = 'font-size:12px;padding:6px 14px;border-radius:20px;';
-    if (mode !== 'complete')   { document.getElementById('filterComplete').style.cssText   = 'font-size:12px;padding:6px 14px;border-radius:20px;color:#4ade80;border-color:#4ade80;'; }
-    else                       { document.getElementById('filterComplete').style.cssText   = 'font-size:12px;padding:6px 14px;border-radius:20px;'; }
-    if (mode !== 'incomplete') { document.getElementById('filterIncomplete').style.cssText = 'font-size:12px;padding:6px 14px;border-radius:20px;color:#f59e0b;border-color:#f59e0b;'; }
-    else                       { document.getElementById('filterIncomplete').style.cssText = 'font-size:12px;padding:6px 14px;border-radius:20px;'; }
+    var map = { filterAll: 'all', filterComplete: 'complete', filterIncomplete: 'incomplete' };
+    Object.keys(map).forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('is-on', mode === map[id]);
+    });
     applyProductFilters();
 }
 
@@ -1248,6 +2814,14 @@ function editProduct(productId) {
             document.getElementById('editProductCartonQty').value = data.carton_qty;
             // Set source
             document.getElementById('editProductSource').value = data.source || 'general';
+            document.getElementById('editProductSourceUrl').value = data.source_url || '';
+            // Set category, then narrow the subcategory list to that category
+            // BEFORE assigning the subcategory — assigning it while its option
+            // is still hidden/disabled would silently leave the select blank.
+            var editCategory = document.getElementById('editProductCategory');
+            editCategory.value = data.category || '';
+            syncSubcategoryOptions(editCategory);
+            document.getElementById('editProductSubcategory').value = data.subcategory || '';
             // Set ready-to-ship toggle
             document.getElementById('editProductReadyToShip').checked = !!data.ready_to_ship;
             // Set draft toggle
@@ -1272,8 +2846,71 @@ function editProduct(productId) {
             } else {
                 container.innerHTML = '';
             }
+            // Existing specs, plus one blank row to type into. Without the blank
+            // row a product with no specs shows an empty editor and looks broken.
+            attrSetRows('editProductAttrs', data.attributes);
+            if (!data.attributes || data.attributes.length === 0) {
+                attrAddRow('editProductAttrs', '', '');
+            }
+            // No blank starter row here, unlike the specs editor: an accidental
+            // empty variation would turn a plain product into a variant product
+            // and take Add-to-Cart off its catalogue card.
+            variantSetRows(data.variants);
             new bootstrap.Modal(document.getElementById('editProductModal')).show();
         });
+}
+
+/**
+ * Read-only variation list for the product detail popup.
+ *
+ * Retired variations (is_active false, because an order still references them)
+ * are shown greyed rather than hidden — "why does this order mention an option
+ * I cannot find" is a worse question than a dimmed row.
+ */
+function renderDetailVariants(variants) {
+    var block = document.getElementById('detailVariantsBlock');
+    var list = document.getElementById('detailVariantsList');
+    if (!variants || !variants.length) {
+        block.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    block.style.display = '';
+    document.getElementById('detailVariantsCount').textContent = '(' + variants.length + ')';
+
+    list.innerHTML = variants.map(function (v) {
+        var dim = v.is_active ? '' : 'opacity:.45;';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:7px 11px;' +
+            'border-bottom:1px solid var(--border-color);' + dim + '">' +
+            (v.image
+                ? '<img src="' + escapeAttr(v.image) + '" style="width:34px;height:34px;object-fit:cover;border-radius:6px;flex:0 0 auto;" alt="" onerror="this.style.visibility=\'hidden\'">'
+                : '<span style="width:34px;height:34px;flex:0 0 auto;"></span>') +
+            '<span style="flex:1 1 auto;min-width:0;font-size:12.5px;font-weight:600;">' +
+                escapeAttr(v.name) +
+                (v.is_active ? '' : ' <span style="font-weight:400;font-size:11px;">(retired)</span>') +
+                (v.stock != null ? '<br><span style="font-weight:400;font-size:11px;color:var(--text-secondary);">stock ' + v.stock + '</span>' : '') +
+            '</span>' +
+            '<span style="font-weight:700;font-size:13px;white-space:nowrap;">' + escapeAttr(v.price) + '</span>' +
+            '</div>';
+    }).join('');
+}
+
+/** Read-only specification list for the product detail popup. */
+function renderDetailAttributes(attributes) {
+    var block = document.getElementById('detailAttributesBlock');
+    var list = document.getElementById('detailAttributesList');
+    if (!attributes || !attributes.length) {
+        block.style.display = 'none';
+        list.innerHTML = '';
+        return;
+    }
+    block.style.display = '';
+    list.innerHTML = attributes.map(function (a) {
+        return '<div class="detail-spec-item">' +
+            '<div class="detail-spec-label">' + escapeAttr(a.name) + '</div>' +
+            '<div class="detail-spec-value">' + escapeAttr(a.value) + '</div>' +
+            '</div>';
+    }).join('');
 }
 
 function toggleDelImg(checkbox) {
@@ -1310,6 +2947,613 @@ document.getElementById('editProductForm').addEventListener('submit', function(e
         });
 });
 
+// ===== Catalogue export =====
+//
+// Both catalogue URLs read the same repeatable ?category= parameter, so this
+// only has to assemble a query string. No ticks means no parameters, which the
+// server reads as "everything" — matching what the old buttons did.
+
+function catalogueSelectedCats() {
+    return Array.prototype.slice
+        .call(document.querySelectorAll('.catalogue-cat:checked'))
+        .map(function (box) { return box.value; });
+}
+
+function setAllCatalogueCats(checked) {
+    document.querySelectorAll('.catalogue-cat').forEach(function (box) {
+        box.checked = checked;
+    });
+    updateCatalogueScopeNote();
+}
+
+/** Say plainly what the buttons are about to export. */
+function updateCatalogueScopeNote() {
+    var note = document.getElementById('catalogueScopeNote');
+    if (!note) return;
+    var n = catalogueSelectedCats().length;
+    var total = document.querySelectorAll('.catalogue-cat').length;
+    if (n === 0 || n === total) {
+        note.textContent = n === 0
+            ? 'Nothing ticked — the export will include every category.'
+            : 'All categories selected.';
+    } else {
+        note.textContent = n + ' of ' + total + ' categories selected. Uncategorised products are excluded.';
+    }
+}
+
+// Catalogue import: the sheet runCatalogueExport() hands out, coming back.
+//
+// The per-row problems are listed rather than summarised. "6 rows skipped" is
+// not actionable; "Row 14: no product matches SKU MLK-1099" is the one line
+// someone needs to fix their spreadsheet, and the row number is the one in
+// the file they are looking at.
+function runCatalogueImport() {
+    var input = document.getElementById('catalogueImportFile');
+    var box = document.getElementById('catalogueImportResult');
+    var btn = document.getElementById('catalogueImportBtn');
+    var label = document.getElementById('catalogueImportBtnText');
+
+    if (!input.files || !input.files.length) {
+        showToast('Choose a catalogue file first.', 'error');
+        return;
+    }
+
+    var formData = new FormData();
+    formData.append('catalogue_file', input.files[0]);
+
+    btn.disabled = true;
+    label.textContent = 'Applying...';
+    box.style.display = 'none';
+
+    fetch('/products/catalogue-import/', {
+        method: 'POST',
+        loadingMessage: 'Applying the catalogue sheet...',
+        headers: { 'X-CSRFToken': getCookie('csrftoken') },
+        body: formData
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        btn.disabled = false;
+        label.textContent = 'Apply changes';
+
+        var html = '<div class="alert alert-' + (res.success ? 'success' : 'danger') +
+                   ' py-2 mb-2" style="font-size:12px;">' + res.message + '</div>';
+        if (res.errors && res.errors.length) {
+            html += '<ul style="margin:0;padding-left:18px;color:var(--text-secondary);">';
+            res.errors.forEach(function (e) {
+                html += '<li>' + e + '</li>';
+            });
+            html += '</ul>';
+        }
+        box.innerHTML = html;
+        box.style.display = 'block';
+
+        if (res.updated) {
+            showToast(res.message, 'success');
+            // Only reload when something actually changed - a reload on a
+            // no-op would throw away the error list the operator needs to read.
+            setTimeout(function () { location.reload(); }, 1400);
+        }
+    })
+    .catch(function () {
+        btn.disabled = false;
+        label.textContent = 'Apply changes';
+        showToast('The upload failed. Check your connection and try again.', 'error');
+    });
+}
+
+function runCatalogueExport(baseUrl, newTab) {
+    var slugs = catalogueSelectedCats();
+    var total = document.querySelectorAll('.catalogue-cat').length;
+    // Ticking every box is the same request as ticking none, and the shorter
+    // URL keeps the filename clean.
+    var params = (slugs.length && slugs.length < total)
+        ? slugs.map(function (s) { return 'category=' + encodeURIComponent(s); })
+        : [];
+
+    // Read at click time, not at page load: the operator may tick it after the
+    // dialog is already open.
+    var noPrices = document.getElementById('catalogueNoPrices');
+    if (noPrices && noPrices.checked) params.push('prices=0');
+
+    var url = baseUrl + (params.length ? '?' + params.join('&') : '');
+    if (newTab) {
+        window.open(url, '_blank', 'noopener');
+    } else {
+        window.location.href = url;
+    }
+    var modal = bootstrap.Modal.getInstance(document.getElementById('catalogueExportModal'));
+    if (modal) modal.hide();
+}
+
+document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('catalogue-cat')) {
+        updateCatalogueScopeNote();
+    }
+});
+
+// ===== Product specifications (free-form attributes) =====
+//
+// Two editors exist in this document at once (Add and Edit), so everything below
+// is scoped to a container element rather than reaching for ids.
+
+function attrRowHtml(name, value) {
+    return '<div class="mlk-attr-row d-flex gap-2 mb-2">' +
+        '<input type="text" name="attr_name[]" class="form-control" placeholder="Name (e.g. Model)" ' +
+               'style="flex:0 0 38%;" value="' + escapeAttr(name) + '">' +
+        '<input type="text" name="attr_value[]" class="form-control" placeholder="Value (e.g. ST-128PlusMax)" ' +
+               'value="' + escapeAttr(value) + '">' +
+        '<button type="button" class="btn-ghost mlk-attr-del" title="Remove this row" ' +
+               'style="flex:0 0 auto;padding:6px 10px;color:#B3261E;"><i class="bi bi-x-lg"></i></button>' +
+        '</div>';
+}
+
+// Values come back from the edit endpoint as JSON and go straight into an HTML
+// string, so they must be escaped or a quote in a spec value breaks the markup.
+function escapeAttr(text) {
+    return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function attrAddRow(editorId, name, value) {
+    var rows = document.querySelector('#' + editorId + ' .mlk-attr-rows');
+    if (!rows) return;
+    rows.insertAdjacentHTML('beforeend', attrRowHtml(name || '', value || ''));
+    var row = rows.lastElementChild;
+    row.querySelector('.mlk-attr-del').addEventListener('click', function () { row.remove(); });
+}
+
+/** Replace an editor's rows with `list` ([{name, value}, ...]). */
+function attrSetRows(editorId, list) {
+    var rows = document.querySelector('#' + editorId + ' .mlk-attr-rows');
+    if (!rows) return;
+    rows.innerHTML = '';
+    (list || []).forEach(function (a) { attrAddRow(editorId, a.name, a.value); });
+}
+
+// "Add row" on both editors. Delegated from the document so it works for markup
+// that Bootstrap has not shown yet.
+document.addEventListener('click', function (e) {
+    var button = e.target.closest('.mlk-attr-add');
+    if (!button) return;
+    attrAddRow(button.closest('.mlk-attrs').id, '', '');
+});
+
+// A fresh Add-Product form starts with one empty row, so the feature is visible
+// rather than hidden behind a button nobody thinks to press.
+document.getElementById('addProductModal').addEventListener('show.bs.modal', function () {
+    attrSetRows('addProductAttrs', []);
+    attrAddRow('addProductAttrs', '', '');
+});
+
+// ===== Bulk: set category =====
+//
+// Slug-keyed rather than id-keyed like the add/edit forms: the bulk endpoint
+// resolves slugs, which are stable across the local and production databases.
+var BULK_SUBCATEGORIES = {
+{% for c in categories %}  '{{ c.slug|escapejs }}': [{% for s in c.subcategories.all %}{% if s.is_active %}{ slug: '{{ s.slug|escapejs }}', name: '{{ s.name|escapejs }}' },{% endif %}{% endfor %}],
+{% endfor %}};
+
+function syncBulkSubcategories() {
+    var chosen = document.getElementById('bulkCatCategory').value;
+    var target = document.getElementById('bulkCatSubcategory');
+    target.innerHTML = '<option value="">— none —</option>';
+    (BULK_SUBCATEGORIES[chosen] || []).forEach(function (s) {
+        var opt = document.createElement('option');
+        opt.value = s.slug;
+        opt.textContent = s.name;
+        target.appendChild(opt);
+    });
+}
+
+function submitBulkCategory() {
+    var ids = getSelectedProductIds();
+    if (!ids.length) { showToast('Select at least one product', 'error'); return; }
+    var category = document.getElementById('bulkCatCategory').value;
+    var subcategory = document.getElementById('bulkCatSubcategory').value;
+    if (!category && !subcategory) {
+        showToast('Pick a category or subcategory first', 'error');
+        return;
+    }
+    var payload = { action: 'set_category', ids: ids,
+                    category_slug: category, subcategory_slug: subcategory };
+    if (FILTERED_SCOPE) {
+        // The destination category travels as category_slug/subcategory_slug, so
+        // the filter that chooses the products needs its own field names — see
+        // filter_category_slug in bulk_action.
+        var f = currentListFilters();
+        payload.scope = 'filtered';
+        payload.q = f.q;
+        payload.filter_category_slug = f.category_slug;
+        payload.filter_subcategory_slug = f.subcategory_slug;
+        payload.visibility = f.visibility;
+        payload.tags = f.tags;
+        if (!confirm('Move all {{ total_count }} products matching the current filter into this category?')) return;
+    }
+    postBulk(payload, 'bulkCategoryModal');
+}
+
+// ===== Bulk: apply margin =====
+
+/**
+ * Show what the margin will actually do, using the selection's own prices.
+ *
+ * "20%" reads as harmless in the abstract. Seeing the cheapest and dearest
+ * selected product turn into their new figures is what makes the size of the
+ * change — and its irreversibility — land before the button is pressed.
+ */
+function bulkMarginScope() {
+    var picked = document.querySelector('input[name="bulkMarginScope"]:checked');
+    return picked ? picked.value : 'selected';
+}
+
+/** Category slugs ticked in the Adjust Prices dialog. */
+function marginSelectedCats() {
+    return Array.prototype.slice
+        .call(document.querySelectorAll('.margin-cat:checked'))
+        .map(function (box) { return box.value; });
+}
+
+function setAllMarginCats(checked) {
+    document.querySelectorAll('.margin-cat').forEach(function (b) { b.checked = checked; });
+    previewBulkMargin();
+}
+
+/** Show the category picker only when that scope is chosen. */
+function syncMarginScopeUI() {
+    var box = document.getElementById('bulkMarginCatBox');
+    if (box) box.style.display = bulkMarginScope() === 'category' ? '' : 'none';
+}
+
+/**
+ * The signed percentage to send: positive to raise, negative to lower.
+ *
+ * The number box only ever holds a positive figure; direction comes from the
+ * radio pair. Returns NaN when the box is empty or not a usable number.
+ */
+function bulkMarginSigned() {
+    var value = parseFloat(document.getElementById('bulkMarginValue').value);
+    if (!Number.isFinite(value) || value <= 0) return NaN;
+    var dir = document.querySelector('input[name="bulkMarginDir"]:checked');
+    return (dir && dir.value === 'down') ? -value : value;
+}
+
+function previewBulkMargin() {
+    var box = document.getElementById('bulkMarginPreview');
+    var margin = bulkMarginSigned();
+    var scope = bulkMarginScope();
+    var ids = getSelectedProductIds().map(Number);
+
+    syncMarginScopeUI();
+
+    // PRODUCT_CALC_DATA holds every product rendered on this page, so it is the
+    // right sample for the page-level scopes — 'all' and 'category' additionally
+    // cover products on other pages, which the wording below is careful not to
+    // claim it is showing.
+    var rows;
+    if (scope === 'all') {
+        rows = PRODUCT_CALC_DATA;
+    } else if (scope === 'category') {
+        // The card markup carries no category, so the preview cannot narrow by it
+        // client-side. Showing the whole page's span would understate a category
+        // adjustment as easily as overstate it, so the preview is skipped and the
+        // confirmation carries the detail instead.
+        var cats = marginSelectedCats();
+        box.style.display = '';
+        box.innerHTML = cats.length
+            ? '<div style="font-weight:700;margin-bottom:4px;">' + cats.length +
+              ' categor' + (cats.length === 1 ? 'y' : 'ies') + ' selected</div>' +
+              '<div style="color:var(--text-secondary);">Every product filed under ' +
+              (cats.length === 1 ? 'it' : 'them') + ' will move by the percentage above, ' +
+              'including products on other pages.</div>'
+            : '<div style="color:#B3261E;">Pick at least one category.</div>';
+        return;
+    } else {
+        rows = PRODUCT_CALC_DATA.filter(function (p) { return ids.indexOf(p.id) !== -1; });
+    }
+
+    if (!Number.isFinite(margin) || !rows.length) {
+        box.style.display = 'none';
+        return;
+    }
+
+    var prices = rows.map(function (p) { return Number(p.price); })
+                     .filter(function (n) { return Number.isFinite(n); });
+    if (!prices.length) { box.style.display = 'none'; return; }
+
+    var mult = 1 + margin / 100;
+    // Mirrors the server's floor: a steep discount on a cheap item stops at 0.01
+    // rather than reaching zero, so the preview cannot promise a free product.
+    function after(v) { return Math.max(0.01, v * mult).toFixed(2); }
+
+    var low = Math.min.apply(null, prices);
+    var high = Math.max.apply(null, prices);
+    var label = scope === 'all' ? 'on this page' : 'selected';
+    var signed = (margin > 0 ? '+' : '') + margin + '%';
+    var colour = margin > 0 ? '#157F4A' : '#B3261E';
+
+    box.style.display = '';
+    box.innerHTML =
+        '<div style="font-weight:700;margin-bottom:5px;color:' + colour + ';">After ' + signed + '</div>' +
+        '<div>cheapest ' + label + ': <strong>' + low.toFixed(2) + '</strong> &rarr; <strong>' + after(low) + '</strong></div>' +
+        '<div>dearest ' + label + ': <strong>' + high.toFixed(2) + '</strong> &rarr; <strong>' + after(high) + '</strong></div>' +
+        '<div style="margin-top:5px;color:var(--text-secondary);">Variation prices move by the same percentage.</div>';
+}
+
+function submitBulkMargin() {
+    var scope = bulkMarginScope();
+    var ids = getSelectedProductIds();
+    var cats = marginSelectedCats();
+
+    if (scope === 'selected' && !ids.length) {
+        showToast('Select some products, or choose another scope', 'error');
+        return;
+    }
+    if (scope === 'category' && !cats.length) {
+        showToast('Pick at least one category', 'error');
+        return;
+    }
+    var margin = bulkMarginSigned();
+    if (!Number.isFinite(margin)) {
+        showToast('Enter a percentage greater than 0', 'error');
+        return;
+    }
+    if (margin <= -100) {
+        showToast('A decrease cannot be 100% or more', 'error');
+        return;
+    }
+    // "Selected" means the whole filter once the operator has asked for that,
+    // otherwise it would silently reprice one page of a several-page filter.
+    var wide = FILTERED_SCOPE && scope === 'selected';
+    if (wide) scope = 'filtered';
+
+    var what = scope === 'all'
+        ? 'EVERY product in the catalogue'
+        : scope === 'filtered'
+            ? 'all {{ total_count }} products matching the current filter'
+            : scope === 'category'
+                ? 'every product in ' + cats.length + ' categor' + (cats.length === 1 ? 'y' : 'ies')
+                : ids.length + ' selected product(s)';
+    var skipPrivate = document.getElementById('bulkMarginSkipPrivate').checked;
+    var verb = margin > 0 ? 'Raise' : 'Reduce';
+    if (!confirm(verb + ' the price of ' + what + ' by ' + Math.abs(margin) + '%?\n\n' +
+                 (skipPrivate ? 'Private products are left unchanged.\n\n' : '') +
+                 'Placed orders keep the price they were placed at.\n\n' +
+                 'This overwrites the stored catalogue price and cannot be undone. ' +
+                 'Note that -20% does not undo +20% — the second percentage ' +
+                 'applies to the already-changed number.')) return;
+    var payload = {
+        action: 'apply_margin',
+        ids: ids,
+        margin: margin,
+        scope: scope,
+        category_slugs: cats,
+        exclude_private: skipPrivate,
+    };
+    if (scope === 'filtered') {
+        var f = currentListFilters();
+        payload.q = f.q;
+        payload.category_slug = f.category_slug;
+        payload.subcategory_slug = f.subcategory_slug;
+        payload.visibility = f.visibility;
+        payload.tags = f.tags;
+    }
+    postBulk(payload, 'bulkMarginModal');
+}
+
+/* ---------------------------------------------------------------------------
+   Tags
+   ---------------------------------------------------------------------------
+   runBulkTags posts the same three-scope payload every other bulk action uses,
+   so tagging honours "select all N matching the current filter" exactly as
+   publishing or repricing does. That is the whole point: labelling forty
+   products one at a time is the job nobody does.
+   --------------------------------------------------------------------------- */
+function runBulkTags(action) {
+    var ids = getSelectedProductIds();
+    if (!ids.length) {
+        showToast('Select at least one product', 'error');
+        return;
+    }
+
+    var tagIds = [];
+    document.querySelectorAll('#bulkTagPicker .bulk-tag-check:checked').forEach(function(cb) {
+        tagIds.push(parseInt(cb.value, 10));
+    });
+    var newTags = (document.getElementById('bulkNewTags').value || '')
+        .split(',').map(function(s) { return s.trim(); }).filter(Boolean);
+
+    if (action !== 'clear_tags' && !tagIds.length && !newTags.length) {
+        showToast('Pick a tag or type a new one', 'error');
+        return;
+    }
+
+    // Tagging is reversible on any scope, so unlike delete it is offered
+    // filter-wide. Removing a tag from the wrong 200 products is undone by
+    // adding it back to the same 200.
+    var wide = FILTERED_SCOPE;
+    var count = wide ? Number('{{ total_count }}') : ids.length;
+    var noun = count === 1 ? 'product' : 'products';
+
+    if (action === 'clear_tags') {
+        if (!confirm('Remove EVERY tag from ' + count + ' ' + noun + '?')) return;
+    } else if (wide) {
+        var verb = action === 'add_tags' ? 'Tag' : 'Untag';
+        if (!confirm(verb + ' all ' + count + ' ' + noun + ' matching the current filter?')) return;
+    }
+
+    var payload = { action: action, ids: ids, tag_ids: tagIds, new_tags: newTags };
+    if (wide) {
+        payload.scope = 'filtered';
+        var f = currentListFilters();
+        payload.q = f.q;
+        payload.category_slug = f.category_slug;
+        payload.subcategory_slug = f.subcategory_slug;
+        payload.visibility = f.visibility;
+        payload.tags = f.tags;
+    }
+    postBulk(payload, 'bulkTagModal');
+}
+
+/** Say which set the dialog is about to act on, before it acts on it. */
+function syncBulkTagScope() {
+    var note = document.getElementById('bulkTagScopeNote');
+    if (!note) return;
+    var n = getSelectedProductIds().length;
+    note.textContent = FILTERED_SCOPE
+        ? 'Applies to all {{ total_count }} products matching the current filter.'
+        : 'Applies to the ' + n + ' selected product' + (n === 1 ? '' : 's') + '.';
+}
+
+function saveTag(btn) {
+    var row = btn.closest('tr');
+    fetch('/products/tags/save/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({
+            id: parseInt(row.dataset.tagId, 10),
+            name: row.querySelector('.mt-name').value,
+            colour: row.querySelector('.mt-colour').value
+        })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        showToast(res.message, res.success ? 'success' : 'error');
+        // Reload only on success: the chips, the filter bar and the cards all
+        // carry the old name, and leaving them stale is worse than the reload.
+        if (res.success) setTimeout(function() { location.reload(); }, 600);
+    })
+    .catch(function() { showToast('Could not save the tag', 'error'); });
+}
+
+function deleteTag(btn, name, attached) {
+    var msg = attached
+        ? 'Delete "' + name + '"? It will be removed from ' + attached +
+          ' product' + (attached === 1 ? '' : 's') + '. The products themselves are not affected.'
+        : 'Delete "' + name + '"?';
+    if (!confirm(msg)) return;
+    var row = btn.closest('tr');
+    fetch('/products/tags/delete/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify({ id: parseInt(row.dataset.tagId, 10) })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(res) {
+        showToast(res.message, res.success ? 'success' : 'error');
+        if (res.success) setTimeout(function() { location.reload(); }, 600);
+    })
+    .catch(function() { showToast('Could not delete the tag', 'error'); });
+}
+
+var BULK_DIALOG_LABELS = {
+    set_category: 'Moving products into the category...',
+    apply_margin: 'Recalculating prices...',
+    // Naming the action matters most on the whole-filter scope, where the run
+    // can be hundreds of rows: "Working..." gives no clue whether it caught the
+    // page or the filter.
+    add_tags: 'Tagging products...',
+    remove_tags: 'Removing tags...',
+    clear_tags: 'Clearing tags...'
+};
+
+/** Shared POST for the bulk dialogs. runBulkAction covers the one-click ones. */
+function postBulk(payload, modalId) {
+    fetch('/products/bulk-action/', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+        body: JSON.stringify(payload),
+        // A margin run rewrites every product price AND every variant price, so
+        // it is the slowest thing on this screen by some margin.
+        loadingMessage: BULK_DIALOG_LABELS[payload.action] || 'Working...'
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        if (res.success) {
+            showToast(res.message, 'success');
+            var modal = bootstrap.Modal.getInstance(document.getElementById(modalId));
+            if (modal) modal.hide();
+            showLoading('Refreshing...');
+            setTimeout(function () { location.reload(); }, 600);
+        } else {
+            showToast(res.message || 'Bulk action failed', 'error');
+        }
+    })
+    .catch(function () { showToast('Network error', 'error'); });
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    syncListSubcategories();
+
+    var catSelect = document.getElementById('bulkCatCategory');
+    if (catSelect) catSelect.addEventListener('change', syncBulkSubcategories);
+
+    // Both dialogs show the live selection count when they open.
+    ['bulkCategoryModal', 'bulkMarginModal'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('show.bs.modal', function () {
+            var n = getSelectedProductIds().length;
+            var catCount = document.getElementById('bulkCatCount');
+            var selCount = document.getElementById('bulkMarginSelCount');
+            if (catCount) catCount.textContent = n;
+            if (selCount) selCount.textContent = n;
+
+            // Opened from the topbar with nothing ticked: default to "all",
+            // because that is the only thing the dialog can usefully do then.
+            var allRadio = document.querySelector('input[name="bulkMarginScope"][value="all"]');
+            var selRadio = document.querySelector('input[name="bulkMarginScope"][value="selected"]');
+            if (allRadio && selRadio) {
+                if (n === 0) allRadio.checked = true; else selRadio.checked = true;
+            }
+            previewBulkMargin();
+        });
+    });
+});
+
+// ===== Product variations editor =====
+//
+// The hidden id field is what makes this an edit rather than a rebuild: a row
+// that carries an existing id is updated in place, so open carts and past order
+// lines keep pointing at the same variation. See products/views._save_variants.
+
+function variantRowHtml(v) {
+    v = v || {};
+    var retired = v.is_active === false;
+    return '<div class="mlk-variant-row d-flex gap-2 mb-2 align-items-center"' +
+               (retired ? ' style="opacity:.55;"' : '') + '>' +
+        '<input type="hidden" name="variant_id[]" value="' + escapeAttr(v.id || '') + '">' +
+        '<input type="text" name="variant_name[]" class="form-control" placeholder="Option name" ' +
+               'style="flex:1 1 auto;" value="' + escapeAttr(v.name || '') + '">' +
+        '<input type="number" name="variant_price[]" class="form-control" placeholder="Price" ' +
+               'step="0.01" min="0" style="flex:0 0 96px;" value="' + escapeAttr(v.price || '') + '">' +
+        '<input type="number" name="variant_stock[]" class="form-control" placeholder="Stock" ' +
+               'step="1" min="0" style="flex:0 0 88px;" value="' + escapeAttr(v.stock == null ? '' : v.stock) + '">' +
+        '<button type="button" class="btn-ghost mlk-variant-del" title="Remove this variation" ' +
+               'style="flex:0 0 auto;padding:6px 10px;color:#B3261E;"><i class="bi bi-x-lg"></i></button>' +
+        '</div>';
+}
+
+function variantAddRow(v) {
+    var rows = document.querySelector('#editProductVariants .mlk-variant-rows');
+    if (!rows) return;
+    rows.insertAdjacentHTML('beforeend', variantRowHtml(v));
+    var row = rows.lastElementChild;
+    row.querySelector('.mlk-variant-del').addEventListener('click', function () { row.remove(); });
+}
+
+function variantSetRows(list) {
+    var rows = document.querySelector('#editProductVariants .mlk-variant-rows');
+    if (!rows) return;
+    rows.innerHTML = '';
+    (list || []).forEach(variantAddRow);
+}
+
+document.addEventListener('click', function (e) {
+    if (e.target.closest('.mlk-variant-add')) variantAddRow({});
+});
+
 // ===== Bulk Upload =====
 var bulkParsedRows = [];
 var bulkSelectedRows = {};
@@ -1321,8 +3565,8 @@ var bulkRowImages = {}; // rowIdx  -> {file, objectUrl}  (per-row assignment, ta
     var dz = document.getElementById('bulkDropZone');
     dz.addEventListener('dragover', function (e) {
         e.preventDefault();
-        this.style.borderColor = 'var(--accent-3)';
-        this.style.background = 'rgba(255,140,0,0.06)';
+        this.style.borderColor = 'var(--accent-gold)';
+        this.style.background = 'rgba(176,132,33,0.06)';
     });
     dz.addEventListener('dragleave', function () {
         this.style.borderColor = 'var(--border-color)';
@@ -1339,16 +3583,16 @@ var bulkRowImages = {}; // rowIdx  -> {file, objectUrl}  (per-row assignment, ta
     var idz = document.getElementById('bulkImgDropZone');
     idz.addEventListener('dragover', function (e) {
         e.preventDefault();
-        this.style.borderColor = '#a78bfa';
-        this.style.background = 'rgba(167,139,250,0.07)';
+        this.style.borderColor = '#B08421';
+        this.style.background = 'rgba(176, 132, 33,0.07)';
     });
     idz.addEventListener('dragleave', function () {
-        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.borderColor = 'rgba(176, 132, 33,0.4)';
         this.style.background = '';
     });
     idz.addEventListener('drop', function (e) {
         e.preventDefault();
-        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.borderColor = 'rgba(176, 132, 33,0.4)';
         this.style.background = '';
         handleBulkImages(e.dataTransfer.files);
     });
@@ -1425,8 +3669,8 @@ function refreshImageStrip() {
     keys.forEach(function (key) {
         var matched = bulkParsedRows.some(function (r) { return normName(r.name || '') === key; });
         html += '<div style="position:relative;" title="' + bulkImages[key].file.name + '">' +
-            '<img src="' + bulkImages[key].objectUrl + '" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:2px solid ' + (matched ? '#a78bfa' : '#ef4444') + ';" alt="">' +
-            '<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#fff;background:' + (matched ? '#a78bfa' : '#ef4444') + ';border-radius:8px;padding:1px 5px;white-space:nowrap;">' + (matched ? 'matched' : 'no match') + '</div>' +
+            '<img src="' + bulkImages[key].objectUrl + '" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:2px solid ' + (matched ? '#B08421' : '#B3261E') + ';" alt="">' +
+            '<div style="position:absolute;bottom:-4px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:#fff;background:' + (matched ? '#B08421' : '#B3261E') + ';border-radius:8px;padding:1px 5px;white-space:nowrap;">' + (matched ? 'matched' : 'no match') + '</div>' +
             '</div>';
     });
     strip.innerHTML = html;
@@ -1437,7 +3681,33 @@ function getRowImageSrc(idx) {
     if (bulkRowImages[idx]) return bulkRowImages[idx].objectUrl;
     var row = bulkParsedRows[idx];
     if (row && bulkImages[normName(row.name || '')]) return bulkImages[normName(row.name || '')].objectUrl;
+    // The `image` column holds a URL in files exported by the sourcing extension.
+    // This used to be ignored here, so every row previewed as an empty "add an
+    // image" placeholder even when the file carried a perfectly good photo URL —
+    // and the count badge said 0 images while the import went on to download them.
+    // A locally attached file still wins: it is the more deliberate choice.
+    if (row && /^https?:\/\//i.test((row.image || '').trim())) return row.image.trim();
     return null;
+}
+
+/**
+ * A remote image URL that the browser could not load.
+ *
+ * NOT the same as "there is no image": the browser and the server reach the
+ * internet by different routes, so a thumbnail blocked here (hotlink protection,
+ * VPN, ad blocker) may still download fine server-side on import. Say that,
+ * rather than showing the empty placeholder and implying the row has no picture.
+ */
+function bulkImgPreviewFailed(img) {
+    var label = img.closest('label');
+    if (!label) return;
+    label.title = 'Image URL could not be previewed in this browser. ' +
+        'The server will still try to download it when you import.';
+    label.innerHTML =
+        '<span style="width:42px;height:42px;border-radius:7px;background:var(--bg-input);' +
+        'border:1.5px solid rgba(179,38,30,0.5);display:inline-flex;align-items:center;' +
+        'justify-content:center;color:#B3261E;font-size:15px;">' +
+        '<i class="bi bi-link-45deg"></i></span>';
 }
 
 function assignRowImage(idx, input) {
@@ -1455,12 +3725,12 @@ function getCellImageHtml(idx) {
     var inputTag = '<input type="file" accept="image/*" style="display:none;position:absolute;" onchange="assignRowImage(' + idx + ',this)">';
     if (src) {
         return '<label style="cursor:pointer;position:relative;display:inline-block;width:42px;height:42px;" title="Click to change image">' +
-            '<img src="' + src + '" style="width:42px;height:42px;object-fit:cover;border-radius:7px;border:2px solid #a78bfa;display:block;" alt="">' +
+            '<img src="' + src + '" onerror="bulkImgPreviewFailed(this)" style="width:42px;height:42px;object-fit:cover;border-radius:7px;border:2px solid #B08421;display:block;" alt="">' +
             '<span style="position:absolute;inset:0;border-radius:7px;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity 0.15s;" onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0">' +
             '<i class="bi bi-camera-fill" style="color:#fff;font-size:14px;pointer-events:none;"></i></span>' +
             inputTag + '</label>';
     }
-    return '<label style="width:42px;height:42px;border-radius:7px;background:var(--bg-input);border:1.5px dashed rgba(167,139,250,0.45);display:inline-flex;align-items:center;justify-content:center;color:#a78bfa;font-size:17px;cursor:pointer;transition:background 0.15s,border-color 0.15s;" title="Click to add image" onmouseenter="this.style.background=\'rgba(167,139,250,0.12)\';this.style.borderColor=\'#a78bfa\'" onmouseleave="this.style.background=\'var(--bg-input)\';this.style.borderColor=\'rgba(167,139,250,0.45)\'">' +
+    return '<label style="width:42px;height:42px;border-radius:7px;background:var(--bg-input);border:1.5px dashed rgba(176, 132, 33,0.45);display:inline-flex;align-items:center;justify-content:center;color:#8A661A;font-size:17px;cursor:pointer;transition:background 0.15s,border-color 0.15s;" title="Click to add image" onmouseenter="this.style.background=\'rgba(176, 132, 33,0.12)\';this.style.borderColor=\'#B08421\'" onmouseleave="this.style.background=\'var(--bg-input)\';this.style.borderColor=\'rgba(176, 132, 33,0.45)\'">' +
         '<i class="bi bi-camera-fill" style="pointer-events:none;"></i>' +
         inputTag + '</label>';
 }
@@ -1500,8 +3770,8 @@ function renderBulkPreview() {
         if (isValid) validCount++; else errorCount++;
 
         var statusBadge = isValid
-            ? '<span style="font-size:11px;background:rgba(74,222,128,0.15);color:#4ade80;border-radius:10px;padding:2px 8px;font-weight:600;">\u2713 OK</span>'
-            : '<span style="font-size:11px;background:rgba(239,68,68,0.15);color:#ef4444;border-radius:10px;padding:2px 8px;font-weight:600;" title="' + errors.join(', ') + '">\u2717 ' + errors[0] + '</span>';
+            ? '<span style="font-size:11px;background:rgba(74,222,128,0.15);color:#157F4A;border-radius:10px;padding:2px 8px;font-weight:600;">\u2713 OK</span>'
+            : '<span style="font-size:11px;background:rgba(179,38,30,0.15);color:#B3261E;border-radius:10px;padding:2px 8px;font-weight:600;" title="' + errors.join(', ') + '">\u2717 ' + errors[0] + '</span>';
 
         var selectedChecked = bulkSelectedRows[idx] ? 'checked' : '';
         html += '<tr style="' + (isValid ? '' : 'opacity:0.5;') + '">' +
@@ -1510,9 +3780,9 @@ function renderBulkPreview() {
             '</td>' +
             '<td style="color:var(--text-secondary);font-size:12px;">' + (idx + 2) + '</td>' +
             '<td id="bulk-img-' + idx + '" style="padding:6px 10px;">' + getCellImageHtml(idx) + '</td>' +
-            '<td style="font-weight:600;">' + (row.name || '<em style="color:#ef4444">missing</em>') + '</td>' +
-            '<td>' + (row.price || '<em style="color:#ef4444">missing</em>') + '</td>' +
-            '<td>' + (row.moq || '<em style="color:#ef4444">missing</em>') + '</td>' +
+            '<td style="font-weight:600;">' + (row.name || '<em style="color:#B3261E">missing</em>') + '</td>' +
+            '<td>' + (row.price || '<em style="color:#B3261E">missing</em>') + '</td>' +
+            '<td>' + (row.moq || '<em style="color:#B3261E">missing</em>') + '</td>' +
             '<td>' + (row.weight || '\u2014') + '</td>' +
             '<td>' + (row.carton_length || '\u2014') + '</td>' +
             '<td>' + (row.carton_width || '\u2014') + '</td>' +
@@ -1612,6 +3882,7 @@ function submitBulkUpload() {
 
     fetch('/products/bulk-upload/', {
         method: 'POST',
+        loadingMessage: 'Importing products from the CSV...',
         headers: { 'X-CSRFToken': getCookie('csrftoken') },
         body: formData
     })
@@ -1726,6 +3997,29 @@ function parse1688CSV(text) {
     var specsIdx = colIdx('Specifications');
     var imgIdx   = colIdx('Image link');
 
+    // This tab reads the CSV that 1688.com / aiprice.com themselves export, whose
+    // headers are "Product name", "Price", "Quantity", "Image link".
+    //
+    // The sourcing EXTENSION exports a different, lower-case shape (name, image,
+    // price, moq, ...) that the Spreadsheet tab reads. Dropping one into the other
+    // used to match no column at all, so every row previewed as "missing" / "?" with
+    // the Import button still enabled — and importing then silently created nothing,
+    // because the server skips nameless rows. Name the mismatch instead of staging a
+    // table of blanks.
+    if (nameIdx < 0 && priceIdx < 0) {
+        var looksLikeExtensionExport =
+            colIdx('name') >= 0 && colIdx('price') >= 0 && colIdx('moq') >= 0;
+        clear1688();
+        showToast(
+            looksLikeExtensionExport
+                ? 'That is a sourcing-extension export — import it on the Spreadsheet tab, not this one.'
+                : 'This tab expects a 1688.com or aiprice.com cart export with "Product name" and "Price" columns. ' +
+                  'For your own spreadsheet, use the Spreadsheet tab.',
+            'error'
+        );
+        return;
+    }
+
     alibaba1688Rows = [];
     var tbody = document.getElementById('alibaba1688TableBody');
     tbody.innerHTML = '';
@@ -1747,8 +4041,8 @@ function parse1688CSV(text) {
             '<td style="text-align:center;">' +
                 (imgUrl ? '<img src="' + imgUrl + '" style="width:40px;height:40px;object-fit:cover;border-radius:4px;" onerror="this.style.display=\'none\'" alt="">' : '<span style="color:var(--text-secondary);">—</span>') +
             '</td>' +
-            '<td style="font-size:12px;">' + (name || '<span style="color:#ef4444;">missing</span>') + '</td>' +
-            '<td style="text-align:center;">' + (price ? '¥' + price : '<span style="color:#ef4444;">?</span>') + '</td>' +
+            '<td style="font-size:12px;">' + (name || '<span style="color:#B3261E;">missing</span>') + '</td>' +
+            '<td style="text-align:center;">' + (price ? '¥' + price : '<span style="color:#B3261E;">?</span>') + '</td>' +
             '<td style="text-align:center;">' + (qty || '1') + '</td>' +
             '<td style="font-size:11px;color:var(--text-secondary);">' + specs + '</td>';
         tbody.appendChild(tr);
@@ -1782,6 +4076,7 @@ function submit1688Upload() {
     formData.append('csv_file', alibaba1688File);
     fetch('/products/bulk-upload-1688/', {
         method: 'POST',
+        loadingMessage: 'Importing the 1688 export...',
         headers: {'X-CSRFToken': getCookie('csrftoken')},
         body: formData
     })
@@ -1816,7 +4111,7 @@ function switchBulkTab(tab) {
     btnSheet.style.color      = tab === 'spreadsheet' ? '#000' : 'var(--text-secondary)';
     btnPhoto.style.background = tab === 'photos' ? '#C84B31' : 'transparent';
     btnPhoto.style.color      = tab === 'photos' ? '#fff' : 'var(--text-secondary)';
-    btn1688.style.background  = tab === '1688' ? '#dc2626' : 'transparent';
+    btn1688.style.background  = tab === '1688' ? '#B3261E' : 'transparent';
     btn1688.style.color       = tab === '1688' ? '#fff' : 'var(--text-secondary)';
     // footer visibility
     var footer = document.getElementById('bulkModalFooter');
@@ -1838,16 +4133,16 @@ function switchBulkTab(tab) {
     var pdz = document.getElementById('photoDropZone');
     pdz.addEventListener('dragover', function(e) {
         e.preventDefault();
-        this.style.borderColor = '#a78bfa';
-        this.style.background = 'rgba(167,139,250,0.07)';
+        this.style.borderColor = '#B08421';
+        this.style.background = 'rgba(176, 132, 33,0.07)';
     });
     pdz.addEventListener('dragleave', function() {
-        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.borderColor = 'rgba(176, 132, 33,0.4)';
         this.style.background = '';
     });
     pdz.addEventListener('drop', function(e) {
         e.preventDefault();
-        this.style.borderColor = 'rgba(167,139,250,0.4)';
+        this.style.borderColor = 'rgba(176, 132, 33,0.4)';
         this.style.background = '';
         handlePhotosDrop(e.dataTransfer.files);
     });
@@ -1953,6 +4248,7 @@ function submitPhotoUpload() {
 
     fetch('/products/bulk-upload-photos/', {
         method: 'POST',
+        loadingMessage: 'Uploading photos...',
         headers: { 'X-CSRFToken': getCookie('csrftoken') },
         body: fd
     })
@@ -1974,8 +4270,69 @@ function submitPhotoUpload() {
         showToast('Network error', 'error');
     });
 }
+
+// ---------------------------------------------------------------------------
+// CATEGORY / SUB CATEGORY DEPENDENT DROPDOWNS
+// ---------------------------------------------------------------------------
+// Both selects are rendered fully populated. Rather than fetching subcategories
+// when the category changes, we hide the options that belong to other
+// categories. That keeps the interaction instant and works offline in the
+// modal, at the cost of a few dozen extra <option> tags.
+
+/**
+ * Show only the subcategories belonging to the category chosen in `select`,
+ * and clear the subcategory if it no longer belongs to that category.
+ *
+ * @param {HTMLSelectElement} select - the category select, carrying a
+ *        data-target attribute naming its subcategory select's id.
+ */
+function syncSubcategoryOptions(select) {
+    var target = document.getElementById(select.dataset.target);
+    if (!target) return;
+
+    var chosen = select.value;
+    var current = target.value;
+    var currentStillValid = (current === '');
+
+    Array.prototype.forEach.call(target.options, function(option) {
+        if (!option.value) return;  // the "— none —" placeholder always stays
+        var belongs = (option.dataset.category === chosen);
+        // `hidden` alone is not honoured consistently across browsers for
+        // <option>, so the option is disabled as well to keep it unselectable.
+        option.hidden = !belongs;
+        option.disabled = !belongs;
+        if (belongs && option.value === current) currentStillValid = true;
+    });
+
+    // Switching to a category that does not own the selected subcategory would
+    // otherwise leave a stale, now-hidden value in the field.
+    if (!currentStillValid) target.value = '';
+
+    // With no category chosen the server infers one from the name, so a manual
+    // subcategory would be ignored — disable the field to make that visible.
+    target.disabled = (chosen === '');
+}
+
+function initCategorySelects() {
+    Array.prototype.forEach.call(
+        document.querySelectorAll('.category-select'),
+        function(select) {
+            select.addEventListener('change', function() {
+                syncSubcategoryOptions(select);
+            });
+            syncSubcategoryOptions(select);  // apply the initial state
+        }
+    );
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initCategorySelects);
+} else {
+    initCategorySelects();
+}
 </script>
 
-{% include "includes/pagination.html" with page_obj=page_obj %}
+</div>
+
 {% endblock %}
 

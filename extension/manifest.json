@@ -1,0 +1,67 @@
+{
+  "manifest_version": 3,
+  "name": "1688 Product Sourcing \u2014 Mudassir LLC",
+  "version": "2.0.0",
+  "description": "Extract product data, variations, prices and weights from 1688 listings, translate the names, and export or push straight into the LogiManager catalogue.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "*://*.1688.com/*",
+    "*://*.taobao.com/*",
+    "*://*.alibaba.com/*",
+    "*://*.aliimg.com/*",
+    "*://*.alicdn.com/*",
+    "https://translate.googleapis.com/*",
+    "https://api.mymemory.translated.net/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "optional_host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "src/background/service-worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.1688.com/*",
+        "*://*.taobao.com/*",
+        "*://*.alibaba.com/*"
+      ],
+      "js": [
+        "src/lib/namespace.js",
+        "src/lib/storage.js",
+        "src/lib/taxonomy.js",
+        "src/lib/translate.js",
+        "src/lib/pricing.js",
+        "src/lib/providers.js",
+        "src/content/extract-1688.js",
+        "src/content/content.js"
+      ],
+      "css": [
+        "src/content/panel.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "1688 Sourcing list",
+    "default_popup": "src/popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "src/options/options.html"
+}

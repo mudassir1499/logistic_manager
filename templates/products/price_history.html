@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% comment %}
+Bulk price adjustment history.
+
+Context: see products.views.price_history.
+{% endcomment %}
+
+{% block title %}Price History — Logistic Manager{% endblock %}
+{% block nav_products %}active{% endblock %}
+{% block page_title %}Price History{% endblock %}
+
+{% block topbar_actions %}
+<a href="/products/" class="btn-ghost"><i class="bi bi-arrow-left"></i> Back to Products</a>
+{% endblock %}
+
+{% block content %}
+
+<style>
+.ph-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+.ph-tile { border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; }
+.ph-tile__n { font-size: 22px; font-weight: 800; }
+.ph-tile__l { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-secondary); }
+.ph-up { color: #157F4A; }
+.ph-down { color: #B3261E; }
+.ph-scope { font-size: 11px; background: rgba(0,0,0,.06); border-radius: 10px; padding: 2px 8px; }
+</style>
+
+{% comment %}Stated up front because it is the first question this screen
+   provokes. It is a property of the order model — OrderItem stores the unit
+   price at checkout — not something this log enforces.
+{% endcomment %}
+<div class="alert" style="font-size:13px;border:1px solid rgba(59,130,246,.25);background:rgba(59,130,246,.08);">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>Placed orders are never affected.</strong>
+  Each order line stores the price it was placed at, so an order raised at
+  {{ settings.currency_symbol }}5 stays at {{ settings.currency_symbol }}5 however
+  often that product is repriced afterwards. Only the catalogue changes.
+</div>
+
+<div class="ph-tiles">
+  <div class="ph-tile">
+    <div class="ph-tile__n">{{ run_count }}</div>
+    <div class="ph-tile__l">Adjustments</div>
+  </div>
+  <div class="ph-tile">
+    <div class="ph-tile__n">{{ products_touched }}</div>
+    <div class="ph-tile__l">Product prices changed</div>
+  </div>
+  <div class="ph-tile">
+    <div class="ph-tile__n">{{ variants_touched }}</div>
+    <div class="ph-tile__l">Variation prices changed</div>
+  </div>
+  <div class="ph-tile">
+    <div class="ph-tile__n {% if net_change > 0 %}ph-up{% elif net_change < 0 %}ph-down{% endif %}">
+      {% if net_change > 0 %}+{% endif %}{{ settings.currency_symbol }}{{ net_change|floatformat:2 }}
+    </div>
+    <div class="ph-tile__l">Net catalogue change</div>
+  </div>
+</div>
+
+<div class="glass-card">
+  <div class="table-responsive">
+    <table class="table-glass">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>By</th>
+          <th>Change</th>
+          <th>Applied to</th>
+          <th class="text-end">Products</th>
+          <th class="text-end">Variations</th>
+          <th class="text-end">Before</th>
+          <th class="text-end">After</th>
+          <th class="text-end">Difference</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in adjustments %}
+        <tr>
+          <td>{{ a.created_at|date:"M d, Y · H:i" }}</td>
+          <td>{{ a.user.get_username|default:"—" }}</td>
+          <td class="{% if a.percentage > 0 %}ph-up{% else %}ph-down{% endif %}" style="font-weight:700;">
+            {% if a.percentage > 0 %}+{% endif %}{{ a.percentage }}%
+          </td>
+          <td>
+            {{ a.get_scope_display }}
+            {% if a.scope_label %}<span class="ph-scope">{{ a.scope_label }}</span>{% endif %}
+            {% if a.excluded_private %}<span class="ph-scope">private excluded</span>{% endif %}
+          </td>
+          <td class="text-end">{{ a.products_affected }}</td>
+          <td class="text-end">{{ a.variants_affected }}</td>
+          <td class="text-end">{{ settings.currency_symbol }}{{ a.total_before|floatformat:2 }}</td>
+          <td class="text-end">{{ settings.currency_symbol }}{{ a.total_after|floatformat:2 }}</td>
+          <td class="text-end {% if a.difference > 0 %}ph-up{% elif a.difference < 0 %}ph-down{% endif %}"
+              style="font-weight:700;">
+            {% if a.difference > 0 %}+{% endif %}{{ settings.currency_symbol }}{{ a.difference|floatformat:2 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9">
+            <div class="empty-state" style="padding:44px 20px;text-align:center;color:var(--text-secondary);">
+              <i class="bi bi-graph-up-arrow" style="font-size:34px;opacity:.4;display:block;margin-bottom:10px;"></i>
+              No price adjustments yet. Use <strong>Adjust Prices</strong> on the products screen.
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+<div class="d-flex justify-content-center align-items-center gap-3 mt-3" style="font-size:14px;">
+  {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">← Previous</a>{% endif %}
+  <span style="color:var(--text-secondary);">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}<a href="?page={{ page_obj.next_page_number }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

@@ -23,7 +23,7 @@ from django.urls import path
 # Import all view functions from this app's views.py.
 # The dot (.) means "from the current package" (the products app directory).
 # Each function handles a specific HTTP request for the product management system.
-from . import views
+from . import api, feeds, views
 
 # =============================================================================
 # URL PATTERNS FOR PRODUCT MANAGEMENT
@@ -113,6 +113,37 @@ urlpatterns = [
     # -------------------------------------------------------------------------
     path('bulk-action/', views.bulk_action, name='bulk_action'),
 
+    # URL: /products/tags/save/  and  /products/tags/delete/
+    # Rename, recolour or delete one tag, from the tag manager on the product
+    # list. Both are POST-only and return JSON — the dialog updates in place
+    # rather than reloading a list somebody is midway through working through.
+    # URL: /products/feed.csv  and  /products/feed.xml
+    #
+    # The advertising catalogue. Meta (Facebook/Instagram) and TikTok fetch these
+    # on their own schedule to build the product catalogue that dynamic and
+    # retargeting ads are served from.
+    #
+    # DELIBERATELY UNAUTHENTICATED. The crawlers arrive with no session and no
+    # token, so a login wall here means an empty catalogue and no ads at all.
+    # Everything served is already public on the storefront - private products,
+    # drafts and supplier links are filtered out in products/feeds.py, which is
+    # where the reasoning and the tests live.
+    path('feed.csv', feeds.product_feed_csv, name='product_feed_csv'),
+    path('feed.xml', feeds.product_feed_xml, name='product_feed_xml'),
+
+    # Staff-only: what the feeds contain, and what they are silently dropping.
+    path('feed-health/', views.feed_health, name='feed_health'),
+
+    path('tags/save/', views.tag_save, name='tag_save'),
+    path('tags/delete/', views.tag_delete, name='tag_delete'),
+
+    # CATEGORY MANAGEMENT: create/rename/hide/delete categories and their
+    # subcategories without going through Django's own /admin/.
+    path('categories/', views.category_manage, name='category_manage'),
+
+    # PRICE HISTORY: every bulk adjustment, with its money impact.
+    path('price-history/', views.price_history, name='price_history'),
+
     # -------------------------------------------------------------------------
     # BULK UPLOAD: Import Products from a Spreadsheet
     # -------------------------------------------------------------------------
@@ -158,6 +189,31 @@ urlpatterns = [
     # catalog. Useful for sharing with customers, suppliers, or for backup.
     # -------------------------------------------------------------------------
     path('catalogue-export/', views.catalogue_excel_export, name='catalogue_excel_export'),
+
+    # -------------------------------------------------------------------------
+    # CATALOGUE IMPORT: the export, filled in and sent back
+    # -------------------------------------------------------------------------
+    # URL: /products/catalogue-import/
+    # Takes the .xlsx produced by catalogue-export and applies the prices, MOQs
+    # and carton specs in it to the products it names. UPDATES ONLY - a row
+    # matching no product is reported, never created, because creating belongs
+    # to bulk-upload where the other required fields are collected.
+    # -------------------------------------------------------------------------
+    path('catalogue-import/', views.catalogue_import, name='catalogue_import'),
+
+    # -------------------------------------------------------------------------
+    # BROWSER EXTENSION API
+    # -------------------------------------------------------------------------
+    # Token-authenticated JSON endpoints called by the 1688 sourcing extension.
+    # They live under /api/extension/ rather than alongside the HTML views so the
+    # split between "screens a person opens" and "endpoints a script calls" stays
+    # obvious — and so a future reverse-proxy rule can treat them differently.
+    path('api/extension/ping/', api.extension_ping, name='extension_ping'),
+    path('api/extension/extract/', api.extension_extract, name='extension_extract'),
+    path('api/extension/import/', api.extension_import, name='extension_import'),
+    # Lets the panel add a missing category without leaving the 1688 page.
+    path('api/extension/category/', api.extension_create_category,
+         name='extension_create_category'),
 
     # -------------------------------------------------------------------------
     # SUPPLIER QUOTE: Generate Supplier Quote Template

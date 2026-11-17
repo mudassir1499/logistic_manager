@@ -2,7 +2,7 @@
 
 <div class="col-6 col-sm-4 col-md-3 col-lg-2 product-card-col"
      data-product-id="{{ product.id }}"
-     data-is-private="{% if is_private %}1{% else %}0{% endif %}"
+     data-is-private="{% if product.is_private %}1{% else %}0{% endif %}"
      data-source="{{ product.source }}"
      data-complete="{% if product.weight and product.carton_length and product.carton_width and product.carton_height and product.carton_qty %}1{% else %}0{% endif %}">
     <div class="product-list-card glass-card h-100">
@@ -14,11 +14,17 @@
 
         <div class="product-card-media" onclick="showProductDetail({{ product.id }})" title="View details">
 
-            {% with product.images.first as img %}
+            {% with product.images.all|first as img %}
             {% if img %}
 
-            <img src="{{ img.image.url }}" alt="" class="product-card-img"
+            {% comment %}
+              src, not image.url: an imported row may hold only a supplier CDN link
+              because the download failed. is_remote marks those on staff screens —
+              a hotlinked image can disappear when the supplier delists the listing.
+            {% endcomment %}
+            <img src="{{ img.src }}" alt="" class="product-card-img"
                  loading="lazy"
+                 {% if img.is_remote %}title="Image is linked from the supplier's CDN, not stored on this site."{% endif %}
                  onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
             <div class="product-card-img-placeholder" style="display:none;"><i class="bi bi-box-seam"></i></div>
             {% else %}
@@ -31,14 +37,47 @@
         <div class="product-card-body">
 
             <div class="product-card-title" onclick="showProductDetail({{ product.id }})" title="{{ product.name }}">{{ product.name }}</div>
+            {% comment %}A product with variations has no single price, so the card
+               shows the cheapest as a "from" figure — the same number the customer
+               portal headlines.
+            {% endcomment %}
             <div class="product-card-meta">
-                <span class="product-card-price">{{ product.price }}</span>
+                <span class="product-card-price">
+                    {% if product.has_variants %}<span style="font-size:10px;font-weight:400;">from </span>{% endif %}{{ product.display_price }}
+                </span>
                 <span class="product-card-moq">MOQ {{ product.moq }}</span>
             </div>
             
+            {% comment %}Tags sit above the automatic badges, not among them.
+               A tag is something a person deliberately put on this product; the
+               D/P/Amazon markers are derived from its own fields. Reading them
+               as one run makes both slower to scan.
+
+               Two chips then "+N": the card is 187px wide, and a fourth chip
+               wraps the row and pushes the actions off the bottom. The full set
+               is on the row in list view and in the detail modal.
+            {% endcomment %}
+            {% if product.tags.all %}
+            <div class="product-card-tags">
+                {% for tag in product.tags.all|slice:":2" %}
+                <span class="tag-chip" style="--tag:{{ tag.colour }};" title="{{ tag.name }}">{{ tag.name }}</span>
+                {% endfor %}
+                {% if product.tags.all|length > 2 %}
+                <span class="tag-chip tag-chip-more"
+                      title="{% for t in product.tags.all|slice:"2:" %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}">+{{ product.tags.all|length|add:"-2" }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <div class="product-card-badges">
+                {% if product.has_variants %}
+                <span class="product-badge" title="{{ product.active_variants|length }} variations — click to view"
+                      style="background:rgba(176,132,33,.16);color:#8A661A;">
+                    <i class="bi bi-palette"></i> {{ product.active_variants|length }}
+                </span>
+                {% endif %}
                 {% if product.is_draft %}<span class="product-badge draft">D</span>{% endif %}
-                {% if is_private %}<span class="product-badge private">P</span>{% endif %}
+                {% if product.is_private %}<span class="product-badge private">P</span>{% endif %}
                 {% if product.source == 'amazon' %}<span class="product-badge amazon">Amazon</span>{% endif %}
                 {% if product.source == 'noon' %}<span class="product-badge noon">Noon</span>{% endif %}
                 {% if product.ready_to_ship %}<span class="product-badge complete" title="Ready to ship"><i class="bi bi-truck"></i></span>{% endif %}
@@ -50,11 +89,31 @@
                 {% endif %}
             </div>
             
-            <div class="product-card-shipping">
-                <div class="shipping-chip" id="card-air-{{ product.id }}"></div>
-                <div class="shipping-chip" id="card-sea-{{ product.id }}"></div>
-            </div>
-            
+            {% comment %}The air/sea landed-cost chips used to sit here. They were
+               removed from the card: two rates on a 6-per-row grid were too
+               cramped to read, and they pushed the actions out of reach. The
+               calculation itself is untouched and still shown in full — with
+               KSA rates and margins — in the product detail modal.
+
+               The JavaScript that filled them writes through a null-safe
+               helper, so it keeps working with the elements gone.
+            {% endcomment %}
+
+            {% comment %}Where this product came from. Staff-only: which factory
+               supplies a product is the agency's margin, so this never appears
+               in the customer portal. rel="noopener" because target="_blank"
+               would otherwise give the opened page a handle on this one.
+            {% endcomment %}
+            {% if product.source_url %}
+            <a href="{{ product.source_url }}" target="_blank" rel="noopener noreferrer"
+               class="product-card-supplier" onclick="event.stopPropagation();"
+               data-bs-toggle="tooltip"
+               title="Open the supplier's listing to contact them"
+               aria-label="Contact supplier for {{ product.name }}">
+                <i class="bi bi-chat-dots"></i><span>Contact supplier</span>
+            </a>
+            {% endif %}
+
             <div class="product-card-actions">
                 <button class="btn-ghost btn-sm" onclick="event.stopPropagation(); editProduct({{ product.id }})"
                         data-bs-toggle="tooltip" title="Edit product" aria-label="Edit {{ product.name }}">
@@ -69,7 +128,7 @@
                         data-bs-toggle="tooltip" title="Save calculated prices" aria-label="Save calculated prices for {{ product.name }}">
                     <i class="bi bi-floppy"></i>
                 </button>
-                {% if is_private %}
+                {% if product.is_private %}
                 <button class="btn-ghost btn-sm" style="color:var(--accent-3)" onclick="event.stopPropagation(); togglePrivate({{ product.id }}, this)"
                         data-bs-toggle="tooltip" title="Restore to public" aria-label="Restore {{ product.name }} to public">
                     <i class="bi bi-unlock"></i>

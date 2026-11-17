@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Sourcing list</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="header">
+    <span class="logo">✦</span>
+    <div class="header-text">
+      <strong>Sourcing list</strong>
+      <span id="summary" class="summary">0 products</span>
+    </div>
+    <a href="#" id="open-options" class="options-link" title="Options">⚙</a>
+  </header>
+
+  <div id="status" class="status" hidden></div>
+
+  <!--
+    Push progress. A push now downloads every product photo before
+    uploading, so a batch of twenty products can take real seconds - and a
+    button that says "Pushing..." with nothing moving is indistinguishable
+    from one that has hung.
+  -->
+  <div id="pushProgress" class="push-progress" hidden>
+    <div class="push-progress-bar"><div id="pushProgressFill"></div></div>
+    <div id="pushProgressText" class="push-progress-text"></div>
+  </div>
+
+  <!--
+    Per-row import outcomes. The site returns a result for every product
+    it was sent; before this only the one-line summary was shown, so
+    "2 duplicate(s) skipped" gave no way to tell WHICH products were
+    dropped or why - and a skip caused by a name clash with an unrelated
+    listing looked exactly like a genuine re-import.
+  -->
+  <ul id="results" class="results" hidden></ul>
+
+  <div id="empty" class="empty">
+    <p>No products collected yet.</p>
+    <p class="hint">
+      Open a 1688 product page and use the <b>Add to list</b> button in the
+      panel on the right of the page.
+    </p>
+  </div>
+
+  <ul id="list" class="list"></ul>
+
+  <footer class="footer">
+    <div class="export-row">
+      <button id="export-xlsx" type="button">Excel</button>
+      <button id="export-csv" type="button">CSV</button>
+      <button id="export-sql" type="button">SQL</button>
+    </div>
+    <button id="push" type="button" class="push">Push to site</button>
+    <button id="clear" type="button" class="clear">Clear list</button>
+  </footer>
+
+  <!--
+    Classic scripts in dependency order. See lib/namespace.js for why this
+    extension does not use ES modules anywhere.
+  -->
+  <script src="../lib/namespace.js"></script>
+  <script src="../lib/storage.js"></script>
+  <script src="../lib/taxonomy.js"></script>
+  <script src="../lib/pricing.js"></script>
+  <script src="../lib/xlsx.js"></script>
+  <script src="../lib/exporters.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,263 @@
+/**
+ * src/popup/popup.css
+ *
+ * The toolbar popup. Chrome sizes a popup to its content, so the width is
+ * fixed and the list is the only scrolling region — otherwise the window
+ * resizes every time a product is added or removed.
+ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  width: 380px;
+  max-height: 580px;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #0a0a0a;
+  background: #f3f4f7;
+}
+
+/* ---- Header ---- */
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  background: #0a0a0a;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.logo { color: #d9a93c; font-size: 15px; }
+
+.header-text { flex: 1; display: flex; flex-direction: column; line-height: 1.3; }
+.header-text strong { font-size: 13px; }
+.summary { font-size: 11px; color: rgba(255, 255, 255, 0.65); }
+
+.options-link {
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: none;
+  font-size: 16px;
+  padding: 2px 4px;
+}
+.options-link:hover { color: #d9a93c; }
+
+/* ---- Status ---- */
+
+.status {
+  padding: 8px 14px;
+  font-size: 11.5px;
+  background: #e8eaf0;
+  color: #3f3f42;
+  flex-shrink: 0;
+}
+.status-ok    { background: rgba(21, 127, 74, 0.12); color: #157f4a; }
+.status-warn  { background: rgba(194, 65, 12, 0.12); color: #c2410c; }
+.status-error { background: rgba(179, 38, 30, 0.12); color: #b3261e; }
+
+/* ---- Empty state ---- */
+
+.empty { padding: 28px 20px; text-align: center; color: #6a6a6c; }
+.empty p { margin-bottom: 6px; }
+.empty .hint { font-size: 11.5px; line-height: 1.5; }
+
+/* ---- List ---- */
+
+.list {
+  list-style: none;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.item {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 14px;
+  background: #ffffff;
+  border-bottom: 1px solid #e8eaf0;
+}
+
+.item-thumb {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f3f4f7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.no-img { color: #c8cad0; font-size: 16px; }
+
+.item-main { flex: 1; min-width: 0; }
+
+.item-name {
+  font-weight: 600;
+  font-size: 12.5px;
+  line-height: 1.35;
+  /* Two lines maximum: supplier titles run very long and would otherwise push
+     the price and meta line out of view. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #6a6a6c;
+  margin-top: 2px;
+}
+
+.item-price { font-weight: 700; color: #0a0a0a; }
+
+.item-sub { font-size: 10.5px; color: #9a9a9c; margin-top: 2px; }
+
+/* Anything the operator still needs to fill in before import. */
+.missing { color: #c2410c; }
+
+.item-remove {
+  background: transparent;
+  border: 0;
+  color: #c8cad0;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.item-remove:hover { color: #b3261e; }
+
+/* ---- Footer ---- */
+
+.footer {
+  padding: 10px 14px 12px;
+  background: #ffffff;
+  border-top: 1px solid #e8eaf0;
+  flex-shrink: 0;
+}
+
+.export-row { display: flex; gap: 6px; margin-bottom: 8px; }
+
+.footer button {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border: 1px solid #dfe1e6;
+  background: #ffffff;
+  color: #0a0a0a;
+}
+
+.export-row button { flex: 1; }
+.footer button:hover:not(:disabled) { border-color: #b08421; color: #8a661a; }
+
+.push {
+  width: 100%;
+  background: #0a0a0a;
+  color: #ffffff;
+  border-color: #0a0a0a;
+  margin-bottom: 6px;
+}
+.push:hover:not(:disabled) { background: #000000; color: #ffffff; border-color: #000000; }
+.push:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.clear { width: 100%; color: #b3261e; }
+.clear:hover { border-color: #b3261e; color: #b3261e; }
+
+/* =============================================================================
+   PER-ROW IMPORT RESULTS
+   =============================================================================
+   Shown after a push, listing only the products that were NOT created. The
+   summary line covers the successes; this is for the ones needing a decision.
+   ========================================================================== */
+.results {
+    list-style: none;
+    margin: 0 0 8px;
+    padding: 0 10px;
+    max-height: 190px;
+    overflow-y: auto;
+}
+
+.result {
+    padding: 7px 9px;
+    margin-bottom: 6px;
+    border-radius: 6px;
+    border-left: 3px solid transparent;
+    background: rgba(0, 0, 0, 0.03);
+    font-size: 11.5px;
+    line-height: 1.4;
+}
+
+.result-skipped { border-left-color: #B08421; }
+.result-error   { border-left-color: #C2410C; }
+
+.result-name {
+    font-weight: 700;
+    /* 1688 titles are long keyword strings. Clamped so one product cannot push
+       the rest of the list out of view in a popup this narrow. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.result-why {
+    margin-top: 2px;
+    opacity: 0.8;
+}
+
+.result-flag {
+    margin-top: 4px;
+    font-weight: 700;
+    color: #8A661A;
+}
+
+/* =============================================================================
+   PUSH PROGRESS
+   =============================================================================
+   Shown while a push is running. The bar tracks products whose images have been
+   fetched; the text says which phase it is in, because "downloading photos" and
+   "uploading to the site" fail for completely different reasons and the
+   operator should know which one they are waiting on.
+   ========================================================================== */
+.push-progress {
+    padding: 0 10px 8px;
+}
+
+.push-progress-bar {
+    height: 4px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.10);
+    overflow: hidden;
+}
+
+.push-progress-bar > div {
+    height: 100%;
+    width: 0;
+    background: #B08421;
+    border-radius: 3px;
+    transition: width 0.2s ease;
+}
+
+.push-progress-text {
+    margin-top: 5px;
+    font-size: 11px;
+    color: #666;
+    /* A long Chinese product name must not push the panel wider. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}

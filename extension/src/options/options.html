@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>1688 Sourcing — Options</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<div class="wrap">
+  <h1><span class="logo">✦</span> 1688 Sourcing — Options</h1>
+
+  <div id="status" class="status" hidden></div>
+
+  <section class="card">
+    <h2>Pricing</h2>
+    <p class="help">
+      1688 quotes a cheaper unit price at higher quantities. The extension reads
+      the tier that applies at your order quantity and reports it as-is.
+      <strong>No markup is added</strong> &mdash; every price is editable in the
+      panel before you add a product, and again on the site afterwards.
+    </p>
+
+    <label for="targetQty">Order quantity to price at</label>
+    <input id="targetQty" type="number" step="1" min="1">
+    <p class="help">
+      Also becomes the product&rsquo;s MOQ, unless the supplier&rsquo;s own minimum is higher.
+    </p>
+
+    <label class="check">
+      <input id="importAsDraft" type="checkbox">
+      Import products as drafts
+      <span class="help inline">Recommended — keeps a bad scrape out of the customer catalogue until you have checked it.</span>
+    </label>
+  </section>
+
+  <section class="card">
+    <h2>Product names</h2>
+    <p class="help">
+      The page is always read directly. Names on 1688 are in Chinese, so they
+      can optionally be translated into English before being added to your list.
+    </p>
+
+    <label for="aiMode">Translate names</label>
+    <select id="aiMode">
+      <option value="translate">Yes — translate to English (free, no setup)</option>
+      <option value="none">No — keep the original Chinese</option>
+    </select>
+
+    <div id="translate-note" class="note">
+      Translates the product title and every variation name. No account or key
+      needed. Prices, weights, stock and categories are always read from the
+      page &mdash; translation never touches them.
+      <br><br>
+      Results are cached, so a name is only ever translated once.
+      <br><br>
+      <button id="test-translate" type="button" class="secondary" style="margin-top:0">
+        Test translation
+      </button>
+      <button id="clear-cache" type="button" class="secondary" style="margin-top:0">
+        Clear cache
+      </button>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Your site</h2>
+    <p class="help">
+      Needed for &ldquo;Push to site&rdquo;, for category suggestions, and for the Claude
+      extraction mode. File exports work without it.
+    </p>
+
+    <label for="siteUrl">Site address</label>
+    <input id="siteUrl" type="text" placeholder="http://127.0.0.1:8000">
+
+    <label for="apiToken">API token</label>
+    <input id="apiToken" type="password" placeholder="mlk_…">
+    <p class="help">
+      Create one at <code>/accounts/api-tokens/</code> on your site. It is shown
+      once; if you lose it, revoke it there and make a new one.
+    </p>
+
+    <button id="test" type="button" class="secondary">Test connection</button>
+  </section>
+
+  <div class="actions">
+    <button id="save" type="button">Save settings</button>
+  </div>
+</div>
+
+<script src="../lib/namespace.js"></script>
+<script src="../lib/storage.js"></script>
+<script src="options.js"></script>
+</body>
+</html>

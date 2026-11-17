@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+
+{% comment %}
+Category and subcategory management.
+
+Every action is a plain POST-and-redirect rather than AJAX: these are rare,
+consequential edits where a full reload showing the real state afterwards is
+worth more than staying on the page.
+
+Context:
+    categories           active and inactive, with subcategories and products prefetched
+    uncategorised_count  products with no category at all
+{% endcomment %}
+
+{% block title %}Categories — Logistic Manager{% endblock %}
+{% block nav_products %}active{% endblock %}
+{% block page_title %}Categories{% endblock %}
+
+{% block topbar_actions %}
+<a href="/products/" class="btn-ghost"><i class="bi bi-arrow-left"></i> Back to Products</a>
+{% endblock %}
+
+{% block content %}
+
+<style>
+.cat-card { border: 1px solid var(--border-color); border-radius: var(--radius-sm); margin-bottom: 14px; overflow: hidden; }
+.cat-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: rgba(0,0,0,.03); flex-wrap: wrap; }
+.cat-name { font-weight: 700; font-size: 15px; }
+.cat-slug { font-size: 11px; color: var(--text-secondary); font-family: ui-monospace, monospace; }
+.cat-count { font-size: 11px; background: rgba(176,132,33,.16); color: #8A661A; border-radius: 10px; padding: 2px 9px; font-weight: 600; }
+.cat-off { opacity: .5; }
+.sub-row { display: flex; align-items: center; gap: 10px; padding: 8px 16px 8px 34px; border-top: 1px solid var(--border-color); flex-wrap: wrap; }
+.sub-name { font-size: 13px; font-weight: 600; }
+.inline-form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.inline-form input[type=text] { max-width: 210px; }
+.mini { font-size: 11px; padding: 4px 9px; }
+</style>
+
+{% if messages %}
+  {% for message in messages %}
+  <div class="alert alert-{{ message.tags }}" style="font-size:13px;">{{ message }}</div>
+  {% endfor %}
+{% endif %}
+
+<div class="glass-card mb-3" style="padding:16px;">
+  <form method="post" class="d-flex gap-2 flex-wrap align-items-end">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="add_category">
+    <div style="flex:1 1 260px;">
+      <label class="form-label mb-1">New category</label>
+      <input type="text" name="name" class="form-control" placeholder="e.g. Home &amp; Kitchen" required>
+    </div>
+    <button type="submit" class="btn-glow"><i class="bi bi-plus-lg me-1"></i> Add Category</button>
+  </form>
+  {% if uncategorised_count %}
+  <div style="font-size:12px;color:var(--text-secondary);margin-top:10px;">
+    <i class="bi bi-info-circle me-1"></i>{{ uncategorised_count }} product(s) have no category.
+    Select them on the Products screen and use <strong>Set Category</strong> to file them in bulk.
+  </div>
+  {% endif %}
+</div>
+
+{% for category in categories %}
+<div class="cat-card {% if not category.is_active %}cat-off{% endif %}">
+
+  <div class="cat-head">
+    <span class="cat-name">{{ category.name }}</span>
+    <span class="cat-slug">{{ category.slug }}</span>
+    <span class="cat-count">{{ category.products.count }} product{{ category.products.count|pluralize }}</span>
+    {% if not category.is_active %}<span class="cat-count" style="background:rgba(179,38,30,.14);color:#B3261E;">hidden</span>{% endif %}
+
+    <div class="ms-auto d-flex gap-2 flex-wrap">
+      <form method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rename_category">
+        <input type="hidden" name="category_id" value="{{ category.id }}">
+        <input type="text" name="name" class="form-control form-control-sm" value="{{ category.name }}" required>
+        <button type="submit" class="btn-ghost mini">Rename</button>
+      </form>
+
+      <form method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_category">
+        <input type="hidden" name="category_id" value="{{ category.id }}">
+        <button type="submit" class="btn-ghost mini"
+                title="Hidden categories disappear from the portal filters but keep their products">
+          {% if category.is_active %}Hide{% else %}Show{% endif %}
+        </button>
+      </form>
+
+      <form method="post" class="inline-form"
+            onsubmit="return confirm('Delete {{ category.name|escapejs }}?\n\n{{ category.products.count }} product(s) will become uncategorised. They are NOT deleted.');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_category">
+        <input type="hidden" name="category_id" value="{{ category.id }}">
+        <button type="submit" class="btn-danger-ghost mini">Delete</button>
+      </form>
+    </div>
+  </div>
+
+  {% for sub in category.subcategories.all %}
+  <div class="sub-row {% if not sub.is_active %}cat-off{% endif %}">
+    <i class="bi bi-arrow-return-right" style="color:var(--text-secondary);"></i>
+    <span class="sub-name">{{ sub.name }}</span>
+    <span class="cat-slug">{{ sub.slug }}</span>
+    {% if not sub.is_active %}<span class="cat-count" style="background:rgba(179,38,30,.14);color:#B3261E;">hidden</span>{% endif %}
+
+    <div class="ms-auto d-flex gap-2 flex-wrap">
+      <form method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rename_subcategory">
+        <input type="hidden" name="subcategory_id" value="{{ sub.id }}">
+        <input type="text" name="name" class="form-control form-control-sm" value="{{ sub.name }}" required>
+        <button type="submit" class="btn-ghost mini">Rename</button>
+      </form>
+      <form method="post" class="inline-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_subcategory">
+        <input type="hidden" name="subcategory_id" value="{{ sub.id }}">
+        <button type="submit" class="btn-ghost mini">{% if sub.is_active %}Hide{% else %}Show{% endif %}</button>
+      </form>
+      <form method="post" class="inline-form"
+            onsubmit="return confirm('Delete subcategory {{ sub.name|escapejs }}?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_subcategory">
+        <input type="hidden" name="subcategory_id" value="{{ sub.id }}">
+        <button type="submit" class="btn-danger-ghost mini">Delete</button>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+
+  <div class="sub-row">
+    <form method="post" class="inline-form">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="add_subcategory">
+      <input type="hidden" name="category_id" value="{{ category.id }}">
+      <input type="text" name="name" class="form-control form-control-sm"
+             placeholder="New subcategory in {{ category.name }}" required>
+      <button type="submit" class="btn-ghost mini"><i class="bi bi-plus-lg"></i> Add</button>
+    </form>
+  </div>
+
+</div>
+{% empty %}
+<div class="glass-card" style="padding:48px;text-align:center;color:var(--text-secondary);">
+  <i class="bi bi-tags" style="font-size:38px;opacity:.4;display:block;margin-bottom:12px;"></i>
+  No categories yet. Add the first one above.
+</div>
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block title %}Ad Feed — {{ block.super }}{% endblock %}
+{% block nav_feed %}active{% endblock %}
+
+{% comment %}
+  What the advertising catalogue currently contains.
+
+  This page exists because a product feed fails QUIETLY. Meta fetches it on its
+  own schedule, rejects whatever does not meet the spec, and records why inside
+  Commerce Manager — a screen nobody opens between campaigns. The usual result
+  is a catalogue that has been half empty for a month without anyone noticing.
+{% endcomment %}
+
+{% block content %}
+<style>
+.feed-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.feed-stat { background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius-sm); padding: 14px 16px; }
+.feed-stat__n { font-size: 28px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.feed-stat__l { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+.feed-stat--warn .feed-stat__n { color: #C2410C; }
+.feed-stat--ok .feed-stat__n { color: #157F4A; }
+
+.feed-url { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: var(--bg-input); border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; }
+.feed-url code { font-size: 12.5px; flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
+.feed-url__tag { font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .04em; color: var(--text-secondary); flex-shrink: 0; }
+
+.feed-missing { width: 100%; border-collapse: collapse; font-size: 13px; }
+.feed-missing th { font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--text-secondary); text-align: left; padding: 6px 8px;
+  border-bottom: 1px solid var(--border-color); }
+.feed-missing td { padding: 7px 8px; border-bottom: 1px solid var(--border-color); }
+.feed-missing tr:last-child td { border-bottom: 0; }
+.feed-note { font-size: 12.5px; color: var(--text-secondary); }
+</style>
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <h1 class="page-title mb-0">Ad feed</h1>
+  <a href="{% url 'product_list' %}" class="btn-ghost btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>Back to products
+  </a>
+</div>
+
+<div class="feed-grid">
+  <div class="glass-card feed-stat feed-stat--ok">
+    <div class="feed-stat__n">{{ row_count }}</div>
+    <div class="feed-stat__l">Items in the feed</div>
+  </div>
+  <div class="glass-card feed-stat">
+    <div class="feed-stat__n">{{ product_count }}</div>
+    <div class="feed-stat__l">Products advertised</div>
+  </div>
+  <div class="glass-card feed-stat {% if skipped_no_image %}feed-stat--warn{% endif %}">
+    <div class="feed-stat__n">{{ skipped_no_image }}</div>
+    <div class="feed-stat__l">Dropped — no photo</div>
+  </div>
+  <div class="glass-card feed-stat">
+    <div class="feed-stat__n">{{ private_excluded }}</div>
+    <div class="feed-stat__l">Held back — private</div>
+  </div>
+  <div class="glass-card feed-stat">
+    <div class="feed-stat__n">{{ draft_excluded }}</div>
+    <div class="feed-stat__l">Held back — draft</div>
+  </div>
+</div>
+
+{% comment %}More rows than products is normal and correct: a product with
+   variations contributes one row per variation, because that is what the
+   customer actually buys and what the ad must link to.{% endcomment %}
+<div class="glass-card mb-3" style="padding:16px;">
+  <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;">Feed addresses</h2>
+  <p class="feed-note" style="margin:0 0 12px;">
+    Paste one of these into Meta Commerce Manager or TikTok Catalog Manager as a
+    <strong>scheduled feed</strong>. They re-fetch on their own — nothing to upload again.
+  </p>
+
+  <div class="feed-url">
+    <span class="feed-url__tag">Meta / CSV</span>
+    <code id="feedCsv">{{ site_url }}{% url 'product_feed_csv' %}</code>
+    <button type="button" class="btn-ghost btn-sm" onclick="copyFeed('feedCsv', this)">
+      <i class="bi bi-clipboard"></i>
+    </button>
+    <a href="{% url 'product_feed_csv' %}" class="btn-ghost btn-sm" target="_blank" rel="noopener">
+      <i class="bi bi-box-arrow-up-right"></i>
+    </a>
+  </div>
+
+  <div class="feed-url">
+    <span class="feed-url__tag">TikTok / XML</span>
+    <code id="feedXml">{{ site_url }}{% url 'product_feed_xml' %}</code>
+    <button type="button" class="btn-ghost btn-sm" onclick="copyFeed('feedXml', this)">
+      <i class="bi bi-clipboard"></i>
+    </button>
+    <a href="{% url 'product_feed_xml' %}" class="btn-ghost btn-sm" target="_blank" rel="noopener">
+      <i class="bi bi-box-arrow-up-right"></i>
+    </a>
+  </div>
+
+  {% if not site_url %}
+  {% comment %}Without a site address the feed emits relative links, which every
+     network rejects. Worth saying loudly rather than letting the catalogue fail
+     on their end.{% endcomment %}
+  <p class="feed-note" style="color:#B3261E;margin:10px 0 0;">
+    <i class="bi bi-exclamation-triangle me-1"></i>
+    No website address is set, so the feed cannot build product links.
+    Set it in <a href="/settings/">Settings</a> before submitting the feed.
+  </p>
+  {% endif %}
+</div>
+
+{% if missing_image_products %}
+<div class="glass-card" style="padding:16px;">
+  <h2 style="font-size:15px;font-weight:700;margin:0 0 4px;">
+    Not being advertised — no usable photo
+  </h2>
+  <p class="feed-note" style="margin:0 0 12px;">
+    Meta and TikTok both reject an item with no image, so these are left out
+    entirely. Usually an import whose photo download failed: the product looks
+    fine on the list, but there is no file behind it.
+  </p>
+  <table class="feed-missing">
+    <thead><tr><th>Product</th><th>SKU</th><th></th></tr></thead>
+    <tbody>
+      {% for product in missing_image_products %}
+      <tr>
+        <td>{{ product.name }}</td>
+        <td>{{ product.sku|default:"—" }}</td>
+        <td class="text-end">
+          <button class="btn-ghost btn-sm" onclick="location.href='{% url 'product_list' %}?q={{ product.sku|urlencode }}'">
+            Find
+          </button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function copyFeed(id, btn) {
+    var text = document.getElementById(id).textContent.trim();
+    navigator.clipboard.writeText(text).then(function () {
+        var icon = btn.querySelector('i');
+        var was = icon.className;
+        icon.className = 'bi bi-check-lg';
+        setTimeout(function () { icon.className = was; }, 1200);
+    });
+}
+</script>
+{% endblock %}

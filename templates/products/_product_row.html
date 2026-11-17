@@ -1,0 +1,147 @@
+{% comment %}
+One product as a table row — the dense counterpart to _product_card.html.
+
+WHY THIS EXISTS
+The grid is a browsing layout: six image tiles per row, 187px wide, names
+truncated to two lines. That is the right shape for recognising a product you
+half-remember, and the wrong shape for the job this screen is actually used
+for — selecting forty rows and doing one thing to them. At 187px the checkbox
+is a 16px target sitting on top of a photo, the SKU is not shown at all, and a
+screen holds 24 products.
+
+A row holds the same product in a quarter of the height, shows the SKU and the
+category and the tags as text you can read down a column, and puts every
+checkbox in one vertical line so a selection is a single downward drag of the
+eye rather than a hunt across a grid.
+
+Both are kept because both are right sometimes. The toggle remembers which you
+picked.
+
+CONTRACT WITH THE SELECTION CODE
+The checkbox carries class="product-row-check" and value="{{ product.id }}",
+exactly as the card does, and calls the same updateProductBulkBar(). Every
+existing function — getSelectedProductIds, toggleSelectAllProducts,
+clearProductSelection — walks those two attributes and therefore works here
+untouched. The view toggle swaps which container is visible; it does not swap
+the selection model.
+{% endcomment %}
+
+<tr class="product-row product-card-col"
+    data-product-id="{{ product.id }}"
+    data-is-private="{% if product.is_private %}1{% else %}0{% endif %}"
+    data-source="{{ product.source }}"
+    data-complete="{% if product.weight and product.carton_length and product.carton_width and product.carton_height and product.carton_qty %}1{% else %}0{% endif %}">
+
+    <td class="prow-check">
+        <input type="checkbox" class="product-row-check" value="{{ product.id }}"
+               onchange="updateProductBulkBar()"
+               title="Select {{ product.name }}" aria-label="Select {{ product.name }}">
+    </td>
+
+    <td class="prow-media">
+        {% with product.images.all|first as img %}
+        {% if img %}
+        {% comment %}src, not image.url — an imported row may hold only a supplier
+           CDN link because the download failed. Same reasoning as the card.{% endcomment %}
+        <img src="{{ img.src }}" alt="" class="prow-img" loading="lazy"
+             {% if img.is_remote %}title="Image is linked from the supplier's CDN, not stored on this site."{% endif %}
+             onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+        <div class="prow-img-placeholder" style="display:none;"><i class="bi bi-box-seam"></i></div>
+        {% else %}
+        <div class="prow-img-placeholder"><i class="bi bi-box-seam"></i></div>
+        {% endif %}
+        {% endwith %}
+    </td>
+
+    <td class="prow-name">
+        <button type="button" class="prow-title" onclick="showProductDetail({{ product.id }})"
+                title="{{ product.name }}">{{ product.name }}</button>
+        <div class="prow-sub">
+            {% if product.sku %}<span class="prow-sku">{{ product.sku }}</span>{% endif %}
+            {% if product.has_variants %}
+            <span class="prow-variants" title="{{ product.active_variants|length }} variations">
+                <i class="bi bi-palette"></i> {{ product.active_variants|length }}
+            </span>
+            {% endif %}
+            {% if product.source_url %}
+            {% comment %}rel="noopener" because target="_blank" would otherwise hand
+               the opened page a handle on this one.{% endcomment %}
+            <a href="{{ product.source_url }}" target="_blank" rel="noopener noreferrer"
+               class="prow-supplier" title="Open the supplier's listing">
+                <i class="bi bi-box-arrow-up-right"></i> Supplier
+            </a>
+            {% endif %}
+        </div>
+    </td>
+
+    <td class="prow-cat">
+        {% if product.subcategory %}<span class="prow-cat-sub">{{ product.subcategory.name }}</span>
+        {% elif product.category %}<span class="prow-cat-sub">{{ product.category.name }}</span>
+        {% else %}<span class="prow-empty">—</span>{% endif %}
+    </td>
+
+    {% comment %}The whole tag set, not a truncated two. This column is why
+       somebody switches to list view when they are working through tags.{% endcomment %}
+    <td class="prow-tags">
+        {% for tag in product.tags.all %}
+        <span class="tag-chip" style="--tag:{{ tag.colour }};">{{ tag.name }}</span>
+        {% empty %}
+        <span class="prow-empty">—</span>
+        {% endfor %}
+    </td>
+
+    <td class="prow-price">
+        {% if product.has_variants %}<span class="prow-from">from</span> {% endif %}{{ product.display_price }}
+    </td>
+
+    <td class="prow-moq">{{ product.moq }}</td>
+
+    <td class="prow-status">
+        {% if product.is_draft %}<span class="product-badge draft" title="Draft">D</span>{% endif %}
+        {% if product.is_private %}<span class="product-badge private" title="Private">P</span>{% endif %}
+        {% if product.source == 'amazon' %}<span class="product-badge amazon">Amazon</span>{% endif %}
+        {% if product.source == 'noon' %}<span class="product-badge noon">Noon</span>{% endif %}
+        {% if product.ready_to_ship %}<span class="product-badge complete" title="Ready to ship"><i class="bi bi-truck"></i></span>{% endif %}
+        {% if product.weight and product.carton_length and product.carton_width and product.carton_height and product.carton_qty %}
+        <span class="product-badge complete" title="Shipping details complete"><i class="bi bi-check-circle"></i></span>
+        {% else %}
+        <span class="product-badge incomplete" title="Missing weight or carton details"><i class="bi bi-exclamation-circle"></i></span>
+        {% endif %}
+    </td>
+
+    <td class="prow-actions">
+        <button class="btn-ghost btn-sm" onclick="editProduct({{ product.id }})"
+                title="Edit product" aria-label="Edit {{ product.name }}">
+            <i class="bi bi-pencil"></i>
+        </button>
+        <a href="/products/supplier-quote/{{ product.id }}/" class="btn-ghost btn-sm"
+           style="color:var(--info);" title="Supplier quote"
+           aria-label="Supplier quote for {{ product.name }}">
+            <i class="bi bi-send"></i>
+        </a>
+        {% comment %}Shares the id pattern the price calculator writes to, so the
+           button enables itself on this row exactly as it does on a card.{% endcomment %}
+        <button id="row-save-btn-{{ product.id }}" class="btn-ghost btn-sm"
+                onclick="saveProductPrices({{ product.id }})" disabled
+                title="Save calculated prices" aria-label="Save calculated prices for {{ product.name }}">
+            <i class="bi bi-floppy"></i>
+        </button>
+        {% if product.is_private %}
+        <button class="btn-ghost btn-sm" style="color:var(--accent-3)"
+                onclick="togglePrivate({{ product.id }}, this)"
+                title="Restore to public" aria-label="Restore {{ product.name }} to public">
+            <i class="bi bi-unlock"></i>
+        </button>
+        {% else %}
+        <button class="btn-ghost btn-sm" onclick="togglePrivate({{ product.id }}, this)"
+                title="Move to private" aria-label="Move {{ product.name }} to private">
+            <i class="bi bi-lock"></i>
+        </button>
+        {% endif %}
+        <button class="btn-danger btn-sm"
+                onclick="confirmDelete('/products/delete/{{ product.id }}/', '{{ product.name|escapejs }}')"
+                title="Delete product" aria-label="Delete {{ product.name }}">
+            <i class="bi bi-trash"></i>
+        </button>
+    </td>
+</tr>
