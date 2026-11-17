@@ -1,51 +1,104 @@
+{% extends 'portal/base.html' %}
 {% load static %}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Login{% endblock %} — {{ settings.company_name|default:'LogiManager' }}</title>
-    <meta name="robots" content="noindex, nofollow">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'style.css' %}?v=warm">
-    <style>
-        body {
-            min-height: 100vh; display: flex; align-items: center; justify-content: center;
-            background: linear-gradient(135deg, #FFF5F2 0%, #FCE9E4 50%, #F8DDD6 100%);
-            font-family: var(--font-family); padding: 1.5rem 1rem;
-        }
-        .auth-card {
-            background: #fff; border: 1px solid var(--border-color); border-radius: var(--radius-lg);
-            width: 100%; max-width: 440px; padding: 2.5rem; box-shadow: var(--shadow-lg);
-        }
-        .auth-brand { font-size: 3rem; margin-bottom: 0.25rem; text-align: center; }
-        .auth-card .form-control, .auth-card .input-group-text {
-            background: var(--bg-input); border-color: var(--border-color); color: var(--text-primary);
-        }
-        .auth-card .form-control:focus {
-            background: #fff; border-color: var(--accent-1);
-            box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.12);
-        }
-        .auth-card .input-group-text { color: var(--text-muted); }
-    </style>
-</head>
-<body>
+
+{% comment %}------------------------------------------------------------------
+   THE SHELL EVERY AUTH PAGE SITS IN — login, register, the 2FA code, and both
+   password-reset steps.
+
+   It used to be a standalone HTML document carrying the BACK-OFFICE styling.
+   That made the customer journey flip themes mid-flow: someone browsing the
+   portal (navbar, gold-on-white branding, footer) pressed Customer Login and
+   landed on a bare centred card with none of it, then flipped back again on
+   arrival at their dashboard. The 2FA step made it obvious because it puts a
+   second admin-looking page in the middle of a customer's sign-in.
+
+   Extending the portal base fixes the whole flow at once rather than patching
+   the one page it was noticed on — patching only the 2FA page would have given
+   customers TWO theme changes instead of one.
+
+   It also removes three CDN dependencies. The old shell pulled Bootstrap,
+   Bootstrap Icons and Inter from jsdelivr and fonts.googleapis.com, while the
+   rest of the site serves those locally. Google Fonts is blocked in mainland
+   China — where this company operates from — so the login page was the one page
+   on the site that could render unstyled for its own staff.
+
+   Staff see this too. That is deliberate: it is the public front door, and the
+   back-office theme starts once you are actually inside it.
+
+   The five blocks below (title, heading, subheading, form, footer_links) are
+   unchanged, so no child template needed editing.
+---------------------------------------------------------------{% endcomment %}
+
+{% block meta_robots %}noindex, nofollow{% endblock %}
+{% block body_class %}auth-page{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Centre the card in whatever space is left between the fixed navbar and
+       the footer, rather than in the viewport — the navbar exists now. */
+    .auth-shell {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: clamp(1.5rem, 6vw, 4rem) 1rem;
+        min-height: 62vh;
+    }
+
+    .auth-card {
+        background: #fff;
+        border: 1px solid var(--border-color, #E3E6EA);
+        border-radius: 16px;
+        width: 100%;
+        max-width: 440px;
+        padding: clamp(1.6rem, 4vw, 2.5rem);
+        box-shadow: 0 1px 2px rgba(16, 24, 40, .04), 0 12px 32px -12px rgba(16, 24, 40, .16);
+    }
+
+    .auth-brand { margin-bottom: .75rem; text-align: center; }
+    .auth-brand-img {
+        width: 48px; height: 48px;
+        border-radius: 12px;
+        object-fit: contain;
+    }
+
+    .auth-card .form-control,
+    .auth-card .input-group-text {
+        border-color: var(--border-color, #E3E6EA);
+    }
+    .auth-card .form-control:focus {
+        background: #fff;
+        border-color: #B08421;
+        box-shadow: 0 0 0 3px rgba(176, 132, 33, .20);
+    }
+    .auth-card .input-group-text { background: #F7F8FA; color: #6B7480; }
+
+    /* The one-time code: wide, evenly spaced digits that are easy to check
+       against the email before pressing the button. */
+    .auth-card input[name="code"] {
+        font-size: 1.5rem;
+        letter-spacing: .45em;
+        text-align: center;
+        font-variant-numeric: tabular-nums;
+        padding-left: .45em;   /* offsets the trailing letter-space so it looks centred */
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="auth-shell">
     <div class="auth-card">
-        <div class="auth-brand">📦</div>
-        <h4 class="fw-bold mb-1 text-center">{% block heading %}Welcome back{% endblock %}</h4>
+
+        <div class="auth-brand">
+            <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}"
+                 alt="" width="48" height="48" class="auth-brand-img" decoding="async">
+        </div>
+
+        <h1 class="h5 fw-bold mb-1 text-center">{% block heading %}Welcome back{% endblock %}</h1>
         <p class="text-secondary small mb-4 text-center">{% block subheading %}Log in to continue{% endblock %}</p>
 
-        {% if messages %}
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags|default:'info' }} py-2 small mb-3" role="alert">
-                {{ message }}
-            </div>
-            {% endfor %}
-        {% endif %}
+        {% comment %}Flash messages are NOT rendered here. portal/base.html emits
+           them above <main>, and repeating them would show every error twice.
+        {% endcomment %}
 
         {% block form %}{% endblock %}
 
@@ -54,6 +107,7 @@
             <a href="/" class="text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Back to website</a>
             {% endblock %}
         </div>
+
     </div>
-</body>
-</html>
+</div>
+{% endblock %}

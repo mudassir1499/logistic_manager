@@ -15,7 +15,7 @@ from .models import Profile
 
 
 @receiver(post_save, sender=settings.AUTH_USER_MODEL)
-def ensure_profile(sender, instance, created, **kwargs):
+def ensure_profile(sender, instance, created, raw=False, **kwargs):
     """
     Create a Profile the first time a User is saved.
 
@@ -27,6 +27,11 @@ def ensure_profile(sender, instance, created, **kwargs):
     We use ``get_or_create`` rather than ``create`` so this is safe even if a
     Profile was already created explicitly (e.g. inside the data migration).
     """
+    # ``raw=True`` means the save comes from loaddata/fixtures, which restore the
+    # Profile rows themselves from the dump. Auto-creating one here would collide
+    # with the incoming Profile (OneToOne) and abort the import — so skip it.
+    if raw:
+        return
     if not created:
         return
 

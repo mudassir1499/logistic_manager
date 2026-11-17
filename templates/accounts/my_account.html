@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}My Account{% endblock %}
+{% block page_title %}My Account{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title"><i class="bi bi-person-circle me-2"></i>My Account</h1>
+    <p class="text-secondary mb-0">View your role and update your password</p>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card h-100">
+            <div class="card-body">
+                <h6 class="fw-bold text-uppercase text-secondary small mb-3">Account details</h6>
+                <dl class="row mb-0 small">
+                    <dt class="col-5 text-secondary">Username</dt>
+                    <dd class="col-7 fw-semibold">{{ request.user.username }}</dd>
+                    <dt class="col-5 text-secondary">Email</dt>
+                    <dd class="col-7">{{ request.user.email|default:"—" }}</dd>
+                    <dt class="col-5 text-secondary">Role</dt>
+                    <dd class="col-7"><span class="badge bg-secondary">{{ profile.get_role_display }}</span></dd>
+                    {% if profile.is_customer %}
+                    <dt class="col-5 text-secondary">Customer</dt>
+                    <dd class="col-7">{{ profile.customer.name }}</dd>
+                    {% else %}
+                    <dt class="col-5 text-secondary">Modules</dt>
+                    <dd class="col-7">
+                        {% if profile.is_admin %}All modules
+                        {% else %}
+                            {% for m in granted_modules %}<span class="badge bg-light text-dark border me-1 mb-1 text-capitalize">{{ m }}</span>{% empty %}—{% endfor %}
+                        {% endif %}
+                    </dd>
+                    {% endif %}
+                    <dt class="col-5 text-secondary">Email verified</dt>
+                    <dd class="col-7">
+                        {% if profile.email_verified %}<span class="badge bg-success">Verified</span>
+                        {% else %}<span class="badge bg-warning text-dark">Not verified</span>
+                        <a href="{% url 'account_resend_verification' %}" class="small ms-1">Resend link</a>{% endif %}
+                    </dd>
+                </dl>
+
+                <hr>
+                <h6 class="fw-bold text-uppercase text-secondary small mb-2">Two-factor authentication</h6>
+                <p class="small text-secondary mb-2">
+                    {% if profile.two_factor_enabled %}
+                        <i class="bi bi-shield-check text-success me-1"></i>Enabled — logging in requires a code sent to your email.
+                    {% else %}
+                        <i class="bi bi-shield-exclamation text-warning me-1"></i>Disabled — only your password protects this account.
+                    {% endif %}
+                </p>
+                {% if profile.is_admin %}
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="toggle_2fa">
+                    {% if profile.two_factor_enabled %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger"
+                            onclick="return confirm('Disable two-factor authentication?');">
+                        <i class="bi bi-shield-x me-1"></i>Disable 2FA
+                    </button>
+                    {% else %}
+                    <button type="submit" class="btn btn-sm btn-primary">
+                        <i class="bi bi-shield-lock me-1"></i>Enable 2FA
+                    </button>
+                    {% endif %}
+                </form>
+                {% else %}
+                <div class="small text-secondary">
+                    <i class="bi bi-info-circle me-1"></i>This setting is managed by your administrator.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body">
+                <h6 class="fw-bold text-uppercase text-secondary small mb-3">Change password</h6>
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Current password</label>
+                        <input type="password" name="current_password" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">New password</label>
+                        <input type="password" name="new_password" class="form-control" required>
+                        <div class="form-text small">At least 8 characters, with an uppercase, a lowercase, and a digit.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small fw-semibold">Confirm new password</label>
+                        <input type="password" name="confirm_password" class="form-control" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-shield-lock me-1"></i>Update Password</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

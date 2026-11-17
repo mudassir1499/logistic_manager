@@ -36,6 +36,10 @@
         </button>
     </div>
 </form>
+
+{% comment %}Same button as the login page: for a new visitor this IS registration -
+   the account is created on first sign-in, so there is no separate path to offer.{% endcomment %}
+{% include "accounts/_google_button.html" %}
 {% endblock %}
 
 {% block footer_links %}

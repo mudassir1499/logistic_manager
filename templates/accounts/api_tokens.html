@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}API Tokens{% endblock %}
+{% block page_title %}API Tokens{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title"><i class="bi bi-key me-2"></i>API Tokens</h1>
+    <p class="text-secondary mb-0">Bearer tokens for the 1688 product-sourcing browser extension</p>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+{% comment %}
+Shown on exactly one request — the one that created the token. Only a SHA-256
+hash is stored, so if the user navigates away without copying it, the token is
+unrecoverable and they must issue a new one. The warning says so plainly.
+{% endcomment %}
+{% if new_token_plaintext %}
+<div class="card mb-4" style="border:2px solid var(--warning, #C2410C);">
+    <div class="card-body">
+        <h5 class="mb-2"><i class="bi bi-exclamation-triangle me-2"></i>Copy this token now</h5>
+        <p class="text-secondary small">
+            This is the only time it will ever be shown. We store only a hash, so
+            it cannot be displayed again. If you lose it, revoke it and create another.
+        </p>
+        <div class="d-flex gap-2 align-items-center">
+            <input type="text" class="form-control font-monospace" id="newTokenValue"
+                   value="{{ new_token_plaintext }}" readonly onclick="this.select()">
+            <button class="btn btn-primary" type="button" onclick="copyToken()">
+                <i class="bi bi-clipboard me-1"></i>Copy
+            </button>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header"><strong>Create a token</strong></div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create">
+                    <label class="form-label">Name</label>
+                    <input type="text" name="name" class="form-control mb-3"
+                           placeholder="e.g. Laptop Chrome" maxlength="100">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-plus-lg me-1"></i>Create token
+                    </button>
+                </form>
+                <hr>
+                <p class="small text-secondary mb-0">
+                    Paste the token into the extension&rsquo;s Options page, along with
+                    this site&rsquo;s address. A token can do exactly what your account
+                    can &mdash; no more.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-header"><strong>Your tokens</strong></div>
+            <div class="card-body p-0">
+                {% if tokens %}
+                <div class="table-responsive">
+                    <table class="table mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Token</th>
+                                <th>Last used</th>
+                                <th>Status</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for token in tokens %}
+                            <tr>
+                                <td>{{ token.name }}</td>
+                                <td class="font-monospace small text-secondary">{{ token.prefix }}&hellip;</td>
+                                <td class="small text-secondary">
+                                    {{ token.last_used_at|default:"never" }}
+                                </td>
+                                <td>
+                                    {% if token.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Revoked</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if token.is_active %}
+                                    <form method="post" class="d-inline"
+                                          onsubmit="return confirm('Revoke this token? The extension using it will stop working immediately.');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="revoke">
+                                        <input type="hidden" name="token_id" value="{{ token.id }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">Revoke</button>
+                                    </form>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="p-4 text-center text-secondary small">
+                    No tokens yet. Create one to connect the browser extension.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyToken() {
+    var input = document.getElementById('newTokenValue');
+    input.select();
+    // navigator.clipboard needs a secure context (https or localhost); fall back
+    // to the legacy command so this still works over plain http on a LAN address.
+    if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(input.value);
+    } else {
+        document.execCommand('copy');
+    }
+}
+</script>
+{% endblock %}

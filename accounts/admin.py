@@ -10,7 +10,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from django.contrib.auth.models import User
 
-from .models import Profile
+from .models import Profile, AuditLog
 
 
 class ProfileInline(admin.StackedInline):
@@ -23,6 +23,7 @@ class ProfileInline(admin.StackedInline):
         'role', 'customer',
         'perm_orders', 'perm_products', 'perm_customers',
         'perm_khata', 'perm_noon_labels', 'perm_support', 'perm_settings',
+        'two_factor_enabled', 'email_verified',
     )
     raw_id_fields = ('customer',)
 
@@ -50,3 +51,18 @@ class ProfileAdmin(admin.ModelAdmin):
     list_filter = ('role',)
     search_fields = ('user__username', 'user__email', 'customer__name')
     raw_id_fields = ('user', 'customer')
+
+
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    """Read-only audit trail in Django admin."""
+    list_display = ('created_at', 'user', 'action', 'target', 'ip_address')
+    list_filter = ('action',)
+    search_fields = ('target', 'detail', 'user__username')
+    readonly_fields = ('user', 'action', 'target', 'detail', 'ip_address', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

@@ -62,6 +62,16 @@
                 {% endif %}
 
                 <div class="col-12">
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input" id="two_factor_enabled" name="two_factor_enabled"
+                               {% if profile.two_factor_enabled %}checked{% endif %}>
+                        <label class="form-check-label small" for="two_factor_enabled">
+                            <i class="bi bi-shield-lock me-1"></i>Require two-factor authentication (emailed code at login)
+                        </label>
+                    </div>
+                </div>
+
+                <div class="col-12">
                     <label class="form-label small fw-semibold d-block">Module permissions (staff & support)</label>
                     <div class="row g-2">
                         {% for module in modules %}

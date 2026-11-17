@@ -66,7 +66,7 @@ class Profile(models.Model):
 
     # The list of back-office modules that can be individually granted to staff.
     # Keep this in sync with the ``perm_*`` fields and MODULE_FIELD_MAP below.
-    MODULES = ['orders', 'products', 'customers', 'khata', 'noon_labels', 'support', 'settings']
+    MODULES = ['orders', 'quotes', 'products', 'customers', 'khata', 'noon_labels', 'support', 'settings']
 
     # OneToOne link to the actual login account. CASCADE so deleting a User also
     # deletes its Profile (there is no meaningful Profile without a User).
@@ -100,12 +100,24 @@ class Profile(models.Model):
     # the flag exists so it can be granted deliberately if ever needed.
     # -------------------------------------------------------------------------
     perm_orders = models.BooleanField(default=False)
+    # Quotations (the quotes app). Added by migration 0007.
+    perm_quotes = models.BooleanField(default=False)
     perm_products = models.BooleanField(default=False)
     perm_customers = models.BooleanField(default=False)
     perm_khata = models.BooleanField(default=False)
     perm_noon_labels = models.BooleanField(default=False)
     perm_support = models.BooleanField(default=False)
     perm_settings = models.BooleanField(default=False)
+
+    # Two-factor authentication via emailed one-time code. Off by default; each
+    # user opts in from My Account. When on, login requires a 6-digit code sent
+    # to the account email after the password step.
+    two_factor_enabled = models.BooleanField(default=False)
+
+    # Whether the account's email address has been confirmed via the emailed
+    # verification link. Existing accounts are marked verified by the migration;
+    # new self-registrations start unverified and see a gentle banner.
+    email_verified = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -114,6 +126,7 @@ class Profile(models.Model):
     # flag up dynamically instead of a long if/elif chain.
     MODULE_FIELD_MAP = {
         'orders': 'perm_orders',
+        'quotes': 'perm_quotes',
         'products': 'perm_products',
         'customers': 'perm_customers',
         'khata': 'perm_khata',
@@ -128,6 +141,32 @@ class Profile(models.Model):
 
     def __str__(self):
         return f'{self.user.get_username()} ({self.get_role_display()})'
+
+    @classmethod
+    def for_user(cls, user):
+        """
+        Return ``user``'s Profile, creating a default one if it is missing.
+
+        ``user.profile`` raises ``RelatedObjectDoesNotExist`` when no row exists,
+        which is a 500 rather than anything the caller can act on. The post_save
+        signal in signals.py only fires for newly created Users, so any account
+        that predates that signal — the original ``createsuperuser`` account, and
+        anyone imported by an early loaddata — has no Profile at all. Those users
+        are rejected by every guard in decorators.py and used to crash the user
+        editor outright.
+
+        The role default matches the signal's: superusers administer the system,
+        everyone else starts as a customer.
+        """
+        profile, created = cls.objects.get_or_create(
+            user=user,
+            defaults={'role': cls.ROLE_ADMIN if user.is_superuser else cls.ROLE_CUSTOMER},
+        )
+        if created and profile.role == cls.ROLE_ADMIN:
+            for field in cls.MODULE_FIELD_MAP.values():
+                setattr(profile, field, True)
+            profile.save()
+        return profile
 
     # -------------------------------------------------------------------------
     # ROLE HELPERS
@@ -198,3 +237,120 @@ class Profile(models.Model):
         if self.is_support:
             return 'support_queue'
         return 'dashboard'
+
+
+class AuditLog(models.Model):
+    """
+    A permanent record of who did what, when — for accountability across the
+    multi-role team (order/customer/user/settings changes, logins, payments).
+
+    Rows are written via ``accounts.services.log_action`` and are intentionally
+    never edited or deleted from the UI. Admin-only viewer at /accounts/audit/.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,                      # NULL = system action or deleted account
+        on_delete=models.SET_NULL,
+        related_name='audit_entries',
+    )
+    action = models.CharField(max_length=50, db_index=True)   # e.g. 'login', 'customer.delete'
+    target = models.CharField(max_length=200, blank=True, default='')  # e.g. 'Customer #12 (Acme)'
+    detail = models.TextField(blank=True, default='')
+    ip_address = models.CharField(max_length=45, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Audit Log Entry'
+        verbose_name_plural = 'Audit Log'
+
+    def __str__(self):
+        who = self.user.get_username() if self.user else 'system'
+        return f'{who}: {self.action} {self.target}'.strip()
+
+
+class ApiToken(models.Model):
+    """
+    A long-lived bearer token that lets a non-browser client authenticate.
+
+    The 1688 browser extension runs on alibaba.com pages, not on this site, so
+    it has no session cookie and cannot use the normal login. It authenticates
+    with ``Authorization: Bearer <token>`` instead.
+
+    ONLY THE HASH IS STORED. The plaintext token is shown once, at creation, and
+    is unrecoverable afterwards — the same contract as an SSH key or a GitHub
+    PAT. A leaked database therefore does not hand an attacker working tokens.
+
+    Every request through a token acts as the token's ``user``, so the existing
+    per-module permission checks (``profile.can('products')``) still apply — a
+    token can never do more than the person it belongs to.
+    """
+
+    # SHA-256 of the plaintext token, hex-encoded (64 chars). Indexed and unique
+    # because every authenticated request looks a token up by this column.
+    token_hash = models.CharField(max_length=64, unique=True, db_index=True)
+
+    # First 8 characters of the plaintext, stored so the UI can show the user
+    # WHICH token a row refers to without being able to reconstruct it.
+    prefix = models.CharField(max_length=12, blank=True, default='')
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='api_tokens',
+    )
+
+    name = models.CharField(
+        max_length=100,
+        default='Browser extension',
+        help_text='What this token is used for, e.g. "Laptop Chrome".',
+    )
+
+    # Revocation is a flag rather than a delete so the audit trail survives.
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    # Written on every successful authentication so an unused token is easy to
+    # spot and revoke. Deliberately not indexed — it is display-only.
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'API Token'
+
+    def __str__(self):
+        return f'{self.name} ({self.prefix}…) for {self.user.get_username()}'
+
+    @staticmethod
+    def hash_token(raw):
+        """
+        Hash a plaintext token for storage or lookup.
+
+        Plain SHA-256, deliberately NOT a slow password hash. Tokens are 32
+        bytes of cryptographic randomness, so there is no dictionary to attack
+        and no need for a work factor — and a slow hash would add that cost to
+        every single API request.
+        """
+        import hashlib
+        return hashlib.sha256(raw.encode('utf-8')).hexdigest()
+
+    @classmethod
+    def issue(cls, user, name='Browser extension'):
+        """
+        Create a token for ``user``.
+
+        Returns:
+            tuple[ApiToken, str]: the saved row and the PLAINTEXT token. The
+            caller must show the plaintext to the user immediately — it cannot
+            be recovered from the database afterwards.
+        """
+        import secrets
+        raw = 'mlk_' + secrets.token_urlsafe(32)
+        token = cls.objects.create(
+            user=user,
+            name=name or 'Browser extension',
+            token_hash=cls.hash_token(raw),
+            prefix=raw[:12],
+        )
+        return token, raw

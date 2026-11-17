@@ -37,6 +37,10 @@
         </button>
     </div>
 </form>
+
+{% comment %}Outside the <form> on purpose: it is a link, not a submit, and
+nesting it would make Enter in the password field ambiguous.{% endcomment %}
+{% include "accounts/_google_button.html" %}
 {% endblock %}
 
 {% block footer_links %}

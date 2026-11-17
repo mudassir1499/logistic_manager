@@ -104,3 +104,85 @@ def customer_required(view_func):
         request.customer = profile.customer
         return view_func(request, *args, **kwargs)
     return wrapper
+
+
+def api_token_required(module=None):
+    """
+    Guard a JSON endpoint that is called by the browser extension.
+
+    The extension runs on 1688.com pages, so it has no session cookie and no CSRF
+    token. It authenticates with ``Authorization: Bearer <token>`` instead, where
+    the token was issued by ``ApiToken.issue``.
+
+    On success the decorator sets ``request.user`` to the token's owner and
+    ``request.api_token`` to the token row, so downstream code can treat the
+    request as an ordinary authenticated one.
+
+    Args:
+        module (str | None): When given, the token's owner must also hold that
+            module permission. This is what stops a customer-role token from
+            reaching the product-import endpoint — a token never grants more
+            than the person it belongs to already has.
+
+    Returns:
+        A decorator. Failures return JSON with 401 (bad/missing token) or 403
+        (valid token, insufficient permission) rather than redirecting, because
+        the caller is a script and cannot follow a login redirect.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def wrapper(request, *args, **kwargs):
+            from django.http import JsonResponse
+            from django.utils import timezone
+
+            from .models import ApiToken
+
+            header = request.META.get('HTTP_AUTHORIZATION', '')
+            if not header.startswith('Bearer '):
+                return JsonResponse(
+                    {'success': False, 'error': 'missing_token',
+                     'message': 'Authorization: Bearer <token> header required.'},
+                    status=401,
+                )
+
+            raw = header[len('Bearer '):].strip()
+            if not raw:
+                return JsonResponse(
+                    {'success': False, 'error': 'missing_token',
+                     'message': 'Empty bearer token.'},
+                    status=401,
+                )
+
+            token = (
+                ApiToken.objects
+                .select_related('user', 'user__profile')
+                .filter(token_hash=ApiToken.hash_token(raw), is_active=True)
+                .first()
+            )
+            # Same response for "no such token" and "revoked token" — telling the
+            # caller which one it was would confirm that a guessed token exists.
+            if token is None or not token.user.is_active:
+                return JsonResponse(
+                    {'success': False, 'error': 'invalid_token',
+                     'message': 'Token is invalid or has been revoked.'},
+                    status=401,
+                )
+
+            profile = getattr(token.user, 'profile', None)
+            if module and (profile is None or not profile.can(module)):
+                return JsonResponse(
+                    {'success': False, 'error': 'forbidden',
+                     'message': f'This account may not use the {module} module.'},
+                    status=403,
+                )
+
+            # update_fields so this write cannot clobber a concurrent edit to
+            # any other column on the row.
+            token.last_used_at = timezone.now()
+            token.save(update_fields=['last_used_at'])
+
+            request.user = token.user
+            request.api_token = token
+            return view_func(request, *args, **kwargs)
+        return wrapper
+    return decorator
