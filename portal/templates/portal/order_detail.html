@@ -1,21 +1,123 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
-{% block title %}Order #{{ order.id }} — {{ customer.name }}{% endblock %}
+{% block title %}Order {{ order.display_reference }} — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% block page_title %}Order {{ order.display_reference }}{% endblock %}
+{% comment %}NB: inside Django's date filter every letter is a format code, so a
+   quoted 'at' rendered as "'p.m.31'" (a=am/pm, t=days-in-month).{% endcomment %}
+{% block page_subtitle %}<p class="app-topbar-sub">{{ order.date|date:"F d, Y · H:i" }}</p>{% endblock %}
+{% block page_actions %}<a href="{% url 'portal_orders' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>All orders</a>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-            <div>
-                <h4 class="fw-bold mb-1">Order #{{ order.id }}</h4>
-                <p class="text-secondary mb-0 small">{{ order.date|date:"F d, Y 'at' H:i" }}</p>
+
+        {% comment %}The tracking reference, where the customer will look for it.
+
+           Shown here rather than only in an email so it survives the email being
+           deleted. The page it points at carries no customer details, prices or
+           totals, which is what makes it safe to forward to a freight agent or a
+           colleague.
+        {% endcomment %}
+        {% if order.tracking_number %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                <i class="bi bi-geo-alt" style="font-size:24px;color:var(--color-primary,#b08421);"></i>
+                <div style="flex:1 1 240px;min-width:0;">
+                    <strong>Tracking number</strong>
+                    <div style="font-size:17px;font-weight:700;letter-spacing:.04em;">{{ order.tracking_number }}</div>
+                    <div class="text-secondary" style="font-size:12px;">
+                        Safe to share — shows shipment contents and progress only.
+                    </div>
+                </div>
+                <a href="{% url 'track_shipment' %}?number={{ order.tracking_number|urlencode }}"
+                   class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener">
+                    <i class="bi bi-box-arrow-up-right me-1"></i>Open tracking page
+                </a>
             </div>
-            <a href="{% url 'portal_orders' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back to Orders
-            </a>
         </div>
+        {% endif %}
+
+        {% comment %}WhatsApp handoff.
+
+           The order is saved either way — this sends it to the team's phone,
+           which is where they actually work. Click-to-chat opens the customer's
+           own WhatsApp with the order written out; they press send. Nothing is
+           sent on their behalf, so the button says "Send", not "Sent".
+        {% endcomment %}
+        {% if whatsapp_url %}
+        <div class="card shadow-sm border-0 mb-4" id="waCard">
+            <div class="card-body d-flex flex-wrap align-items-center gap-3">
+                <i class="bi bi-whatsapp" style="font-size:26px;color:#25D366;"></i>
+                <div style="flex:1 1 240px;min-width:0;">
+                    <strong>Send this order to our team on WhatsApp</strong>
+                    <div class="text-secondary" style="font-size:13px;">
+                        Opens WhatsApp with your order details ready — just press send.
+                    </div>
+                </div>
+                <a href="{{ whatsapp_url }}" target="_blank" rel="noopener"
+                   id="waSendLink" class="btn"
+                   style="background:#25D366;color:#fff;font-weight:700;white-space:nowrap;">
+                    <i class="bi bi-whatsapp me-1"></i> Send on WhatsApp
+                </a>
+            </div>
+        </div>
+
+        {% if whatsapp_autoopen %}
+        <script>
+        // Fired once, straight after checkout. Browsers block window.open outside
+        // a user gesture often enough that this cannot be the only route — the
+        // button above is the reliable one and stays regardless.
+        (function () {
+            var link = document.getElementById('waSendLink');
+            if (link) window.open(link.href, '_blank', 'noopener');
+        })();
+        </script>
+        {% endif %}
+        {% endif %}
+
+        {% comment %}Shipment tracking lives in its own card so each shipment's
+           status reads as a separate block instead of being interleaved with
+           the invoice items below.{% endcomment %}
+        {% if shipments %}
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header py-3">
+                <h5 class="fw-bold mb-0"><i class="bi bi-truck me-2 text-primary"></i>Shipment Tracking</h5>
+            </div>
+            <div class="card-body">
+                {% for shipment in shipments %}
+                <div class="{% if not forloop.last %}border-bottom pb-4 mb-4{% endif %}">
+                    <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                        <strong class="small">Shipment #{{ shipment.shipment_no }}</strong>
+                        {% if shipment.shipment_name %}<span class="small text-secondary">— {{ shipment.shipment_name }}</span>{% endif %}
+                        <span class="badge bg-light text-dark border">{{ shipment.method|title }}</span>
+                        {% if shipment.transit %}
+                        <span class="badge bg-primary">{{ shipment.transit.get_status_display }}</span>
+                        {% else %}
+                        <span class="badge bg-secondary">Not started</span>
+                        {% endif %}
+                    </div>
+                    <div class="ship-timeline">
+                        {% for value, label in timeline_steps %}
+                        <div class="ship-step {% if shipment.transit_step >= forloop.counter0 %}done{% endif %}">
+                            <span class="ship-dot"></span>
+                            <span class="ship-label">{{ label }}</span>
+                        </div>
+                        {% if not forloop.last %}<div class="ship-line {% if shipment.transit_step > forloop.counter0 %}done{% endif %}"></div>{% endif %}
+                        {% endfor %}
+                    </div>
+                    {% if not shipment.transit %}
+                    <div class="small text-secondary mt-2">Tracking will start once this shipment is being prepared.</div>
+                    {% else %}
+                    <div class="small text-secondary mt-2">Last update: {{ shipment.transit.updated_at|date:"M d, Y H:i" }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
 
         <div class="row g-4 mb-4">
             <div class="col-lg-8">
@@ -29,9 +131,9 @@
                                 <thead>
                                     <tr>
                                         <th class="ps-4">Product</th>
-                                        <th>Qty</th>
-                                        <th>Unit Price</th>
-                                        <th>Subtotal</th>
+                                        <th class="text-end">Qty</th>
+                                        <th class="text-end">Unit Price</th>
+                                        <th class="text-end pe-4">Subtotal</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -41,15 +143,18 @@
                                             <i class="bi bi-truck me-1"></i>Shipment #{{ shipment.shipment_no }}
                                             {% if shipment.shipment_name %}— {{ shipment.shipment_name }}{% endif %}
                                             <span class="badge bg-light text-dark ms-1">{{ shipment.method|title }}</span>
+                                            {% if shipment.transit %}
+                                            <span class="badge bg-primary ms-1">{{ shipment.transit.get_status_display }}</span>
+                                            {% endif %}
                                         </td>
                                     </tr>
                                     {% for item in shipment.items %}
                                     <tr>
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
-                                                {% with img=item.product.images.first %}
+                                                {% with img=item.product.images.all|first %}
                                                 {% if img %}
-                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                <img src="{{ img.src }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
                                                 {% else %}
                                                 <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                                                     <i class="bi bi-image text-muted"></i>
@@ -58,6 +163,7 @@
                                                 {% endwith %}
                                                 <div>
                                                     <span class="fw-medium">{{ item.product.name }}</span>
+{% if item.variant %}<br><small class="text-secondary">{{ item.variant.name }}</small>{% endif %}
                                                     {% if item.product.ready_to_ship %}
                                                     <br><span class="badge bg-success" style="font-size:10px;"><i class="bi bi-truck me-1"></i>Ready to Ship</span>
                                                     {% endif %}
@@ -69,16 +175,25 @@
                                                 {% if item.carton_mark %}<div><strong>Carton Mark:</strong> {{ item.carton_mark }}</div>{% endif %}
                                                 {% if item.carton_asn %}<div><strong>Carton ASN:</strong> {{ item.carton_asn }}</div>{% endif %}
                                                 {% if item.carton_quantity > 1 %}<div><strong>Carton Qty:</strong> {{ item.carton_quantity }}</div>{% endif %}
-                                                {% if item.shipping_label %}<div><a href="{{ item.shipping_label.url }}" target="_blank"><i class="bi bi-file-earmark-arrow-down me-1"></i>Shipping Label</a></div>{% endif %}
-                                                {% if item.carton_label %}<div><a href="{{ item.carton_label.url }}" target="_blank"><i class="bi bi-file-earmark-arrow-down me-1"></i>Carton Label</a></div>{% endif %}
+                                                {% if item.shipping_label %}<div><a href="{{ item.shipping_label.url }}" target="_blank" rel="noopener"><i class="bi bi-file-earmark-arrow-down me-1"></i>Shipping Label</a></div>{% endif %}
+                                                {% if item.carton_label %}<div><a href="{{ item.carton_label.url }}" target="_blank" rel="noopener"><i class="bi bi-file-earmark-arrow-down me-1"></i>Carton Label</a></div>{% endif %}
                                             </div>
                                             {% endif %}
                                         </td>
-                                        <td>{{ item.quantity }}</td>
-                                        <td>{{ item.price }} {{ settings.currency }}</td>
-                                        <td class="fw-medium">{{ item.subtotal }} {{ settings.currency }}</td>
+                                        <td class="text-end">{{ item.quantity }}</td>
+                                        <td class="text-end text-secondary">{{ item.price|floatformat:2 }}</td>
+                                        <td class="text-end pe-4 fw-medium">{{ item.subtotal|floatformat:2 }} <span class="text-secondary fw-normal" style="font-size:12px;">{{ settings.currency_symbol }}</span></td>
                                     </tr>
                                     {% endfor %}
+                                    {% comment %}The view has always computed these two per
+                                       shipment; nothing rendered them, so a split order gave
+                                       no way to see what each shipment was worth.{% endcomment %}
+                                    <tr class="shipment-subtotal-row">
+                                        <td class="ps-4 text-secondary small">Shipment #{{ shipment.shipment_no }} subtotal</td>
+                                        <td class="text-end text-secondary small">{{ shipment.total_qty }}</td>
+                                        <td></td>
+                                        <td class="text-end pe-4 fw-semibold small">{{ shipment.subtotal|floatformat:2 }} {{ settings.currency_symbol }}</td>
+                                    </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
@@ -88,55 +203,78 @@
             </div>
 
             <div class="col-lg-4">
-                <div class="card shadow-sm border-0">
+                <div class="card shadow-sm border-0 order-summary-sticky">
                     <div class="card-header py-3">
                         <h5 class="fw-bold mb-0"><i class="bi bi-receipt me-2 text-primary"></i>Order Summary</h5>
                     </div>
                     <div class="card-body">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-secondary">Subtotal</span>
-                            <span class="fw-medium">{{ total }} {{ settings.currency }}</span>
+                        <div class="summary-row">
+                            <span class="text-secondary">Goods subtotal</span>
+                            <span class="fw-medium">{{ total|floatformat:2 }} {{ settings.currency_symbol }}</span>
                         </div>
                         {% if order.show_shipping_details %}
-                        <div class="d-flex justify-content-between mb-2">
+                        <div class="summary-row">
                             <span class="text-secondary">Shipping</span>
-                            <span class="fw-medium">{{ shipping }} {{ settings.currency }}</span>
+                            <span class="fw-medium">{{ shipping|floatformat:2 }} {{ settings.currency_symbol }}</span>
                         </div>
                         {% if other > 0 %}
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-secondary">Other Costs</span>
-                            <span class="fw-medium">{{ other }} {{ settings.currency }}</span>
+                        <div class="summary-row">
+                            <span class="text-secondary">
+                                Other costs
+                                {% if order.other_cost_reason %}<span class="d-block text-secondary" style="font-size:12px;">{{ order.other_cost_reason }}</span>{% endif %}
+                            </span>
+                            <span class="fw-medium">{{ other|floatformat:2 }} {{ settings.currency_symbol }}</span>
                         </div>
                         {% endif %}
+                        {% endif %}
+
+                        {% comment %}Commission sits outside the show_shipping_details
+                           gate on purpose. It is a charge on the goods, not part of the
+                           freight breakdown, and it is already inside the grand total —
+                           hiding it left customers with a total they could not reconcile
+                           against the lines above it.{% endcomment %}
                         {% if commission > 0 %}
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="text-secondary">Commission</span>
-                            <span class="fw-medium">{{ commission }} {{ settings.currency }}</span>
+                        <div class="summary-row summary-row-commission">
+                            <span>
+                                <span class="text-secondary">Commission</span>
+                                {% if commission_pct > 0 %}
+                                <span class="commission-rate-badge">{{ commission_pct|floatformat:"-2" }}%</span>
+                                {% endif %}
+                                <span class="d-block text-secondary" style="font-size:12px;">Our service fee on this order</span>
+                            </span>
+                            <span class="fw-medium commission-amount">{{ commission|floatformat:2 }} {{ settings.currency_symbol }}</span>
                         </div>
                         {% endif %}
-                        <hr>
-                        {% else %}
-                        <hr>
-                        <div class="alert alert-info d-flex align-items-center gap-2 mb-3" role="alert">
+
+                        {% if not order.show_shipping_details %}
+                        <div class="alert alert-info d-flex align-items-center gap-2 my-3 py-2" role="alert">
                             <i class="bi bi-info-circle"></i>
                             <span class="small">Shipping details will be provided separately.</span>
                         </div>
                         {% endif %}
-                        <div class="d-flex justify-content-between">
-                            <span class="fw-bold">Grand Total</span>
-                            <span class="fw-bold fs-5 text-primary">{{ grand_total }} {{ settings.currency }}</span>
-                        </div>
+
                         <hr>
-                        <div class="mb-2">
-                            <span class="text-secondary small">Status:</span>
+                        <div class="summary-row align-items-center mb-0">
+                            <span class="fw-bold">Grand Total</span>
+                            <span class="fw-bold fs-5 text-primary">{{ grand_total|floatformat:2 }} {{ settings.currency_symbol }}</span>
+                        </div>
+                        {% if order.payment_due_date %}
+                        <div class="text-secondary text-end" style="font-size:12px;">
+                            Due {{ order.payment_due_date|date:"M d, Y" }}
+                        </div>
+                        {% endif %}
+
+                        <hr>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">Status</span>
                             {% if order.status == 'confirmed' %}
                             <span class="status-badge confirmed">Confirmed</span>
                             {% else %}
                             <span class="status-badge pending">{{ order.status|title }}</span>
                             {% endif %}
                         </div>
-                        <div class="mb-2">
-                            <span class="text-secondary small">Payment:</span>
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="text-secondary small">Payment</span>
                             {% if order.payment_status == 'paid' %}
                             <span class="status-badge paid">Paid</span>
                             {% elif order.payment_status == 'partial' %}
@@ -145,12 +283,12 @@
                             <span class="status-badge unpaid">Unpaid</span>
                             {% endif %}
                         </div>
-                        <div>
-                            <span class="text-secondary small">Placed:</span>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="text-secondary small">Placed with supplier</span>
                             {% if order.is_placed %}
                             <span class="status-badge confirmed">Yes</span>
                             {% else %}
-                            <span class="status-badge pending">No</span>
+                            <span class="status-badge pending">Not yet</span>
                             {% endif %}
                         </div>
                     </div>
@@ -171,4 +309,25 @@
     </div>
 </section>
 
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}Purchase — gated on ?placed=1, which checkout_confirm adds exactly
+   once on the redirect after an order is created. Without that gate the event
+   would re-fire every time the customer opened the order to check progress,
+   re-counting the same revenue and inflating reported ROAS.
+{% endcomment %}
+{% if request.GET.placed %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.trackEvent !== 'function') { return; }
+    window.trackEvent('purchase', {
+      value: '{{ order.total|stringformat:"s" }}',
+      num_items: {{ order.items.count }},
+      content_type: 'product',
+      content_ids: [{% for it in order.items.all %}'{{ it.product_id }}'{% if not forloop.last %},{% endif %}{% endfor %}]
+    });
+  });
+</script>
+{% endif %}
 {% endblock %}

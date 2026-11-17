@@ -1,5 +1,69 @@
 from django.contrib import admin
-from .models import ProductRequest, ProductRequestImage, PortfolioItem, PasswordResetRequest, CartItem, ContactMessage
+from .models import (
+    ProductRequest, ProductRequestImage, PortfolioItem, PasswordResetRequest,
+    CartItem, ContactMessage, BlogCategory, BlogPost,
+)
+
+
+@admin.register(BlogCategory)
+class BlogCategoryAdmin(admin.ModelAdmin):
+    """Admin for blog topic groupings."""
+    list_display = ('name', 'slug', 'display_order', 'post_count')
+    list_editable = ('display_order',)
+    search_fields = ('name', 'description')
+    # Typing a category name fills the slug automatically, which stops
+    # inconsistent hand-typed URLs creeping in.
+    prepopulated_fields = {'slug': ('name',)}
+
+    @admin.display(description='Published posts')
+    def post_count(self, obj):
+        return obj.posts.filter(is_published=True).count()
+
+
+@admin.register(BlogPost)
+class BlogPostAdmin(admin.ModelAdmin):
+    """
+    Admin for writing and editing blog articles.
+
+    The fieldsets separate what the author writes from the SEO overrides, which are
+    collapsed because they are optional — a blank meta title/description falls back
+    to the article title and excerpt.
+    """
+    list_display = ('title', 'category', 'is_published', 'is_featured', 'published_at', 'reading_minutes')
+    list_filter = ('is_published', 'is_featured', 'category', 'published_at')
+    search_fields = ('title', 'excerpt', 'body', 'keywords')
+    list_editable = ('is_published', 'is_featured')
+    date_hierarchy = 'published_at'
+    ordering = ('-published_at',)
+
+    # NOTE: the slug is prepopulated for NEW posts only. Django's admin disables
+    # prepopulation once an object exists, which is exactly what we want — editing
+    # a published post's slug breaks every inbound link to it.
+    prepopulated_fields = {'slug': ('title',)}
+
+    readonly_fields = ('created_at', 'updated_at', 'reading_minutes')
+
+    fieldsets = (
+        ('Article', {
+            'fields': ('title', 'slug', 'category', 'excerpt', 'body', 'author_name'),
+        }),
+        ('Header image', {
+            'fields': ('hero_image', 'hero_image_alt'),
+            'description': 'Optional. Also used as the preview image when the article is shared on WhatsApp or LinkedIn.',
+        }),
+        ('Publishing', {
+            'fields': ('is_published', 'is_featured', 'published_at'),
+        }),
+        ('Search engine settings (optional)', {
+            'classes': ('collapse',),
+            'fields': ('meta_title', 'meta_description', 'keywords'),
+            'description': 'Leave blank to use the article title and excerpt automatically.',
+        }),
+        ('System', {
+            'classes': ('collapse',),
+            'fields': ('reading_minutes', 'created_at', 'updated_at'),
+        }),
+    )
 
 
 @admin.register(ContactMessage)

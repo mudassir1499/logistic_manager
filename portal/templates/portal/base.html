@@ -4,7 +4,10 @@
 
 <!DOCTYPE html>
 
-<html lang="en">
+{% comment %}lang and dir are blocks so the Arabic templates can flip the whole
+   document to right-to-left by overriding two values, rather than maintaining a
+   parallel copy of this file.{% endcomment %}
+<html lang="{% block html_lang %}en{% endblock %}" dir="{% block html_dir %}ltr{% endblock %}">
 <head>
     
     <meta charset="UTF-8">
@@ -29,15 +32,37 @@
     
     <meta name="description" content="{% block meta_description %}Your trusted China sourcing agent based in Xuzhou. We help businesses in UAE and the Middle East find reliable suppliers, negotiate prices, inspect quality, and ship products from China.{% endblock %}">
     <meta name="keywords" content="{% block meta_keywords %}China sourcing agent, product sourcing, supplier verification, quality inspection, China procurement, buy from China, China to UAE, Middle East importer, Xuzhou sourcing{% endblock %}">
-    <meta name="robots" content="index, follow">
+    <meta name="robots" content="{% block meta_robots %}index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1{% endblock %}">
     <meta name="author" content="Mudassir LLC">
+
+    {% comment %}Google Search Console domain-ownership proof. Rendered from the
+       database (Settings → Google Search & Analytics) rather than hardcoded, so the
+       token can be rotated without a redeploy. Removing it un-verifies the property
+       and cuts off all Search Console data, so it must stay on every page.{% endcomment %}
+    {% if settings.google_site_verification %}
+    <meta name="google-site-verification" content="{{ settings.google_site_verification }}">
+    {% endif %}
+
+    {% comment %}Browser UI colour on mobile Chrome/Safari — small polish that makes
+       the site feel like a real brand rather than a default white page.{% endcomment %}
+    <meta name="theme-color" content="#0A0A0A">
+
+    {% comment %}Favicons. Without these, browser tabs and bookmarks show a blank
+       document icon, and Google's search results show a generic globe next to the
+       listing instead of the company mark.{% endcomment %}
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'images/favicon-32.png' %}">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'images/icon-192.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
 
     
     <meta property="og:title" content="{% block og_title %}{{ settings.company_name|default:"LogiManager" }}{% endblock %}">
     <meta property="og:description" content="{% block og_description %}Your trusted China sourcing agent based in Xuzhou. We help businesses in UAE and the Middle East find reliable suppliers, negotiate prices, inspect quality, and ship products from China.{% endblock %}">
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://mudassirllc.com{{ request.path }}">
-    <meta property="og:image" content="{% if settings.og_image %}https://mudassirllc.com{{ settings.og_image.url }}{% else %}https://mudassirllc.com/static/images/og-default.png{% endif %}">
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}">
+    <meta property="og:url" content="{% block og_url %}{{ settings.base_url }}{{ request.path }}{% endblock %}">
+    {% comment %}A block so a product page can advertise the product photo. Without
+       it every share card on the site showed the same company image, which makes
+       a shared product indistinguishable from a shared homepage.{% endcomment %}
+    <meta property="og:image" content="{% block og_image %}{% if settings.og_image %}{{ settings.base_url }}{{ settings.og_image.url }}{% else %}{{ settings.base_url }}/static/images/og-default.png{% endif %}{% endblock %}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
     <meta property="og:site_name" content="{{ settings.company_name|default:"LogiManager" }}">
@@ -47,10 +72,14 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="{% block twitter_title %}{{ settings.company_name|default:"LogiManager" }}{% endblock %}">
     <meta name="twitter:description" content="{% block twitter_description %}Your trusted China sourcing agent based in Xuzhou. We help businesses in UAE and the Middle East find reliable suppliers, negotiate prices, inspect quality, and ship products from China.{% endblock %}">
-    <meta name="twitter:image" content="{% if settings.og_image %}https://mudassirllc.com{{ settings.og_image.url }}{% else %}https://mudassirllc.com/static/images/og-default.png{% endif %}">
+    <meta name="twitter:image" content="{% block twitter_image %}{% if settings.og_image %}{{ settings.base_url }}{{ settings.og_image.url }}{% else %}{{ settings.base_url }}/static/images/og-default.png{% endif %}{% endblock %}">
 
     
-    <link rel="canonical" href="https://mudassirllc.com{{ request.path }}">
+    {% comment %}Canonical URL — the single address this page should be indexed under.
+       Defaults to the current path, which is right for every ordinary page. Listing
+       pages override the block so that ?category=… and ?page=… variants all point at
+       the clean base URL instead of competing with it as near-duplicates.{% endcomment %}
+    <link rel="canonical" href="{% block canonical_url %}{{ settings.base_url }}{{ request.path }}{% endblock %}">
 
     
     
@@ -65,26 +94,80 @@
     
     
     
+    {% comment %}--------------------------------------------------------------
+       STRUCTURED DATA (JSON-LD)
+       ---------------------------------------------------------------------
+       These blocks describe the business to Google in a machine-readable form.
+       They are what let Google build a Knowledge Panel, show the business
+       address/phone next to the listing, and render FAQ rich results.
+
+       Rule for everything below: only state facts that are also visible to a
+       human on the page. Structured data that contradicts the page (or that
+       nobody can verify) is a Google policy violation and can trigger a manual
+       action that removes ALL rich results for the domain.
+       -----------------------------------------------------------------{% endcomment %}
+
+    {% comment %}The business itself. `@id` gives the entity a stable identifier so
+       the other blocks can point at it instead of duplicating the data — that is how
+       Google knows the Organization and the LocalBusiness are the same company.{% endcomment %}
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
+      "@id": "{{ settings.base_url }}/#business",
       "name": "{{ settings.company_name|default:"LogiManager"|escapejs }}",
       "description": "China sourcing agent based in Xuzhou, specializing in product sourcing, supplier verification, quality inspection, and shipping coordination for businesses in UAE and the Middle East.",
-      "url": "https://mudassirllc.com",
+      "url": "{{ settings.base_url }}",
       "telephone": "{{ settings.company_phone|default:""|escapejs }}",
       "address": {
         "@type": "PostalAddress",
-        "streetAddress": "{{ settings.company_address|default:""|escapejs }}"
+        "streetAddress": "{{ settings.company_address|default:""|escapejs }}",
+        "addressLocality": "{{ settings.business_city|escapejs }}",
+        "addressRegion": "{{ settings.business_region|escapejs }}",
+        "addressCountry": "{{ settings.business_country|escapejs }}"
       },
-      "image": "https://mudassirllc.com/static/images/og-default.png",
+      {% comment %}The markets this business actually ships to. This is the
+         machine-readable signal Google uses to decide which countries the site is
+         relevant for - it is worth far more for international reach than any
+         on-page translation widget, because it is read by the crawler rather
+         than rendered in the visitor's browser after the fact.
+         Keep it truthful: listing a country you cannot actually serve earns
+         traffic that bounces, which costs ranking rather than gaining it.
+      {% endcomment %}
+      "areaServed": [
+        {"@type": "Country", "name": "United Arab Emirates"},
+        {"@type": "Country", "name": "Saudi Arabia"},
+        {"@type": "Country", "name": "Pakistan"},
+        {"@type": "Country", "name": "United States"},
+        {"@type": "Country", "name": "United Kingdom"},
+        {"@type": "Country", "name": "Canada"},
+        {"@type": "Place", "name": "Middle East"}
+      ],
+      "knowsLanguage": [{% for c in settings.languages_list %}"{{ c|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+      "image": "{{ settings.base_url }}/static/images/og-default.png",
+      "logo": "{% if settings.logo %}{{ settings.base_url }}{{ settings.logo.url }}{% else %}{{ settings.base_url }}/static/images/logo.png{% endif %}",
       "priceRange": "$$",
       "openingHoursSpecification": {
         "@type": "OpeningHoursSpecification",
-        "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
-        "opens": "09:00",
-        "closes": "18:00"
+        "dayOfWeek": [{% for d in settings.working_days_list %}"{{ d|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
+        "opens": "{{ settings.opening_time|escapejs }}",
+        "closes": "{{ settings.closing_time|escapejs }}"
       }
+    }
+    </script>
+
+    {% comment %}WebSite entity. Declaring it lets Google show the site name (rather
+       than the bare domain) above search results, and registers the site-level
+       search action.{% endcomment %}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": "{{ settings.base_url }}/#website",
+      "name": "{{ settings.company_name|default:"LogiManager"|escapejs }}",
+      "url": "{{ settings.base_url }}",
+      "inLanguage": "en",
+      "publisher": {"@id": "{{ settings.base_url }}/#business"}
     }
     </script>
     <script type="application/ld+json">
@@ -92,18 +175,15 @@
       "@context": "https://schema.org",
       "@type": "Organization",
       "name": "{{ settings.company_name|default:"LogiManager"|escapejs }}",
-      "url": "https://mudassirllc.com",
-      "logo": "https://mudassirllc.com/static/images/logo.png",
-      "sameAs": [
-        {% if settings.whatsapp_number or settings.company_phone %}"https://wa.me/{{ settings.whatsapp_number|default:settings.company_phone|default:""|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}",{% endif %}
-        {% if settings.linkedin_url %}"{{ settings.linkedin_url|escapejs }}",{% endif %}
-        {% if settings.instagram_url %}"{{ settings.instagram_url|escapejs }}",{% endif %}
-        {% if settings.facebook_url %}"{{ settings.facebook_url|escapejs }}",{% endif %}
-        {% if settings.twitter_url %}"{{ settings.twitter_url|escapejs }}",{% endif %}
-        {% if settings.youtube_url %}"{{ settings.youtube_url|escapejs }}",{% endif %}
-        {% if settings.tiktok_url %}"{{ settings.tiktok_url|escapejs }}",{% endif %}
-        {% if settings.whatsapp_channel_url %}"{{ settings.whatsapp_channel_url|escapejs }}"{% endif %}
-      ],
+      "url": "{{ settings.base_url }}",
+      "logo": "{{ settings.base_url }}/static/images/logo.png",
+      {% comment %}BUG FIX: this array was built with one {% if %} per network, each
+         ending in a comma. Whenever a later network was unset the JSON ended with a
+         trailing comma and the whole Organization block was invalid — so Google had
+         been silently discarding it, along with the logo and social profiles it
+         carries. Looping over a pre-filtered list with forloop.last produces valid
+         JSON for every combination of filled and empty fields.{% endcomment %}
+      "sameAs": [{% for url in settings.social_links %}"{{ url|escapejs }}"{% if not forloop.last %}, {% endif %}{% endfor %}],
       "contactPoint": {
         "@type": "ContactPoint",
         "telephone": "{{ settings.company_phone|default:""|escapejs }}",
@@ -112,25 +192,52 @@
       }
     }
     </script>
+    {% comment %}What the business sells, described as a Service (not a Product).
+       A Product entity implies something with stock and a price that Google can
+       show in shopping results; sourcing is a service, and mis-typing it is why
+       these blocks get ignored.
+
+       NOTE: this block previously carried a hardcoded aggregateRating of 4.8 from
+       127 reviews. That figure was not backed by any review data on the site, and
+       self-serving ratings a visitor cannot see on the page violate Google's
+       structured-data policy — the penalty is loss of ALL rich results for the
+       domain, not just the rating stars. It was removed deliberately. If you want
+       star ratings back in search results, collect real reviews (each with an
+       author and text, displayed on the page) and mark those up instead.{% endcomment %}
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
-      "@type": "Product",
+      "@type": "Service",
+      "serviceType": "China sourcing and procurement",
       "name": "China Sourcing & Procurement Services",
       "description": "End-to-end China sourcing services including supplier discovery, factory verification, quality inspection, price negotiation, and shipping coordination for Middle East businesses.",
-      "brand": {
-        "@type": "Organization",
-        "name": "{{ settings.company_name|default:"LogiManager"|escapejs }}"
-      },
-      "offers": {
-        "@type": "AggregateOffer",
-        "priceCurrency": "{{ settings.currency|default:"AED" }}",
-        "availability": "https://schema.org/InStock"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "4.8",
-        "reviewCount": "127"
+      "provider": {"@id": "{{ settings.base_url }}/#business"},
+      {% comment %}The markets this business actually ships to. This is the
+         machine-readable signal Google uses to decide which countries the site is
+         relevant for - it is worth far more for international reach than any
+         on-page translation widget, because it is read by the crawler rather
+         than rendered in the visitor's browser after the fact.
+         Keep it truthful: listing a country you cannot actually serve earns
+         traffic that bounces, which costs ranking rather than gaining it.
+      {% endcomment %}
+      "areaServed": [
+        {"@type": "Country", "name": "United Arab Emirates"},
+        {"@type": "Country", "name": "Saudi Arabia"},
+        {"@type": "Country", "name": "Pakistan"},
+        {"@type": "Country", "name": "United States"},
+        {"@type": "Country", "name": "United Kingdom"},
+        {"@type": "Country", "name": "Canada"},
+        {"@type": "Place", "name": "Middle East"}
+      ],
+      "hasOfferCatalog": {
+        "@type": "OfferCatalog",
+        "name": "Sourcing Services",
+        "itemListElement": [
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Product Sourcing", "description": "Finding and shortlisting Chinese manufacturers for a specific product requirement."}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Supplier Verification", "description": "On-site factory visits, business licence checks and production capability audits before payment."}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Quality Inspection", "description": "Pre-shipment inspection at the factory with photo and video reporting."}},
+          {"@type": "Offer", "itemOffered": {"@type": "Service", "name": "Shipping Coordination", "description": "Air and sea freight coordination from China to the UAE and Middle East, including export documentation."}}
+        ]
       }
     }
     </script>
@@ -140,47 +247,109 @@
     
     
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    {% comment %}Hook for page-specific structured data (FAQPage on /faq/, Service +
+       BreadcrumbList on /services/, and so on). Keeping it in <head> means Google
+       sees it without having to render the page body.{% endcomment %}
+    {% block structured_data %}{% endblock %}
 
-    
-    
-    
-    
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    {% comment %}--------------------------------------------------------------------
+       STYLESHEETS — all self-hosted
+       ---------------------------------------------------------------------------
+       This block used to pull from three external origins: fonts.googleapis.com,
+       fonts.gstatic.com and cdn.jsdelivr.net (twice). Every one of them was
+       render-blocking, so nothing appeared on screen until four separate DNS
+       lookups and TLS handshakes to other people's servers had completed. On a
+       Gulf mobile connection that is a large share of the time-to-first-paint.
 
-    
-    
-    
+       Everything now comes from our own origin on the connection the HTML already
+       arrived on. It also removes the Google Fonts privacy problem — that request
+       exposed every visitor's IP address to a third party.
 
-    
-    <link rel="stylesheet" href="{% static 'portal.css' %}">
+       Load order matters: Bootstrap first, then icons and fonts, then portal.css
+       last so our own rules win without needing !important.
+       -----------------------------------------------------------------{% endcomment %}
+
+    {% comment %}Preload the body font so the browser starts fetching it in parallel
+       with the CSS rather than waiting to discover it inside a stylesheet. crossorigin
+       is required on font preloads even same-origin, or the file is fetched twice.{% endcomment %}
+    <link rel="preload" href="{% static 'vendor/fonts/inter-latin.woff2' %}" as="font" type="font/woff2" crossorigin>
+
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap.min.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap-icons.css' %}">
+    <link rel="stylesheet" href="{% static 'vendor/fonts.css' %}">
+    {% comment %}The ?v= query is a cache-buster: browsers keep a stylesheet until
+       its URL changes, so returning visitors would otherwise sit on the old indigo
+       theme indefinitely. Bump this string whenever the palette changes.{% endcomment %}
+    <link rel="stylesheet" href="{% static 'portal.css' %}?v=navy-gold-5">
+
+    {% comment %}Brand palette for any canvas-drawn chart on the portal side. Kept
+       in <head> for the same reason as the back office: chart blocks can sit
+       inline above the bottom-of-body scripts.{% endcomment %}
+    <script src="{% static 'brand.js' %}?v=mono-gold"></script>
+
+    {% comment %}Arabic pages add a font with Arabic coverage and a short set of
+       right-to-left corrections. Both load only where they are needed, so the
+       English pages carry none of the weight.{% endcomment %}
+    {% block extra_css %}{% endblock %}
+
+    {% comment %}hreflang tells Google that two URLs are the same page in different
+       languages, so it can serve the Arabic version to Arabic-speaking searchers
+       instead of treating it as duplicate content competing with the English one.
+       Both pages in a pair must point at each other AND at themselves, or Google
+       ignores the annotation entirely — which is the most common way this gets
+       implemented wrongly. Pages with no translation output nothing.{% endcomment %}
+    {% block hreflang %}{% endblock %}
 </head>
-<body>
-    <style>body{padding-top:72px}</style>
+<body class="{% block body_class %}{% endblock %}">
+    {% comment %}Offset for the fixed public navbar. A block because the signed-in
+       portal (app_base.html) replaces that navbar with its own shell and needs the
+       offset gone — hardcoded here it left a 72px band of dead space at the top of
+       every portal page.{% endcomment %}
+    {% comment %}Clears the fixed navbar. 82px, not 72px: the bar is 12px of
+       padding top and bottom around a 58px row, and that row is 58px because of
+       the Customer Login button, not the links. At 72px the top 10px of every
+       solid-navbar page sat underneath the header. Pages with a dark hero are
+       unaffected either way — there the bar is transparent and the hero is meant
+       to run under it. The signed-in shell zeroes this block; see app_base.
+    {% endcomment %}
+    {% block body_offset %}<style>body{padding-top:82px}</style>{% endblock %}
 
-    {# Page-wide CSRF token. AJAX helpers (add-to-cart, cart update) read this
-       hidden input so POSTs carry a valid token — no view needs @csrf_exempt. #}
+    {% comment %}Page-wide CSRF token. AJAX helpers (add-to-cart, cart update) read this
+       hidden input so POSTs carry a valid token — no view needs @csrf_exempt.{% endcomment %}
     {% csrf_token %}
 
     <a href="#main-content" class="skip-link">Skip to main content</a>
 
-<nav class="navbar navbar-expand-lg portal-navbar">
+{% comment %}The whole public navbar is a block so the signed-in portal can swap it
+   for its own sidebar shell without inheriting a second, competing navigation.
+   Public pages are unaffected — they simply do not override it.{% endcomment %}
+{% block site_nav %}
+{% comment %}expand-XL, not expand-lg. Seven links plus a brand and a Customer
+   Login button need about 1090px; Bootstrap's .container is only 960px between
+   992 and 1199, so at `lg` the full row was being shown in a space it could not
+   fit and was crushed. Collapsing to the menu button below 1200px is what makes
+   the difference.{% endcomment %}
+<nav class="navbar navbar-expand-xl portal-navbar">
     <div class="container">
-        
+
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+            {% comment %}Real logo mark instead of the 📦 emoji. An emoji renders as a
+               different glyph on every OS (and as a monochrome box on some Androids),
+               which is the opposite of a consistent brand. width/height are set so the
+               browser reserves the space and the header does not shift while loading.
+               alt="" because the company name sits right next to it — announcing the
+               logo too would make screen readers say the brand twice.{% endcomment %}
+            {% comment %}Uploaded logo if the owner has set one, otherwise the bundled
+               mark. width/height are kept identical either way so the header cannot
+               shift as the image loads.{% endcomment %}
+            <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}"
+                 alt="" width="34" height="34" style="border-radius:9px;object-fit:contain;" loading="eager" decoding="async">
             
-            <span class="brand-icon">📦</span>
             
             
             
             
-            
-            <span class="brand-text">{{ settings.company_name|default:"LogiManager" }}</span>
+            <span class="brand-text notranslate" translate="no">{{ settings.company_name|default:"LogiManager" }}</span>
         </a>
 
         
@@ -198,7 +367,11 @@
         
         <div class="collapse navbar-collapse" id="navbarNav">
             
-            <ul class="navbar-nav ms-auto align-items-center gap-1">
+            {% comment %}No gap-1 here: Bootstrap's spacing utilities carry !important,
+               so the nav spacing could only be tuned by fighting it. The gap now
+               lives with the rest of the navbar rules in portal.css, where it can
+               be budgeted against the row width.{% endcomment %}
+            <ul class="navbar-nav ms-auto align-items-center">
 
                 
                 
@@ -243,11 +416,8 @@
                 <li class="nav-item dropdown">
                     <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><i class="bi bi-box-seam me-1"></i>Products</a>
                     <ul class="dropdown-menu dropdown-menu-end shadow">
-                        <li><a class="dropdown-item" href="{% url 'portal_products' %}">My Products</a></li>
-                        <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'portal_marketplace' %}"><i class="bi bi-grid me-2"></i>Marketplace (All)</a></li>
-                        <li><a class="dropdown-item" href="{% url 'portal_amazon_products' %}"><i class="bi bi-shop me-2"></i>Amazon Products</a></li>
-                        <li><a class="dropdown-item" href="{% url 'portal_noon_products' %}"><i class="bi bi-shop-window me-2"></i>Noon Products</a></li>
+                        <li><a class="dropdown-item" href="{% url 'shop_index' %}"><i class="bi bi-grid me-2"></i>Browse Products</a></li>
+                        <li><a class="dropdown-item" href="{% url 'portal_products' %}"><i class="bi bi-box-seam me-2"></i>My Products</a></li>
                     </ul>
                 </li>
                 
@@ -256,7 +426,16 @@
                 </li>
 
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'portal_support_list' %}"><i class="bi bi-life-preserver me-1"></i>Support</a>
+                    <a class="nav-link" href="{% url 'portal_support_list' %}"><i class="bi bi-life-preserver me-1"></i>Support{% if customer_open_tickets %} <span class="badge bg-primary rounded-pill">{{ customer_open_tickets }}</span>{% endif %}</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link position-relative" href="{% url 'portal_notifications' %}" title="Notifications">
+                        <i class="bi bi-bell"></i>
+                        {% if customer_unread_notifications %}
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size:9px;">{{ customer_unread_notifications }}</span>
+                        {% endif %}
+                    </a>
                 </li>
 
                 
@@ -277,6 +456,7 @@
                     <ul class="dropdown-menu dropdown-menu-end shadow">
                         
                         <li><a class="dropdown-item" href="{% url 'portal_profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="{% url 'my_account' %}"><i class="bi bi-shield-lock me-2"></i>Security &amp; 2FA</a></li>
                         
                         <li><hr class="dropdown-divider"></li>
                         
@@ -288,51 +468,156 @@
                 
                 
                 {% else %}
-                
+                {% comment %}The whole logged-out nav is one block so translated pages
+                   can swap it wholesale. An Arabic page carrying an English navbar
+                   reads as a machine translation of one page rather than a site that
+                   speaks the language.{% endcomment %}
+                {% block public_nav %}
+                {% comment %}--------------------------------------------------------
+                   PUBLIC NAVIGATION
+                   ---------------------------------------------------------------
+                   This was nine top-level items: Portfolio, About, Services,
+                   Marketplace, Guides, Contact, Testimonials, FAQ, Login. Four of
+                   them — Portfolio, Guides, Testimonials, FAQ — are all variations
+                   on "proof and information", and having them compete at the top
+                   level left no room for the two things a visitor actually needs
+                   to find: what you do, and how to reach you.
+
+                   Now five: Services, About, Marketplace, Resources, Contact, plus
+                   the login button. Everything still reachable in one click or one
+                   hover, and nothing was removed from the site.
+                   -------------------------------------------------------{% endcomment %}
+
+                {% comment %}The public catalogue. Without a nav entry it was
+                   reachable only from a sitemap or a search result — no visitor
+                   would ever find it by browsing, and internal links are also
+                   how a crawler discovers and weights a section.
+                {% endcomment %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'portfolio_page' %}"><i class="bi bi-collection-play me-1"></i>Portfolio</a>
+                    <a class="nav-link" href="{% url 'shop_index' %}"><i class="bi bi-grid me-1"></i>Products</a>
                 </li>
-                
-                <li class="nav-item">
-                    <a class="nav-link" href="{% url 'about_page' %}"><i class="bi bi-info-circle me-1"></i>About</a>
-                </li>
-                
+
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'services_page' %}"><i class="bi bi-briefcase me-1"></i>Services</a>
                 </li>
 
+                {% comment %}The shipping calculator sits at the top level rather
+                   than under Resources. "What will it cost me to ship?" is the
+                   question a prospective importer arrives with, and it is the one
+                   page here that answers a visitor's own question about their own
+                   goods instead of describing what we do — which makes it both the
+                   strongest entry point and something people return to.
+                {% endcomment %}
+                {% comment %}"Calculator", not "Shipping Calculator". The longer
+                   label was 182px — the widest item in the bar by 36px — and it
+                   was what pushed the row past the container and made every link
+                   wrap. Beside a calculator icon, in the navigation of a freight
+                   company, the short form loses nothing; the page's own title and
+                   H1 still read "Shipping Calculator" for search.{% endcomment %}
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'shipping_calculator_page' %}"><i class="bi bi-calculator me-1"></i>Calculator</a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'about_page' %}"><i class="bi bi-info-circle me-1"></i>About</a>
+                </li>
+
+                {% comment %}Resources gathers the four proof/information pages. The
+                   guides are listed first and given a description, because they are
+                   the strongest asset for someone still deciding whether to trust
+                   us — and a blog buried in a footer never gets read.{% endcomment %}
                 <li class="nav-item dropdown">
-                    <a class="nav-link dropdown-toggle" href="#" data-bs-toggle="dropdown"><i class="bi bi-shop me-1"></i>Marketplace</a>
+                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-journal-text me-1"></i>Resources</a>
                     <ul class="dropdown-menu dropdown-menu-end shadow">
-                        <li><a class="dropdown-item" href="{% url 'portal_marketplace' %}"><i class="bi bi-grid me-2"></i>All Products</a></li>
+                        <li>
+                            <a class="dropdown-item py-2" href="{% url 'blog_index' %}">
+                                <i class="bi bi-journal-text me-2"></i><strong>Import Guides</strong>
+                                <span class="d-block small text-secondary ms-4">Customs, freight, suppliers &amp; costs</span>
+                            </a>
+                        </li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'portal_amazon_products' %}"><i class="bi bi-shop me-2"></i>Amazon Products</a></li>
-                        <li><a class="dropdown-item" href="{% url 'portal_noon_products' %}"><i class="bi bi-shop-window me-2"></i>Noon Products</a></li>
+                        <li><a class="dropdown-item" href="{% url 'portfolio_page' %}"><i class="bi bi-collection-play me-2"></i>Portfolio</a></li>
+                        <li><a class="dropdown-item" href="{% url 'testimonials_page' %}"><i class="bi bi-chat-quote me-2"></i>Testimonials</a></li>
+                        <li><a class="dropdown-item" href="{% url 'faq_page' %}"><i class="bi bi-question-circle me-2"></i>FAQ</a></li>
                     </ul>
                 </li>
 
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'contact_page' %}"><i class="bi bi-envelope me-1"></i>Contact</a>
                 </li>
-                
+                {% comment %}Tracking needs a top-level entry, not a footer link.
+                   A buyer chasing a shipment is the most impatient visitor the
+                   site gets, and they arrive on the homepage with a number in
+                   hand — burying it costs a support message every time.
+                {% endcomment %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'testimonials_page' %}"><i class="bi bi-chat-quote me-1"></i>Testimonials</a>
+                    <a class="nav-link" href="{% url 'track_shipment' %}"><i class="bi bi-geo-alt me-1"></i>Track</a>
                 </li>
-                
+
+                {% comment %}Language switcher. `lang_switch_url` is supplied by the
+                   Arabic templates (pointing back to English) and by nothing else,
+                   so the link appears only where a translation actually exists —
+                   sending someone to a page that has not been translated is worse
+                   than not offering the switch.{% endcomment %}
+                {% block lang_switch %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'faq_page' %}"><i class="bi bi-question-circle me-1"></i>FAQ</a>
+                    <a class="nav-link" href="{% url 'ar_home' %}" lang="ar" hreflang="ar" title="العربية">
+                        <i class="bi bi-translate me-1"></i>العربية
+                    </a>
                 </li>
-                
-                
+                {% endblock %}
+
                 <li class="nav-item">
                     <a class="btn btn-primary btn-sm px-3" href="{% url 'portal_login' %}" aria-label="Customer login"><i class="bi bi-box-arrow-in-right me-1"></i>Customer Login</a>
                 </li>
+                {% endblock %}
                 {% endif %}
             </ul>
         </div>
     </div>
 </nav>
 
+{% comment %}Catalogue search bar.
+
+   Its own row rather than a slot in the navbar: with eight nav links and a login
+   button already in that row, the form was the only shrinkable item and
+   collapsed to 136px, and the login button was pushed off the right edge.
+
+   GET to shop_index, which already parses `q` - no new view and no new route.
+   It echoes the active term so a customer who searched and then clicked a
+   category still sees what they searched for, instead of an empty box implying
+   the term was dropped.
+
+   Hidden on the auth screens via {% templatetag openblock %} block search_bar {% templatetag closeblock %}, where a product
+   search next to a password field is noise.
+{% endcomment %}
+{% block search_bar %}
+<div class="search-bar">
+    <div class="container">
+        <form class="navbar-search" role="search" method="get" action="{% url 'shop_index' %}">
+            <label for="navSearch" class="visually-hidden">Search the product catalogue</label>
+            <i class="bi bi-search navbar-search__icon" aria-hidden="true"></i>
+            <input id="navSearch" type="search" name="q" value="{{ filter_q|default:'' }}"
+                   class="navbar-search__input"
+                   placeholder="Search products, SKU or category..."
+                   autocomplete="off">
+            <button type="submit" class="navbar-search__btn">Search</button>
+        </form>
+        <a class="search-bar__link" href="{% url 'shop_index' %}">
+            <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i> All products
+        </a>
+        <a class="search-bar__link" href="{% url 'request_quote' %}">
+            <i class="bi bi-box-seam" aria-hidden="true"></i> Request a product
+        </a>
+    </div>
+</div>
+{% endblock %}
+{% endblock %}
+
+{% comment %}Messages and <main> are one region so the portal shell can re-emit both
+   inside its content column. Split apart, the flash messages rendered above the
+   sidebar instead of above the page they belong to.{% endcomment %}
+{% block main_region %}
 {% if messages %}
 <div class="container mt-3">
     {% for message in messages %}
@@ -345,17 +630,35 @@
 {% endif %}
 
 <main id="main-content" class="portal-main">
+    {% block email_verify_banner %}
+    {% if portal_customer and current_profile and not current_profile.email_verified %}
+    <div class="container mt-3">
+        <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 small mb-0">
+            <div><i class="bi bi-envelope-exclamation me-2"></i>Please verify your email address to secure your account.</div>
+            <a href="{% url 'account_resend_verification' %}" class="btn btn-sm btn-warning">Resend verification email</a>
+        </div>
+    </div>
+    {% endif %}
+    {% endblock %}
     {% block content %}{% endblock %}
 </main>
+{% endblock %}
 
+{% block site_footer %}
 <footer class="portal-footer">
     <div class="container">
+        {% comment %}The descriptive footer columns are a block for the same reason
+           as the navbar: a translated page should not carry English boilerplate.
+           The social icons and copyright line below are language-neutral and stay
+           shared between all versions.{% endcomment %}
+        {% block footer_columns %}
         <div class="row gy-4">
             
             <div class="col-lg-4">
                 <div class="d-flex align-items-center gap-2 mb-3">
-                    <span class="brand-icon">📦</span>
-                    <span class="fw-bold">{{ settings.company_name|default:"LogiManager" }}</span>
+                    <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}"
+                         alt="" width="30" height="30" style="border-radius:8px;object-fit:contain;" loading="lazy" decoding="async">
+                    <span class="fw-bold notranslate" translate="no">{{ settings.company_name|default:"LogiManager" }}</span>
                 </div>
                 <p class="text-secondary mb-0">Your trusted China sourcing agent based in Xuzhou. We help businesses in the UAE and Middle East buy products from China with confidence.</p>
             </div>
@@ -374,12 +677,12 @@
                 <h6 class="fw-bold mb-3">Quick Links</h6>
                 <ul class="list-unstyled text-secondary">
                     <li class="mb-1"><a href="/" class="text-secondary text-decoration-none hover-primary">Home</a></li>
+                    <li class="mb-1"><a href="{% url 'shop_index' %}" class="text-secondary text-decoration-none hover-primary">Product Catalogue</a></li>
                     <li class="mb-1"><a href="{% url 'about_page' %}" class="text-secondary text-decoration-none hover-primary">About Us</a></li>
                     <li class="mb-1"><a href="{% url 'services_page' %}" class="text-secondary text-decoration-none hover-primary">Services</a></li>
-                    <li class="mb-1"><a href="{% url 'portal_marketplace' %}" class="text-secondary text-decoration-none hover-primary">Marketplace</a></li>
-                    <li class="mb-1"><a href="{% url 'portal_amazon_products' %}" class="text-secondary text-decoration-none hover-primary">Amazon Products</a></li>
-                    <li class="mb-1"><a href="{% url 'portal_noon_products' %}" class="text-secondary text-decoration-none hover-primary">Noon Products</a></li>
+                    <li class="mb-1"><a href="{% url 'blog_index' %}" class="text-secondary text-decoration-none hover-primary">Import Guides</a></li>
                     <li class="mb-1"><a href="{% url 'contact_page' %}" class="text-secondary text-decoration-none hover-primary">Contact</a></li>
+                    <li class="mb-1"><a href="{% url 'track_shipment' %}" class="text-secondary text-decoration-none hover-primary">Track a shipment</a></li>
                     <li class="mb-1"><a href="{% url 'portfolio_page' %}" class="text-secondary text-decoration-none hover-primary">Portfolio</a></li>
                     <li class="mb-1"><a href="{% url 'testimonials_page' %}" class="text-secondary text-decoration-none hover-primary">Testimonials</a></li>
                     <li class="mb-1"><a href="{% url 'faq_page' %}" class="text-secondary text-decoration-none hover-primary">FAQ</a></li>
@@ -387,6 +690,7 @@
                 </ul>
             </div>
         </div>
+        {% endblock %}
         
         <div class="border-top mt-4 pt-4">
             <div class="row align-items-center">
@@ -443,27 +747,128 @@
         </div>
         
         <div class="border-top mt-4 pt-4 text-center text-secondary small">
-            
-            
-            &copy; {% now "Y" %} {{ settings.company_name|default:"LogiManager" }}. All rights reserved.
+
+            {% comment %}------------------------------------------------------
+               ON-PAGE TRANSLATION
+
+               Google's website widget. It translates in the VISITOR'S BROWSER
+               after the page has loaded, so be clear about what it is and is
+               not:
+
+                 IS   - a convenience for a reader who does not read English.
+                 IS NOT - an SEO feature. Search engines index the English HTML
+                          the server sent; the translated text never exists on
+                          the server and is never crawled. It creates no
+                          additional indexable pages and cannot make the site
+                          rank in another language.
+
+               Reaching Pakistan, the US, UK and Canada is done by the
+               `areaServed` markup at the top of this file, by hreflang, and by
+               content those markets search for - not by this control.
+
+               Deliberately in the footer rather than the header: the widget
+               inserts its own toolbar and shifts the page, which is far more
+               disruptive above the fold. The CSS below suppresses that banner.
+
+               Google discontinued new signups for this widget, so it may stop
+               working with no notice. Removing it means deleting this block -
+               nothing else depends on it.
+            ------------------------------------------------------{% endcomment %}
+            <div id="google_translate_element" class="mb-3"></div>
+
+            &copy; {% now "Y" %} <span class="notranslate" translate="no">{{ settings.company_name|default:"LogiManager" }}</span>. All rights reserved.
         </div>
     </div>
 </footer>
+{% endblock %}
 
 <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toastContainer" role="status" aria-live="polite" aria-label="Notification area"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% comment %}Self-hosted Bootstrap JS (dropdowns, collapse, alerts, toasts). Sits at
+   the end of <body> so it never blocks rendering.{% endcomment %}
+<script src="{% static 'vendor/bootstrap.bundle.min.js' %}"></script>
 
-<script src="{% static 'portal.js' %}"></script>
+{% comment %}portal.js carried no cache-buster, unlike the stylesheet next to it. A
+   returning visitor therefore kept whatever copy their browser had cached from a
+   previous visit — which is how the sidebar drawer toggle shipped without ever
+   reaching anyone who had loaded the site before. Bump this whenever the file
+   changes, exactly as with portal.css above.{% endcomment %}
+<script src="{% static 'portal.js' %}?v=marketplace-6"></script>
 
 {% block extra_js %}{% endblock %}
 
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+{% comment %}--------------------------------------------------------------------
+   GOOGLE ANALYTICS 4
+   ---------------------------------------------------------------------------
+   The Measurement ID comes from the database (Settings → Google Search &
+   Analytics), NOT from a hardcoded string. This block used to ship a literal
+   'G-XXXXXXXXXX' placeholder, which meant every public page loaded gtag.js and
+   reported to nothing — all traffic since launch went unrecorded.
+
+   Two guards:
+     1. No ID configured  -> the tag is not emitted at all, so we never ship a
+        broken analytics call or the extra ~50 KB of gtag.js.
+     2. Internal traffic   -> staff and admin sessions are excluded. The owner and
+        team hit these pages constantly while working; counting those visits makes
+        bounce rate, session counts and conversion rate meaningless. Customers are
+        NOT excluded — they are real traffic.
+
+   `window.gtagEvent` below is a safe wrapper used by the CTA handlers: it no-ops
+   when analytics is disabled, so page scripts never need their own guard.
+--------------------------------------------------------------------{% endcomment %}
+{% if settings.google_analytics_id and not user.is_staff %}
+<script async src="https://www.googletagmanager.com/gtag/js?id={{ settings.google_analytics_id }}"></script>
 <script>
   window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-XXXXXXXXXX');
+  gtag('config', '{{ settings.google_analytics_id }}');
+</script>
+{% endif %}
+<script>
+  // Fire a GA4 event if analytics is loaded; do nothing otherwise. Every CTA on
+  // the public site routes through this, so the markup does not need to know
+  // whether tracking is configured.
+  window.gtagEvent = function (name, params) {
+    if (typeof gtag === 'function') { gtag('event', name, params || {}); }
+  };
+
+  // --- Conversion tracking on the public CTAs ---------------------------------
+  // These are the actions that actually indicate a lead. Wired here (once, in the
+  // base template) rather than as inline onclick attributes so every page gets
+  // them and the event names stay consistent across the site.
+  document.addEventListener('DOMContentLoaded', function () {
+    // WhatsApp — the primary contact channel for this market.
+    document.querySelectorAll('a[href*="wa.me"], a[href*="whatsapp.com"]').forEach(function (link) {
+      link.addEventListener('click', function () {
+        window.gtagEvent('contact_whatsapp', { link_url: link.href });
+      });
+    });
+
+    // Click-to-call on the phone number.
+    document.querySelectorAll('a[href^="tel:"]').forEach(function (link) {
+      link.addEventListener('click', function () {
+        window.gtagEvent('contact_phone_call', { link_url: link.href });
+      });
+    });
+
+    // NOTE: the floating "Get a Quote" pill this used to track was removed — it
+    // covered page content on every screen and duplicated CTAs that already exist
+    // in the navbar and at the foot of each page. The in-page quote buttons still
+    // report `quote_cta_click` via their own inline handlers, so the metric is
+    // unbroken; it just no longer counts the floating pill.
+
+    // Any lead/contact form on a public page. `generate_lead` is a GA4
+    // recommended event name, so it maps straight onto a conversion in the
+    // Google Analytics UI without custom configuration.
+    document.querySelectorAll('form[data-lead-form]').forEach(function (form) {
+      form.addEventListener('submit', function () {
+        window.gtagEvent('generate_lead', {
+          form_name: form.getAttribute('data-lead-form') || 'unnamed'
+        });
+      });
+    });
+  });
 </script>
 
 {% if settings.meta_pixel_id %}
@@ -486,17 +891,133 @@
 <!-- End Meta Pixel Code -->
 {% endif %}
 
+{% if settings.tiktok_pixel_id %}
+<!-- TikTok Pixel Code -->
+<script>
+!function (w, d, t) {
+  w.TiktokAnalyticsObject=t;var ttq=w[t]=w[t]||[];ttq.methods=["page","track","identify","instances","debug","on","off","once","ready","alias","group","enableCookie","disableCookie"];
+  ttq.setAndDefer=function(t,e){t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}};
+  for(var i=0;i<ttq.methods.length;i++)ttq.setAndDefer(ttq,ttq.methods[i]);
+  ttq.instance=function(t){for(var e=ttq._i[t]||[],n=0;n<ttq.methods.length;n++)ttq.setAndDefer(e,ttq.methods[n]);return e};
+  ttq.load=function(e,n){var r="https://analytics.tiktok.com/i18n/pixel/events.js";ttq._i=ttq._i||{},ttq._i[e]=[],ttq._i[e]._u=r,ttq._t=ttq._t||{},ttq._t[e]=+new Date,ttq._o=ttq._o||{},ttq._o[e]=n||{};
+  var o=document.createElement("script");o.type="text/javascript",o.async=!0,o.src=r+"?sdkid="+e+"&lib="+t;
+  var a=document.getElementsByTagName("script")[0];a.parentNode.insertBefore(o,a)};
+  ttq.load('{{ settings.tiktok_pixel_id }}');
+  ttq.page();
+}(window, document, 'ttq');
+</script>
+<!-- End TikTok Pixel Code -->
+{% endif %}
+
+{% comment %}--------------------------------------------------------------------
+   ONE TRACKING CALL, THREE PLATFORMS
+
+   window.trackEvent(name, params) is the only thing page code should call. It
+   maps a business event onto each platform's own vocabulary and normalises the
+   parameters, so a call site never has to know that a purchase is `Purchase` on
+   Meta, `CompletePayment` on TikTok and `purchase` on GA4.
+
+   VALUE AND CURRENCY ARE NOT OPTIONAL on the commerce events. Without them Meta
+   and TikTok can report conversions but cannot optimise for value or calculate
+   ROAS, so the campaign spends the same to win a ¥12 accessory as a ¥280
+   machine.
+
+   CONTENT_IDS must match the ids in the product feed, or catalogue and dynamic
+   retargeting ads have nothing to join on. They are the product's primary key,
+   which is what the feed exports.
+
+   Fires safely when a pixel is not configured: each block checks for its global
+   first, so a site with only Meta set up throws nothing.
+------------------------------------------------------------------{% endcomment %}
+<script>
+(function () {
+  var CURRENCY = '{{ settings.currency_code|default:"CNY" }}';
+
+  // business name -> [meta, tiktok, ga4]
+  var MAP = {
+    view_item:      ['ViewContent',          'ViewContent',        'view_item'],
+    add_to_cart:    ['AddToCart',            'AddToCart',          'add_to_cart'],
+    begin_checkout: ['InitiateCheckout',     'InitiateCheckout',   'begin_checkout'],
+    purchase:       ['Purchase',             'CompletePayment',    'purchase'],
+    lead:           ['Lead',                 'SubmitForm',         'generate_lead'],
+    sign_up:        ['CompleteRegistration', 'CompleteRegistration', 'sign_up'],
+    search:         ['Search',               'Search',             'search'],
+    contact:        ['Contact',              'Contact',            'contact']
+  };
+
+  window.trackEvent = function (name, params) {
+    params = params || {};
+    var m = MAP[name];
+    if (!m) { return; }
+
+    var value = params.value !== undefined && params.value !== null && params.value !== ''
+      ? Number(params.value) : undefined;
+    var ids = params.content_ids
+      ? (Array.isArray(params.content_ids) ? params.content_ids : [params.content_ids]).map(String)
+      : undefined;
+
+    // ---- Meta -------------------------------------------------------------
+    if (typeof fbq === 'function') {
+      var fb = {};
+      if (ids) { fb.content_ids = ids; fb.content_type = params.content_type || 'product'; }
+      if (params.content_name) { fb.content_name = params.content_name; }
+      if (value !== undefined) { fb.value = value; fb.currency = CURRENCY; }
+      if (params.num_items) { fb.num_items = params.num_items; }
+      if (params.search_string) { fb.search_string = params.search_string; }
+      fbq('track', m[0], fb);
+    }
+
+    // ---- TikTok -----------------------------------------------------------
+    // TikTok wants `contents: [{content_id, quantity, price}]` rather than Meta's
+    // flat content_ids, so the shape is rebuilt rather than reused.
+    if (typeof ttq !== 'undefined' && ttq && typeof ttq.track === 'function') {
+      var tt = {};
+      if (ids) {
+        tt.contents = ids.map(function (id) {
+          return {
+            content_id: id,
+            content_type: params.content_type || 'product',
+            content_name: params.content_name || undefined,
+            quantity: params.quantity || 1,
+            price: params.unit_price !== undefined ? Number(params.unit_price) : undefined
+          };
+        });
+      }
+      if (value !== undefined) { tt.value = value; tt.currency = CURRENCY; }
+      if (params.search_string) { tt.query = params.search_string; }
+      ttq.track(m[1], tt);
+    }
+
+    // ---- GA4 --------------------------------------------------------------
+    if (typeof window.gtagEvent === 'function') {
+      var g = {};
+      if (value !== undefined) { g.value = value; g.currency = CURRENCY; }
+      if (params.content_name) { g.item_name = params.content_name; }
+      if (ids) { g.item_id = ids[0]; }
+      if (params.search_string) { g.search_term = params.search_string; }
+      window.gtagEvent(m[2], g);
+    }
+  };
+})();
+</script>
+
+
+{% comment %}Live chat. The widget ID used to be hardcoded here, so switching
+   provider or pausing chat meant a code change. Blank now removes the widget —
+   and its third-party script — from the site entirely.{% endcomment %}
+{% if settings.tawk_widget_id %}
 <script type="text/javascript">
 var Tawk_API=Tawk_API||{}, Tawk_LoadStart=new Date();
 (function(){
 var s1=document.createElement("script"),s0=document.getElementsByTagName("script")[0];
 s1.async=true;
-s1.src='https://embed.tawk.to/6a46bc264b956a1d4cbbc178/1jsi4ttv4';
+s1.src='https://embed.tawk.to/{{ settings.tawk_widget_id }}';
 s1.charset='UTF-8';
 s1.setAttribute('crossorigin','*');
 s0.parentNode.insertBefore(s1,s0);
 })();
 </script>
+{% endif %}
 
     
     
@@ -508,24 +1029,87 @@ s0.parentNode.insertBefore(s1,s0);
     
     
 
-    {% with wa_number=settings.whatsapp_number|default:settings.company_phone|default:"" %}
-    {% if wa_number %}
-    
-    <a href="https://wa.me/{{ wa_number|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}" target="_blank" rel="noopener noreferrer" class="whatsapp-float" aria-label="Chat on WhatsApp" title="Chat on WhatsApp">
-        <i class="bi bi-whatsapp"></i>
-    </a>
-    {% endif %}
-    {% endwith %}
+    {% comment %}--------------------------------------------------------------------
+       FLOATING UI — one column on the left, third-party chat on the right
+       ---------------------------------------------------------------------------
+       This used to be four separate things fighting for the bottom of the screen:
+       WhatsApp bottom-left, a "Get a Quote" pill bottom-centre, back-to-top
+       bottom-right — plus the Tawk.to chat bubble, which the third-party script
+       injects bottom-right and which therefore landed on top of back-to-top. On a
+       phone the bottom of the viewport was almost entirely buttons.
 
-    
-    <a href="{% url 'contact_page' %}" class="quote-float" aria-label="Get a Quote">
-        <i class="bi bi-calculator"></i> Get a Quote
-    </a>
+       Now:
+         * The "Get a Quote" pill is gone. It was the worst offender — permanently
+           parked over the middle of the content — and entirely redundant, since a
+           quote CTA already appears in the navbar and at the foot of every page.
+         * WhatsApp and back-to-top are stacked in one column on the LEFT.
+         * The right-hand side is left free for the Tawk.to widget, so the two
+           never collide at any screen size.
 
-    
-    <button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">
-        <i class="bi bi-arrow-up"></i>
-    </button>
+       If you ever add another floating element, put it in this left column too.
+       -----------------------------------------------------------------{% endcomment %}
+    <div class="float-stack" role="complementary" aria-label="Quick actions">
 
+        {% comment %}Back-to-top sits above WhatsApp and is revealed by portal.js only
+           after the visitor has scrolled — it is meaningless at the top of a page and
+           would just be clutter.{% endcomment %}
+        <button class="back-to-top" id="backToTop" aria-label="Back to top" title="Back to top">
+            <i class="bi bi-arrow-up"></i>
+        </button>
+
+        {% comment %}WhatsApp is the primary contact channel for this market, so it is
+           the one permanent, always-visible action.{% endcomment %}
+        {% with wa_number=settings.whatsapp_number|default:settings.company_phone|default:"" %}
+        {% if wa_number %}
+        <a href="https://wa.me/{{ wa_number|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}"
+           target="_blank" rel="noopener noreferrer"
+           class="whatsapp-float" aria-label="Chat with us on WhatsApp" title="Chat on WhatsApp">
+            <i class="bi bi-whatsapp"></i>
+        </a>
+        {% endif %}
+        {% endwith %}
+
+    </div>
+
+{% comment %}Google Translate loader. Deferred and placed last so it can never
+   block first paint - the page is fully usable before this arrives, and if
+   Google's endpoint is slow or blocked nothing else is affected.{% endcomment %}
+<style>
+  /* The widget injects a fixed banner that pushes <body> down by ~40px and
+     leaves a gap at the top of every page. Neutralise it; the inline picker in
+     the footer is the control we actually want. */
+  .goog-te-banner-frame, .skiptranslate iframe { display: none !important; }
+  body { top: 0 !important; }
+  /* `color: inherit` on the gadget alone never reached the text: Google's own
+     stylesheet colours the inner anchor and its spans black, at a higher
+     specificity, so the picker rendered black-on-dark in the footer and could
+     not be read at all. These selectors reach the parts that actually carry
+     the label. */
+  #google_translate_element .goog-te-gadget { font-size: 12px; color: inherit; }
+  #google_translate_element .goog-te-gadget a,
+  #google_translate_element .goog-te-gadget span,
+  #google_translate_element .goog-te-gadget-simple a,
+  #google_translate_element .goog-te-gadget-simple a span {
+    color: rgba(255, 255, 255, .85) !important;
+  }
+  #google_translate_element .goog-te-gadget-simple {
+    background: transparent; border: 1px solid var(--border-color, rgba(0,0,0,.15));
+    border-radius: 8px; padding: 5px 10px;
+  }
+</style>
+<script>
+  function googleTranslateElementInit() {
+    new google.translate.TranslateElement({
+      pageLanguage: 'en',
+      // The languages this catalogue's buyers actually read. Urdu for Pakistan,
+      // Arabic for the Gulf, Chinese for supplier-side staff.
+      includedLanguages: 'ur,ar,zh-CN,fr,es,hi,ru,tr',
+      layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+      autoDisplay: false
+    }, 'google_translate_element');
+  }
+</script>
+<script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"
+        defer></script>
 </body>
 </html>

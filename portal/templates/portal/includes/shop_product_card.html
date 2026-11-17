@@ -1,0 +1,105 @@
+{% comment %}
+Product card for the PUBLIC catalogue (/shop/).
+
+Deliberately a separate partial from portal/includes/product_card.html rather
+than a flag on it. The two differ in the three things a card actually does:
+
+  - where it links (public slug URL vs the customer portal's id URL),
+  - what its button offers (browse/sign-in vs add-to-cart with a quantity), and
+  - who reads it (a crawler and a stranger vs a signed-in buyer).
+
+A single template carrying all of that behind conditionals would be harder to
+read than two short ones, and this one has to stay easy to reason about because
+it is the markup Google sees.
+
+Context:
+    data         {product, first_image, cbm, in_cart}
+    settings     CompanySettings, for the currency label
+    is_customer  True when a signed-in customer is viewing
+{% endcomment %}
+
+<article class="card product-card shop-card">
+
+    <a href="{{ data.product.get_absolute_url }}" class="shop-card__media" tabindex="-1" aria-hidden="true">
+        {% comment %}Guarded on .src, not on the row existing. A ProductImage
+           whose download never succeeded has no file, and src is '' for it —
+           rendering <img src=""> would re-request this page as an image and draw
+           a broken frame. The placeholder below is the honest result.
+        {% endcomment %}
+        {% if data.first_image.src %}
+        <img src="{{ data.first_image.src }}"
+             class="shop-card__img"
+             alt="{{ data.product.name }}"
+             loading="lazy" decoding="async"
+             width="400" height="400">
+        {% else %}
+        <div class="shop-card__img shop-card__img--empty">
+            <i class="bi bi-image" aria-hidden="true"></i>
+        </div>
+        {% endif %}
+
+        {% if data.product.has_variants or data.product.ready_to_ship %}
+        <div class="shop-card__flags">
+            {% if data.product.ready_to_ship %}
+            <span class="shop-card__flag shop-card__flag--ready">Ready to ship</span>
+            {% endif %}
+            {% if data.product.has_variants %}
+            <span class="shop-card__flag">{{ data.product.active_variants|length }} options</span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </a>
+
+    <div class="shop-card__body">
+
+        {% if data.product.category %}
+        <p class="shop-card__eyebrow">
+            {{ data.product.subcategory.name|default:data.product.category.name }}
+        </p>
+        {% endif %}
+
+        <h3 class="shop-card__title">
+            <a href="{{ data.product.get_absolute_url }}">{{ data.product.name }}</a>
+        </h3>
+
+        <p class="shop-card__price">
+            {% if data.product.has_variants %}<span class="shop-card__from">from</span> {% endif %}<span class="shop-card__cur">{{ settings.currency_symbol }}</span>{{ data.product.display_price }}
+        </p>
+
+        <ul class="shop-card__specs">
+            <li>MOQ {{ data.product.moq }}</li>
+            {% if data.product.weight %}<li>{{ data.product.weight }} kg</li>{% endif %}
+            {% if data.cbm %}<li>{{ data.cbm }} CBM</li>{% endif %}
+        </ul>
+
+        {% comment %}The auth boundary, expressed in the UI.
+
+           Browsing is public; ordering is not. An anonymous visitor gets a link
+           to sign in that returns them here afterwards. This is a convenience —
+           add_to_cart rejects anonymous requests on its own, so nothing depends
+           on this button being right.
+        {% endcomment %}
+        <div class="shop-card__actions">
+            {% if is_customer %}
+                {% if data.in_cart %}
+                <span class="shop-card__btn shop-card__btn--muted">
+                    <i class="bi bi-check-lg" aria-hidden="true"></i> In cart
+                </span>
+                {% else %}
+                <a href="{{ data.product.get_absolute_url }}" class="shop-card__btn">
+                    <i class="bi bi-cart-plus" aria-hidden="true"></i> Order
+                </a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'account_login' %}?next={{ data.product.get_absolute_url|urlencode }}"
+                   class="shop-card__btn shop-card__btn--outline">
+                    Sign in to order
+                </a>
+            {% endif %}
+        </div>
+
+        {# Staff only. Renders nothing for customers or anonymous visitors. #}
+        {% include "portal/includes/_supplier_link.html" with product=data.product %}
+
+    </div>
+</article>

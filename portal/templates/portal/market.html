@@ -1,0 +1,192 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}
+One country, one crawlable page.
+
+THE HREFLANG SET IS THE POINT. Every market page lists every other market page,
+including itself, plus x-default. Google discards the whole annotation unless it
+is reciprocal, which is the single most common way this is implemented wrongly —
+a page that names its siblings but is not named back by them is treated as if it
+had said nothing.
+
+Context: see portal.views.market_page.
+{% endcomment %}
+
+{% block title %}China to {{ market.country }} — Sourcing &amp; Shipping | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block meta_description %}Source products from Chinese factories and ship to {{ market.country }}. Supplier verification, quality inspection and consolidated freight into {% for p in market.ports %}{{ p }}{% if not forloop.last %} and {% endif %}{% endfor %}. Get a quote in 24 hours.{% endblock %}
+
+{% block meta_keywords %}china sourcing agent {{ market.short|lower }}, import from china to {{ market.country|lower }}, {{ market.country|lower }} freight forwarder china, buy from china {{ market.cities.0|lower }}{% endblock %}
+
+{% block canonical_url %}{{ settings.base_url }}{{ canonical_path }}{% endblock %}
+
+{% comment %}Reciprocal across the whole set, plus x-default pointing at the
+   English homepage for a visitor in a country we have no page for.{% endcomment %}
+{% block hreflang %}
+{% for m in markets %}
+<link rel="alternate" hreflang="{{ m.hreflang }}" href="{{ settings.base_url }}{% url 'market_page' m.slug %}">
+{% endfor %}
+<link rel="alternate" hreflang="x-default" href="{{ settings.base_url }}{% url 'front_page' %}">
+{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Service",
+  "serviceType": "China sourcing, inspection and freight forwarding",
+  "name": "China to {{ market.country|escapejs }} sourcing and shipping",
+  "description": "Supplier sourcing, factory verification, quality inspection and consolidated freight from China to {{ market.country|escapejs }}.",
+  "provider": { "@id": "{{ settings.base_url }}/#business" },
+  "areaServed": { "@type": "Country", "name": "{{ market.country|escapejs }}" },
+  "url": "{{ settings.base_url }}{{ canonical_path }}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/" },
+    { "@type": "ListItem", "position": 2, "name": "China to {{ market.country|escapejs }}", "item": "{{ settings.base_url }}{{ canonical_path }}" }
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="market-hero">
+  <div class="container">
+    <nav aria-label="Breadcrumb" class="shop-crumbs">
+      <a href="/">Home</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">China to {{ market.country }}</span>
+    </nav>
+
+    <h1 class="market-hero__title">Sourcing and shipping from China to {{ market.country }}</h1>
+
+    <p class="market-hero__lead">
+      We find the factory, verify it on the ground in China, inspect the goods before
+      they ship, and consolidate the freight into
+      {% for p in market.ports %}<strong>{{ p }}</strong>{% if not forloop.last %} and {% endif %}{% endfor %}.
+      Delivering to {% for c in market.cities %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}.
+    </p>
+
+    <div class="market-cta">
+      <a href="{% url 'request_quote' %}" class="btn btn-primary btn-lg">Request a quote</a>
+      <a href="{% url 'shop_index' %}" class="btn btn-outline-secondary btn-lg">Browse the catalogue</a>
+    </div>
+  </div>
+</section>
+
+<section class="section-padding">
+  <div class="container market-body">
+
+    <div class="market-main">
+      <h2 class="section-title">Why buyers in {{ market.country }} use an agent</h2>
+      <p>{{ market.blurb }}</p>
+
+      <h2 class="section-title">What we handle on this lane</h2>
+      <ul class="market-list">
+        <li><strong>Finding the factory.</strong> Not a trading company reselling it — we
+          confirm who actually makes the product before you pay anyone.</li>
+        <li><strong>Verification on the ground.</strong> Our office is in Xuzhou, so a
+          supplier visit is a train ride rather than a video call.</li>
+        <li><strong>Pre-shipment inspection.</strong> Goods are checked against the spec
+          while they are still in China, when a problem is still the factory's to fix.</li>
+        <li><strong>Consolidated freight.</strong> Several suppliers into one shipment, so
+          you pay for one consignment into
+          {{ market.ports.0 }} rather than several.</li>
+        <li><strong>Documentation.</strong> The paperwork {{ market.country }} customs
+          expects, prepared before the goods leave rather than after they land.</li>
+      </ul>
+
+      <h2 class="section-title">Freight to {{ market.country }}</h2>
+      {% if lane_is_priced %}
+      <p>
+        This is a lane we run regularly, so air and sea are both rate-carded. Put the
+        weight and carton size into the
+        <a href="{% url 'shipping_calculator_page' %}">freight calculator</a> for an
+        estimate, or send us the product and we will quote it.
+      </p>
+      {% else %}
+      {% comment %}Deliberately no numbers. Only the UAE and Saudi lanes have rates
+         configured; publishing an invented figure for the others would be a promise
+         operations never made, and a wrong delivery estimate is exactly what a
+         customer quotes back at you.{% endcomment %}
+      <p>
+        We quote this lane per shipment rather than from a rate card — the cost turns
+        on volume, weight and whether the goods travel by air or sea. Send us the
+        product and the quantity and you will have a landed figure within 24 hours.
+      </p>
+      {% endif %}
+
+      <h2 class="section-title">What we source</h2>
+      <div class="cat-tiles">
+        {% for c in categories %}
+        <a class="cat-tile" href="{% url 'shop_index' %}?category={{ c.slug }}">
+          <span class="cat-tile__icon"><i class="bi bi-box-seam" aria-hidden="true"></i></span>
+          <span class="cat-tile__name">{{ c.name }}</span>
+          <span class="cat-tile__count">{{ c.n }} product{{ c.n|pluralize }}</span>
+        </a>
+        {% endfor %}
+      </div>
+    </div>
+
+    <aside class="market-aside">
+      <div class="market-facts">
+        <h2 class="pdp-section-title">{{ market.country }} at a glance</h2>
+        <div class="pdp-specs" style="columns:1;">
+          <div class="pdp-spec"><span class="pdp-spec__k">Ports</span>
+            <span class="pdp-spec__v">{% for p in market.ports %}{{ p }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+          <div class="pdp-spec"><span class="pdp-spec__k">Cities served</span>
+            <span class="pdp-spec__v">{% for c in market.cities %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}</span></div>
+          <div class="pdp-spec"><span class="pdp-spec__k">Local currency</span>
+            <span class="pdp-spec__v">{{ market.currency }}</span></div>
+          <div class="pdp-spec"><span class="pdp-spec__k">Freight</span>
+            <span class="pdp-spec__v">{% if lane_is_priced %}Rate-carded{% else %}Quoted per shipment{% endif %}</span></div>
+        </div>
+        {% if settings.share_contact_display %}
+        <a class="btn btn-success w-100 mt-3"
+           href="https://wa.me/{{ settings.whatsapp_digits }}"
+           target="_blank" rel="noopener">
+          <i class="bi bi-whatsapp me-2" aria-hidden="true"></i>WhatsApp {{ settings.share_contact_display }}
+        </a>
+        {% endif %}
+      </div>
+
+      <div class="market-others">
+        <h2 class="pdp-section-title">Other markets</h2>
+        <ul class="market-others__list">
+          {% for m in markets %}{% if m.slug != market.slug %}
+          <li><a href="{% url 'market_page' m.slug %}">China to {{ m.country }}</a></li>
+          {% endif %}{% endfor %}
+        </ul>
+      </div>
+    </aside>
+
+  </div>
+</section>
+
+{% if featured_products %}
+<section class="section-padding bg-light">
+  <div class="container">
+    <div class="text-center mb-5">
+      <span class="section-label">From the catalogue</span>
+      <h2 class="section-title">Ready to ship to {{ market.country }}</h2>
+    </div>
+    <div class="shop-grid">
+      {% for entry in featured_products %}
+      {% include "portal/includes/shop_product_card.html" with data=entry %}
+      {% endfor %}
+    </div>
+    <div class="text-center mt-4">
+      <a href="{% url 'shop_index' %}" class="btn btn-primary">Browse all products</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+{% endblock %}

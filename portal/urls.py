@@ -27,6 +27,11 @@ Django URL Routing Concepts Used:
 # for most common routing needs.
 from django.urls import path
 
+# RedirectView is a built-in class-based view that issues an HTTP redirect.
+# `pattern_name=` makes it redirect to whatever a named URL currently resolves
+# to, so the target is never hardcoded.
+from django.views.generic.base import RedirectView
+
 # Import all view functions from this app's views.py module.
 # The dot (.) means "from the current package" (the portal app directory).
 # Each function handles a specific page or action within the portal.
@@ -43,31 +48,33 @@ from . import views
 # =============================================================================
 urlpatterns = [
     # =========================================================================
-    # PUBLIC MARKETING PAGES (No login required)
+    # LEGACY PUBLIC-PAGE REDIRECTS  (SEO — do not turn these back into views)
     # =========================================================================
-    # These pages are the company's public website. They attract new customers,
-    # showcase the business's work, explain services, and provide a way to
-    # get in touch. SEO-friendly and accessible to everyone.
-
-    # -------------------------------------------------------------------------
-    # FRONT PAGE: Public Homepage
-    # -------------------------------------------------------------------------
-    # URL: /portal/ (also duplicated at root: /)
-    # The main landing page for the public website. Shows company branding,
-    # hero section, key services, testimonials, and calls-to-action. This is
-    # the first impression potential customers get of the logistics business.
-    # -------------------------------------------------------------------------
-    path('', views.front_page, name='front_page'),
-
-    # -------------------------------------------------------------------------
-    # PORTFOLIO: Showcase of Work
-    # -------------------------------------------------------------------------
-    # URL: /portal/portfolio/ (also duplicated at root: /portfolio/)
-    # Displays the company's portfolio — completed projects, successful
-    # shipments, client logos, or case studies. This builds trust with
-    # potential customers by demonstrating experience and capability.
-    # -------------------------------------------------------------------------
-    path('portfolio/', views.portfolio_page, name='portfolio_page'),
+    # The public marketing pages used to be served from BOTH /portal/<page>/ and
+    # the root /<page>/. That was actively harmful:
+    #
+    #   1. Duplicate content. Both URLs returned HTTP 200 with the same HTML and
+    #      each declared itself canonical, so Google saw two competing copies of
+    #      every page and had to guess which to rank.
+    #
+    #   2. Every internal link pointed at the WRONG one. Django's reverse() takes
+    #      the LAST pattern registered under a name, and portal.urls is included
+    #      after the root routes — so `{% url 'faq_page' %}` in the navbar and
+    #      footer resolved to /portal/faq/, not /faq/. sitemap.xml, built from the
+    #      same reverse() call, submitted the /portal/ URLs too.
+    #
+    #   3. robots.txt disallows /portal/ (it is the logged-in customer area). So
+    #      the site was submitting a sitemap of URLs it simultaneously forbade
+    #      crawling, and giving the canonical root URLs zero internal links. Those
+    #      pages could not rank.
+    #
+    # Serving a 301 here fixes all three at once: the root URL becomes the single
+    # canonical address, reverse() now returns it (these redirect routes are
+    # deliberately left unnamed), and any old inbound link or bookmark still lands
+    # on the right page while passing its link equity to the canonical URL.
+    # =========================================================================
+    path('', RedirectView.as_view(pattern_name='front_page', permanent=True)),
+    path('portfolio/', RedirectView.as_view(pattern_name='portfolio_page', permanent=True)),
 
     # -------------------------------------------------------------------------
     # CUSTOMER LOGIN: Portal Authentication
@@ -177,6 +184,16 @@ urlpatterns = [
     # AMAZON PRODUCTS: Browse Amazon-sourced products
     path('products/amazon/', views.customer_amazon_products, name='portal_amazon_products'),
 
+    # PRODUCT DETAIL: One product in full — gallery, specs, and the free-form
+    # attribute list staff maintain on it.
+    #
+    # Listed AFTER the two literal 'products/<word>/' routes above so 'amazon' and
+    # 'noon' can never be swallowed by <int:product_id>. They could not be anyway
+    # (the converter only matches digits), but keeping literal paths above dynamic
+    # ones is the habit that stops the next addition from breaking them.
+    path('products/<int:product_id>/', views.customer_product_detail,
+         name='portal_product_detail'),
+
     # NOON PRODUCTS: Browse Noon-sourced products
     path('products/noon/', views.customer_noon_products, name='portal_noon_products'),
 
@@ -236,6 +253,7 @@ urlpatterns = [
     # =========================================================================
     # CUSTOMER SUPPORT TICKETS (Login Required)
     # =========================================================================
+    path('notifications/', views.customer_notifications, name='portal_notifications'),
     path('support/', views.customer_support_list, name='portal_support_list'),
     path('support/new/', views.customer_support_create, name='portal_support_create'),
     path('support/<int:ticket_id>/', views.customer_support_detail, name='portal_support_detail'),
@@ -301,6 +319,25 @@ urlpatterns = [
     # name, date submitted, and requested products. Admins can filter by status
     # (pending, quoted, rejected) to prioritize their work.
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # WEBSITE LEADS (contact-form enquiries)
+    # -------------------------------------------------------------------------
+    # URL: /portal/admin/leads/
+    # Enquiries submitted through the public contact form and the homepage hero
+    # form. These previously existed only in Django's stock /admin/, which meant
+    # nobody saw them — this is the top of the sales funnel, so it belongs in the
+    # back-office next to everything else the team works from.
+    # -------------------------------------------------------------------------
+    path('admin/leads/', views.admin_lead_list, name='admin_lead_list'),
+    path('admin/leads/<int:lead_id>/toggle-read/', views.admin_lead_toggle_read, name='admin_lead_toggle_read'),
+
+    # Bulk clear the spam tab, or release one message back to the inbox.
+    # Clearing one row at a time is why spam accumulates.
+    path('admin/leads/spam-action/', views.admin_lead_spam_action, name='admin_lead_spam_action'),
+
+    # Permanently delete one enquiry or a selection of them (POST only).
+    path('admin/leads/delete/', views.admin_lead_delete, name='admin_lead_delete'),
+
     path('admin/requests/', views.admin_request_list, name='admin_request_list'),
 
     # -------------------------------------------------------------------------
@@ -370,11 +407,17 @@ urlpatterns = [
     # -------------------------------------------------------------------------
     # NOTIFICATION COUNTS: Unread requests and pending orders
     # -------------------------------------------------------------------------
-    # URL: /portal/notifications/
+    # URL: /portal/notification-counts/
     # AJAX endpoint that returns the count of pending product requests and
     # unplaced orders for the admin notification bell badge.
+    #
+    # NOTE: this MUST NOT reuse '/portal/notifications/' — that path is already
+    # claimed above by the customer-facing `portal_notifications` page, which is
+    # @customer_required. Sharing the path made this admin endpoint unreachable
+    # and made the admin bell poll hit the customer page, raising PermissionDenied
+    # (403) for every staff/admin user on a 60s loop. Keep the paths distinct.
     # -------------------------------------------------------------------------
-    path('notifications/', views.notification_counts, name='notification_counts'),
+    path('notification-counts/', views.notification_counts, name='notification_counts'),
 
     # =========================================================================
     # SEO / MARKETING PAGES (No login required)
@@ -383,20 +426,10 @@ urlpatterns = [
     # engines and prospective customers.
 
     # -------------------------------------------------------------------------
-    # TESTIMONIALS: Customer Reviews & Social Proof
+    # Legacy redirects to the canonical root URLs (/testimonials/, /faq/).
+    # See the long note at the top of this file for why these are 301s and not
+    # views. The canonical routes live in logistic_manager/urls.py.
     # -------------------------------------------------------------------------
-    # URL: /portal/testimonials/ (also duplicated at root: /testimonials/)
-    # Displays quotes and reviews from satisfied clients to build trust
-    # with potential customers.
-    # -------------------------------------------------------------------------
-    path('testimonials/', views.testimonials_page, name='testimonials_page'),
-
-    # -------------------------------------------------------------------------
-    # FAQ: Frequently Asked Questions
-    # -------------------------------------------------------------------------
-    # URL: /portal/faq/ (also duplicated at root: /faq/)
-    # Shows common questions and answers in an accordion layout. Helps
-    # prospective customers understand the service before contacting sales.
-    # -------------------------------------------------------------------------
-    path('faq/', views.faq_page, name='faq_page'),
+    path('testimonials/', RedirectView.as_view(pattern_name='testimonials_page', permanent=True)),
+    path('faq/', RedirectView.as_view(pattern_name='faq_page', permanent=True)),
 ]

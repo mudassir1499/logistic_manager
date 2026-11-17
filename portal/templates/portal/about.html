@@ -1,7 +1,38 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
-{% block title %}About Us — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% comment %}Page-specific title/description — see the note in contact.html for why
+   inheriting base.html's generic ones costs rankings.{% endcomment %}
+{% block title %}About Us — A China Sourcing Agent Based in Xuzhou | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}We are a China sourcing agent with a physical office in Xuzhou, China. Learn how our on-the-ground team verifies factories, inspects goods and manages shipping for importers in the UAE and Middle East.{% endblock %}
+{% block meta_keywords %}about China sourcing agent, sourcing company in China, Xuzhou sourcing office, trusted China buying agent, China procurement partner UAE{% endblock %}
+{% block og_title %}About Us — A China Sourcing Agent Based in Xuzhou{% endblock %}
+{% block og_description %}Our team is physically in China. We visit factories, verify suppliers and inspect goods in person for importers across the UAE and Middle East.{% endblock %}
+{% block twitter_title %}About Us — A China Sourcing Agent Based in Xuzhou{% endblock %}
+{% block twitter_description %}Our team is physically in China. We visit factories, verify suppliers and inspect goods in person for importers across the UAE and Middle East.{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  "name": "About {{ settings.company_name|default:"LogiManager"|escapejs }}",
+  "url": "{{ settings.base_url }}/about/",
+  "mainEntity": {"@id": "{{ settings.base_url }}/#business"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "About", "item": "{{ settings.base_url }}/about/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 
@@ -19,7 +50,7 @@
     <div class="container">
         <div class="row align-items-center g-5">
             <div class="col-lg-6">
-                <img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80" alt="Our Team in China" class="about-image img-fluid w-100">
+                <img src="{% if site_images.about_main %}{{ site_images.about_main.image.url }}{% else %}{% static 'images/stock/product-sourcing.webp' %}{% endif %}" alt="Our Team in China" class="about-image img-fluid w-100" width="1200" height="800" loading="lazy" decoding="async">
             </div>
             <div class="col-lg-6">
                 <span class="section-label">Our Story</span>
@@ -37,28 +68,53 @@
     </div>
 </section>
 
+{% comment %}--------------------------------------------------------------------
+   These four counters were hardcoded as "5+ Years in Sourcing", "300+ Happy
+   Clients", "500+ Orders Fulfilled", "200+ Verified Suppliers".
+
+   Worth noting why that was worse than it looks: the homepage separately claimed
+   "7+ Years in China" while this page said "5+ Years in Sourcing", and the
+   testimonials page description said "300+ businesses" while the homepage said
+   "150+ Active Importers". A visitor comparing two pages of the same site found
+   contradictory numbers — which is more damaging than showing no numbers at all,
+   because it proves the figures are decorative.
+
+   They now read from the same Settings fields the homepage uses, so there is one
+   source of truth and the pages cannot disagree. Each renders only when filled
+   in, and the section disappears entirely if none are set.
+-----------------------------------------------------------------------{% endcomment %}
+{% if settings.stat_years_in_china or settings.stat_active_clients or settings.stat_products_sourced or settings.stat_verified_suppliers %}
 <section class="counter-section">
     <div class="container">
         <div class="row text-center g-4">
+            {% if settings.stat_years_in_china %}
             <div class="col-6 col-lg-3">
-                <div class="counter-value">5+</div>
+                <div class="counter-value">{{ settings.stat_years_in_china }}</div>
                 <div class="counter-label">Years in Sourcing</div>
             </div>
+            {% endif %}
+            {% if settings.stat_active_clients %}
             <div class="col-6 col-lg-3">
-                <div class="counter-value">300+</div>
-                <div class="counter-label">Happy Clients</div>
+                <div class="counter-value">{{ settings.stat_active_clients }}</div>
+                <div class="counter-label">Active Clients</div>
             </div>
+            {% endif %}
+            {% if settings.stat_products_sourced %}
             <div class="col-6 col-lg-3">
-                <div class="counter-value">500+</div>
-                <div class="counter-label">Orders Fulfilled</div>
+                <div class="counter-value">{{ settings.stat_products_sourced }}</div>
+                <div class="counter-label">Products Sourced</div>
             </div>
+            {% endif %}
+            {% if settings.stat_verified_suppliers %}
             <div class="col-6 col-lg-3">
-                <div class="counter-value">200+</div>
+                <div class="counter-value">{{ settings.stat_verified_suppliers }}</div>
                 <div class="counter-label">Verified Suppliers</div>
             </div>
+            {% endif %}
         </div>
     </div>
 </section>
+{% endif %}
 
 <section class="section-padding">
     <div class="container">
@@ -99,44 +155,68 @@
     </div>
 </section>
 
+{% comment %}------------------------------------------------------------------
+   MEET OUR TEAM
+
+   This section used to hardcode three people — a founder, a "Head of Supplier
+   Relations" and a "Quality Control Manager" — over stock photographs of
+   strangers, with at least two of the names looking like placeholders nobody
+   ever replaced.
+
+   A named person with a job title is a specific factual claim about who works
+   here, and this page is exactly the one a cautious buyer opens before deciding
+   whether you are real. A reverse image search landing on a stock library ends
+   that conversation.
+
+   So the people now come from Settings, and the whole section RENDERS NOTHING
+   until at least one real colleague has been added. An About page with no team
+   section is unremarkable; one with three invented people is a liability.
+---------------------------------------------------------------{% endcomment %}
+{% if team_members %}
 <section class="section-padding feature-section">
     <div class="container">
         <div class="text-center mb-5">
             <span class="section-label">The People Behind the Mission</span>
             <h2 class="section-title">Meet Our Team</h2>
-            <p class="section-subtitle mx-auto">Dedicated professionals based in China, committed to your sourcing success.</p>
+            <p class="section-subtitle mx-auto">Based in China, and reachable directly.</p>
         </div>
-        <div class="row g-4">
+        <div class="row g-4 justify-content-center">
+            {% for member in team_members %}
             <div class="col-md-4">
-                <div class="team-card">
-                    <div class="team-photo" style="background-image: url('https://images.unsplash.com/photo-1560250097-0b93528c311a?auto=format&fit=crop&w=800&q=80');"></div>
+                <div class="team-card h-100">
+                    {% if member.photo %}
+                    <div class="team-photo" style="background-image: url('{{ member.photo.url }}');"
+                         role="img" aria-label="{{ member.name }}, {{ member.role }}"></div>
+                    {% else %}
+                    {% comment %}A monogram, not a silhouette icon. It still identifies
+                       the person and does not read as a broken image.{% endcomment %}
+                    <div class="team-photo team-photo-initials" aria-hidden="true">{{ member.initials }}</div>
+                    {% endif %}
                     <div class="team-info">
-                        <h5 class="fw-bold mb-1">Mudassir Khan</h5>
-                        <p class="text-secondary small mb-0">Founder & CEO</p>
+                        <h5 class="fw-bold mb-1">{{ member.name }}</h5>
+                        <p class="text-secondary small mb-0">{{ member.role }}</p>
+                        {% if member.bio %}
+                        <p class="text-secondary small mt-2 mb-0">{{ member.bio }}</p>
+                        {% endif %}
+                        {% if member.email or member.linkedin_url %}
+                        <div class="team-links mt-2 d-flex gap-2 justify-content-center">
+                            {% if member.email %}
+                            <a href="mailto:{{ member.email }}" aria-label="Email {{ member.name }}"><i class="bi bi-envelope"></i></a>
+                            {% endif %}
+                            {% if member.linkedin_url %}
+                            <a href="{{ member.linkedin_url }}" target="_blank" rel="noopener noreferrer"
+                               aria-label="{{ member.name }} on LinkedIn"><i class="bi bi-linkedin"></i></a>
+                            {% endif %}
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="team-card">
-                    <div class="team-photo" style="background-image: url('https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=800&q=80');"></div>
-                    <div class="team-info">
-                        <h5 class="fw-bold mb-1">Li Wei</h5>
-                        <p class="text-secondary small mb-0">Head of Supplier Relations</p>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="team-card">
-                    <div class="team-photo" style="background-image: url('https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=800&q=80');"></div>
-                    <div class="team-info">
-                        <h5 class="fw-bold mb-1">Zhang Mei</h5>
-                        <p class="text-secondary small mb-0">Quality Control Manager</p>
-                    </div>
-                </div>
-            </div>
+            {% endfor %}
         </div>
     </div>
 </section>
+{% endif %}
 
 <section class="cta-section">
     <div class="container">

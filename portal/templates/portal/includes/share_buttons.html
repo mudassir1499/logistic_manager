@@ -1,0 +1,69 @@
+{% comment %}
+Share buttons for a product page.
+
+Context:
+    share_url    absolute URL of the thing being shared
+    share_title  the product name
+    share_text   the full message — name, tagline, contact number, then the URL.
+                 Built by CompanySettings.build_share_message so the wording is
+                 editable in Settings and the copy and share-sheet paths cannot
+                 drift apart. Falls back to the bare URL when absent.
+
+WHAT EACH BUTTON CAN ACTUALLY CARRY
+
+Only the copy and share-sheet paths can carry the message. FACEBOOK cannot: it
+ignores any text passed as a parameter and builds its card solely from the target
+page's og: tags — so the tagline reaches Facebook through og:description on the
+product page, not through this button.
+
+FACEBOOK works the way you would expect: sharer.php takes the URL, Facebook
+fetches it, and builds the card from the page's og: tags. Nothing else is
+needed — and notably, passing a title or image as parameters does nothing, since
+Facebook stopped honouring those years ago and reads only the target page.
+
+TIKTOK HAS NO WEB SHARE URL. There is no tiktok.com/share?url= equivalent to
+Facebook's sharer; TikTok's sharing is app-side only, and its Share Kit is an
+SDK for sharing *video files from your own app*, not links from a website. Any
+"TikTok share button" that claims otherwise is either opening the app's
+homepage or silently doing nothing.
+
+So the TikTok button does the only honest thing available: it opens the device's
+native share sheet via the Web Share API, which lists TikTok among the targets
+when the app is installed. Where that API does not exist — every desktop browser
+except Safari — it falls back to copying the link, because pasting into the app
+is the actual workflow on desktop anyway. The label changes to match what will
+happen, so the button never promises something it cannot do.
+{% endcomment %}
+
+{% comment %}Renders nothing without a URL. The signed-in product page passes an
+   empty share_url for drafts and private products, because those 404 publicly —
+   offering to share a link that dead-ends is worse than offering nothing.
+{% endcomment %}
+{% if share_url %}
+<div class="share-row" data-share-url="{{ share_url }}" data-share-title="{{ share_title }}"
+     data-share-text="{{ share_text|default:share_url }}">
+    <span class="share-row__label">Share</span>
+
+    <a class="share-btn share-btn--fb"
+       href="https://www.facebook.com/sharer/sharer.php?u={{ share_url|urlencode }}"
+       target="_blank" rel="noopener"
+       aria-label="Share on Facebook">
+        <i class="bi bi-facebook" aria-hidden="true"></i><span>Facebook</span>
+    </a>
+
+    <button type="button" class="share-btn share-btn--tt" data-share-tiktok
+            aria-label="Share to TikTok">
+        <i class="bi bi-tiktok" aria-hidden="true"></i><span data-share-tiktok-label>TikTok</span>
+    </button>
+
+    {% comment %}Labelled "Copy" rather than "Copy link": it copies the product
+       name, the tagline, the contact number AND the link. A button that says
+       "link" and puts four lines on the clipboard is the kind of small lie that
+       makes someone paste into a customer chat without looking.
+    {% endcomment %}
+    <button type="button" class="share-btn share-btn--copy" data-share-copy
+            aria-label="Copy product details and link">
+        <i class="bi bi-clipboard" aria-hidden="true"></i><span data-share-copy-label>Copy</span>
+    </button>
+</div>
+{% endif %}

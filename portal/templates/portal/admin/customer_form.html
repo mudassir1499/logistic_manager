@@ -54,6 +54,13 @@
                                 <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if not customer or customer.is_active %}checked{% endif %}>
                                 <label class="form-check-label" for="isActive">Active (can log in to portal)</label>
                             </div>
+                            <div class="form-check">
+                                <input type="checkbox" name="two_factor_enabled" class="form-check-input" id="twoFactor"
+                                       {% if customer.user_profile.two_factor_enabled %}checked{% endif %}>
+                                <label class="form-check-label" for="twoFactor">
+                                    <i class="bi bi-shield-lock me-1"></i>Require two-factor authentication at login
+                                </label>
+                            </div>
                         </div>
                     </div>
                     <div class="d-flex gap-2 mt-4">

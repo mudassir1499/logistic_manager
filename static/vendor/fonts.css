@@ -1,0 +1,36 @@
+/*!
+ * Self-hosted Inter (variable, latin subset)
+ * Inter is licensed under the SIL Open Font License 1.1 — https://rsms.me/inter/
+ *
+ * Replaces the Google Fonts stylesheet the site used to load from
+ * fonts.googleapis.com. Three reasons that mattered:
+ *
+ *   1. Speed. The old setup cost two DNS lookups, two TLS handshakes and a
+ *      round trip to fetch a CSS file whose only job was to point at a SECOND
+ *      request for the font itself. Serving the font from our own origin removes
+ *      the whole chain — it is already on the connection the page came down.
+ *   2. Render blocking. That stylesheet sat in <head> and blocked first paint.
+ *   3. Privacy. Google Fonts leaks every visitor's IP to a third party on page
+ *      load, which is a GDPR problem in several jurisdictions and needless here.
+ *
+ * This is the variable font, so one file covers every weight from 100 to 900 —
+ * smaller than the four static weights the site previously requested.
+ */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  /* A range, not a single value: this is a variable font, so the browser
+     synthesises every weight in between from one file. */
+  font-weight: 100 900;
+  /* `swap` renders text immediately in the fallback face and swaps Inter in when
+     it arrives. The alternative is invisible text for up to three seconds on a
+     slow connection, which is far worse than a brief font shift. */
+  font-display: swap;
+  src: url('fonts/inter-latin.woff2') format('woff2');
+  /* Latin subset only. The site's Arabic pages use a separate face, and the four
+     Chinese characters that appear in one article render from the system font. */
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA,
+                 U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+2074, U+20AC,
+                 U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}

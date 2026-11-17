@@ -1,4 +1,5 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
 {% block title %}FAQ — Frequently Asked Questions — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
@@ -8,6 +9,121 @@
 {% block og_description %}Find answers to common questions about China sourcing services, supplier verification, quality inspection, and order management.{% endblock %}
 {% block twitter_title %}FAQ — Frequently Asked Questions — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 {% block twitter_description %}Find answers to common questions about China sourcing services, supplier verification, quality inspection, and order management.{% endblock %}
+
+{% block structured_data %}
+{% comment %}--------------------------------------------------------------------
+   FAQPage structured data
+   ---------------------------------------------------------------------------
+   Every question/answer pair below is a plain-text mirror of what is visible in
+   the accordion further down this page. That correspondence is mandatory: Google
+   discards (and can penalise) FAQ markup describing content a visitor cannot see.
+   If you edit a question in the accordion, edit it here too.
+
+   Realistic expectation: since 2023 Google shows FAQ rich results only for a
+   narrow set of authoritative sites, so this will probably not put expandable
+   Q&A boxes under the listing. It still earns its place — it is how Google, Bing
+   and AI answer engines extract direct answers about pricing, MOQ, lead times and
+   payment terms, which is exactly what a prospect searches before enquiring.
+-----------------------------------------------------------------------{% endcomment %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "What types of products can you source from China?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We source a wide range of products including electronics, machinery, construction materials, home goods, textiles, packaging materials, auto parts, and consumer products. If you have a specific product in mind, send us the details and we will identify suitable manufacturers. We specialize in B2B bulk orders for businesses in the UAE and Middle East."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do you charge for sourcing services?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We typically charge a sourcing fee based on the complexity of the product and order size, plus a commission on the total order value. Alternatively, we can work on a fixed fee per project. All costs are agreed upfront before we begin — no hidden charges. Contact us for a detailed quote tailored to your needs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do you verify suppliers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We verify suppliers through a multi-step process: physical factory visits, business license verification, production capability audits, reference checks with past clients, and review of certifications such as ISO and CE. Because our team is based in China, we can visit factories in person — something remote agents cannot do. You receive a full supplier verification report before any payment is made."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do you handle quality inspections?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Quality inspection is one of our core services. We conduct pre-shipment inspections at the factory before goods leave China. Our inspections cover product specifications, functionality, packaging, labeling, and defect identification. We provide detailed photo and video reports so you can approve or reject the batch before shipping."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is there a minimum order quantity (MOQ)?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It depends on the supplier. Chinese manufacturers typically have their own MOQs, but we negotiate on your behalf to reduce minimums where possible. For the best pricing, larger quantities are recommended. We also offer order consolidation — combining multiple products from different suppliers into one shipment to save on freight costs."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do you handle shipping from China?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. We coordinate air and sea freight from China to your destination in the UAE or Middle East. We do not own cargo ships — we work with trusted freight partners to arrange the best shipping option for your order. We also prepare export documentation and support customs clearance. You get door-to-door coordination without dealing with logistics yourself."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What payment methods do you accept?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "We accept bank transfers, cash deposits, and online payments. New customers typically pay a deposit upfront to begin sourcing, with the balance due before shipping. For established clients with good payment history, we offer credit terms (Net 15 / Net 30). All invoices are available in the customer portal with downloadable PDFs and payment history."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How long does the sourcing process take?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Initial sourcing typically takes 3 to 7 business days depending on product complexity. After supplier selection and sample approval, production usually takes 15 to 45 days. Shipping adds 5 to 10 days by air or 25 to 35 days by sea to the UAE. We keep you updated at every stage through your customer portal."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Where is your office located?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Our main office is in Xuzhou, China at 11-2-303, Penghouyuan. This is our biggest advantage — we are physically in China, visiting factories and managing supplier relationships in person. We primarily serve clients in the UAE and Middle East, but we work with businesses worldwide. Contact us via phone at +8617651652712 or WhatsApp at the same number."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How do I create a customer account?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Click Register and fill in your business details (name, email, phone, address). Once submitted, our team will verify your account within 24 hours. After approval, you can log in to submit sourcing requests, track orders, view your ledger, and manage communications."
+      }
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "FAQ", "item": "{{ settings.base_url }}/faq/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 
@@ -165,8 +281,11 @@
 <section class="cta-section">
     <div class="container text-center">
         <h2 class="fw-bold mb-3">Still Have Questions?</h2>
-        <p class="text-white-50 mb-4">Our team is happy to answer any questions you have about sourcing from China.</p>
-        <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Contact Us</a>
+        <p class="text-white-50 mb-4">Read our in-depth guides on customs, freight and supplier verification — or just ask us directly.</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg">Contact Us</a>
+            <a href="{% url 'blog_index' %}" class="btn btn-outline-light btn-lg">Read the Guides</a>
+        </div>
     </div>
 </section>
 

@@ -1,0 +1,48 @@
+{
+  "name": "Mudassir LLC — Back Office",
+  "short_name": "Back Office",
+  "description": "Orders, products, customers and shipments for Mudassir LLC staff.",
+  "start_url": "/dashboard/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F3F4F7",
+  "theme_color": "#0A0A0A",
+  "icons": [
+    {
+      "src": "/static/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Orders",
+      "url": "/orders/",
+      "description": "Open the order list"
+    },
+    {
+      "name": "Products",
+      "url": "/products/",
+      "description": "Open the product catalogue"
+    },
+    {
+      "name": "Scan / Track",
+      "url": "/track/",
+      "description": "Track a shipment"
+    }
+  ]
+}

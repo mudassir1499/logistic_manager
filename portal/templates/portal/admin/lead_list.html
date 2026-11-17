@@ -1,0 +1,223 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% comment %}--------------------------------------------------------------------
+   WEBSITE LEADS INBOX
+   ---------------------------------------------------------------------------
+   Enquiries from the public contact form and the homepage hero form. Before this
+   page existed they were only in Django's stock /admin/ and were, in practice,
+   never read.
+
+   Designed as an inbox rather than a data table: each lead is a card carrying the
+   full message, because the message IS the useful content and forcing a click
+   through to read it adds a step to the one action that matters — replying fast.
+-----------------------------------------------------------------------{% endcomment %}
+
+{% block title %}Website Leads — Admin{% endblock %}
+{% block nav_leads %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+    <h1 class="page-title">
+        <i class="bi bi-inbox me-2"></i>Website Leads
+    </h1>
+    <p class="text-secondary">Enquiries submitted through the public website contact forms</p>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-amber">
+            <div class="stat-icon"><i class="bi bi-envelope-exclamation"></i></div>
+            <div class="stat-value">{{ new_count }}</div>
+            <div class="stat-label">Awaiting reply</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="stat-card stat-info">
+            <div class="stat-icon"><i class="bi bi-envelope"></i></div>
+            <div class="stat-value">{{ total_count }}</div>
+            <div class="stat-label">Total received</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    
+{% if status == 'spam' %}
+<div class="alert d-flex flex-wrap align-items-center gap-3"
+     style="background:rgba(176,132,33,.08);border:1px solid rgba(176,132,33,.28);">
+    <div style="flex:1;min-width:220px;font-size:13px;">
+        <strong>{{ spam_count }} message{{ spam_count|pluralize }} held back.</strong>
+        These never triggered a notification email. If one of them is a real
+        enquiry, use <em>Not spam</em> to move it to the inbox &mdash; that also
+        sends the alert that was suppressed.
+    </div>
+    <form method="post" action="{% url 'admin_lead_spam_action' %}"
+          onsubmit="return confirm('Permanently delete all {{ spam_count }} spam messages?');">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_all">
+        <button type="submit" class="btn btn-sm btn-danger">
+            <i class="bi bi-trash me-1"></i>Delete all {{ spam_count }}
+        </button>
+    </form>
+</div>
+{% endif %}
+<div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <h5 class="mb-0">{% if status == 'spam' %}Spam{% elif status == 'new' %}Awaiting reply{% else %}All enquiries{% endif %}</h5>
+        <div class="btn-group btn-group-sm">
+            <a href="?status=new" class="btn btn-outline-secondary {% if status == 'new' %}active{% endif %}">Awaiting reply</a>
+            <a href="?status=all" class="btn btn-outline-secondary {% if status == 'all' %}active{% endif %}">All</a>
+            {% comment %}Spam gets its own tab rather than being deleted on sight.
+               The filter is good but not infallible, and a real enquiry thrown
+               away silently is a lost customer who thinks they were ignored.
+            {% endcomment %}
+            {% if spam_count %}
+            <a href="?status=spam" class="btn btn-outline-secondary {% if status == 'spam' %}active{% endif %}">
+                Spam <span class="badge bg-secondary ms-1">{{ spam_count }}</span>
+            </a>
+            {% endif %}
+        </div>
+    </div>
+    <div class="card-body">
+
+        {% if leads %}
+        {% comment %}Bulk delete. The per-card checkboxes join this form through
+           their form="leadBulkDelete" attribute, because each card already holds
+           its own forms and HTML does not allow forms inside forms.{% endcomment %}
+        <form method="post" action="{% url 'admin_lead_delete' %}" id="leadBulkDelete"
+              class="d-flex align-items-center gap-3 flex-wrap mb-3"
+              onsubmit="var n = document.querySelectorAll('.lead-select:checked').length; return n > 0 && confirm('Permanently delete ' + n + ' selected enquir' + (n === 1 ? 'y' : 'ies') + '? This cannot be undone.');">
+            {% csrf_token %}
+            <input type="hidden" name="status" value="{{ status }}">
+            <input type="hidden" name="page" value="{{ page_obj.number }}">
+            <label class="d-flex align-items-center gap-2 mb-0 small" style="cursor:pointer;">
+                <input type="checkbox" class="form-check-input mt-0" id="leadSelectAll" aria-label="Select every enquiry on this page">
+                Select all on this page
+            </label>
+            <button type="submit" class="btn btn-sm btn-outline-danger" id="leadDeleteSelected" disabled>
+                <i class="bi bi-trash me-1"></i>Delete selected (<span id="leadSelectedCount">0</span>)
+            </button>
+        </form>
+
+        <div class="lead-inbox">
+            {% for lead in leads %}
+            <article class="lead-card{% if not lead.is_read %} lead-card-unread{% endif %}">
+
+                <div class="lead-card-head">
+                    <div class="lead-identity">
+                        <input type="checkbox" class="form-check-input lead-select mt-0 me-1"
+                               form="leadBulkDelete" name="lead_ids" value="{{ lead.id }}"
+                               aria-label="Select enquiry from {{ lead.name }}">
+                        <span class="lead-name">
+                            {% if not lead.is_read %}<span class="lead-dot" title="Not yet handled"></span>{% endif %}
+                            {{ lead.name }}
+                        </span>
+                        {% if lead.subject %}<span class="lead-subject">{{ lead.subject }}</span>{% endif %}
+                    </div>
+                    <time class="lead-time" datetime="{{ lead.created_at|date:'c' }}" title="{{ lead.created_at|date:'d M Y, H:i' }}">
+                        {{ lead.created_at|timesince }} ago
+                    </time>
+                </div>
+
+                {% comment %}Contact details as tap-to-act links. On a phone this turns a
+                   lead into a reply in one tap instead of copy-paste.{% endcomment %}
+                <div class="lead-contacts">
+                    <a href="mailto:{{ lead.email }}?subject=Re: your enquiry to {{ settings.company_name|default:'us' }}">
+                        <i class="bi bi-envelope"></i>{{ lead.email }}
+                    </a>
+                    {% if lead.phone %}
+                    <a href="tel:{{ lead.phone }}"><i class="bi bi-telephone"></i>{{ lead.phone }}</a>
+                    <a href="https://wa.me/{{ lead.phone|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}"
+                       target="_blank" rel="noopener noreferrer" class="lead-wa">
+                        <i class="bi bi-whatsapp"></i>WhatsApp
+                    </a>
+                    {% endif %}
+                </div>
+
+                <p class="lead-message">{{ lead.message|linebreaksbr }}</p>
+
+                {% comment %}Why the filter flagged it. Shown so a wrong call can
+                   be seen and corrected rather than guessed at - a filter nobody
+                   can audit is one nobody trusts, and the first false positive
+                   would otherwise mean switching it off.{% endcomment %}
+                {% if lead.is_spam and lead.spam_reason %}
+                <p class="small" style="color:var(--text-secondary);margin:-4px 0 10px;">
+                    <i class="bi bi-funnel me-1"></i>Flagged ({{ lead.spam_score }}): {{ lead.spam_reason }}
+                </p>
+                {% endif %}
+
+                <div class="lead-actions">
+                    {% if lead.is_spam %}
+                    <form method="post" action="{% url 'admin_lead_spam_action' %}">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="not_spam">
+                        <input type="hidden" name="lead_id" value="{{ lead.id }}">
+                        <button type="submit" class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-up-left-square me-1"></i>Not spam
+                        </button>
+                    </form>
+                    {% endif %}
+                    <form method="post" action="{% url 'admin_lead_toggle_read' lead.id %}?status={{ status }}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm {% if lead.is_read %}btn-outline-secondary{% else %}btn-success{% endif %}">
+                            <i class="bi {% if lead.is_read %}bi-arrow-counterclockwise{% else %}bi-check2{% endif %} me-1"></i>
+                            {% if lead.is_read %}Mark unread{% else %}Mark handled{% endif %}
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'admin_lead_delete' %}"
+                          onsubmit="return confirm('Permanently delete the enquiry from {{ lead.name|escapejs }}? This cannot be undone.');">
+                        {% csrf_token %}
+                        <input type="hidden" name="lead_ids" value="{{ lead.id }}">
+                        <input type="hidden" name="status" value="{{ status }}">
+                        <input type="hidden" name="page" value="{{ page_obj.number }}">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash me-1"></i>Delete
+                        </button>
+                    </form>
+                </div>
+
+            </article>
+            {% endfor %}
+        </div>
+
+        {% include 'includes/pagination.html' %}
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-inbox" style="font-size:3rem;opacity:.25;"></i>
+            <p class="text-secondary mt-3 mb-1">
+                {% if status == 'spam' %}No spam caught.{% elif status == 'new' %}Nothing waiting for a reply.{% else %}No enquiries yet.{% endif %}
+            </p>
+            {% if status == 'new' and total_count %}
+            <a href="?status=all" class="btn btn-sm btn-outline-secondary mt-2">View all {{ total_count }} enquiries</a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+
+<script>
+(function () {
+    var all = document.getElementById('leadSelectAll');
+    var button = document.getElementById('leadDeleteSelected');
+    var count = document.getElementById('leadSelectedCount');
+    if (!all || !button) { return; }
+    var boxes = Array.prototype.slice.call(document.querySelectorAll('.lead-select'));
+
+    function refresh() {
+        var n = boxes.filter(function (b) { return b.checked; }).length;
+        count.textContent = n;
+        button.disabled = n === 0;
+        all.checked = n > 0 && n === boxes.length;
+        all.indeterminate = n > 0 && n < boxes.length;
+    }
+    all.addEventListener('change', function () {
+        boxes.forEach(function (b) { b.checked = all.checked; });
+        refresh();
+    });
+    boxes.forEach(function (b) { b.addEventListener('change', refresh); });
+    refresh();
+})();
+</script>
+{% endblock %}

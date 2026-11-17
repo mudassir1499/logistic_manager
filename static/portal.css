@@ -1,28 +1,77 @@
 :root {
-  --color-primary: #C84B31;
-  --color-primary-dark: #A33D28;
-  --color-primary-light: #D96E58;
-  --color-secondary: #2D5A27;
-  --color-secondary-dark: #1F3E1B;
-  --color-accent: #F5A623;
-  --color-accent-dark: #D48A1A;
-  --color-dark: #0F172A;
-  --color-dark-light: #1E293B;
-  --color-slate: #334155;
-  --color-muted: #64748B;
-  --color-light: #F8FAFC;
-  --color-bg: #F1F5F9;
+  /* -------------------------------------------------------------------------
+     Brand palette: deep navy with a gold accent.
+
+     The ink used to be the logo's pure black (#0A0A0A). It is now navy, which
+     is the one deliberate departure from the wordmark - the gold star is
+     untouched and still sets every accent, so the logo continues to sit on
+     these surfaces without clashing. Navy was chosen over black because the
+     dark areas of this design are large (hero wash, feature bar, footer) and a
+     full-black field of that size reads as a void rather than as a brand
+     colour.
+
+     The ramp runs from the darkest surface to the lightest:
+       --color-ink-900  #0E182A  pressed states, the deepest wash
+       --color-ink-800  #16243D  the primary dark surface: nav, footer, buttons
+       --color-ink-700  #1B2A47  gradient partner
+       --color-ink-600  #24365A  body copy on white (12.9:1)
+       --color-ink-500  #44557A  muted navy for rules and secondary shapes
+
+     Gold keeps its three tiers, because one value cannot be legible everywhere:
+       --color-gold        shapes, rules, icons, focus rings, large display text
+                           (3.40:1 on white — AA for large text and non-text,
+                           NOT enough for body copy)
+       --color-gold-text   gold text at body size (5.26:1 on white — AA)
+       --color-gold-light  gold on dark surfaces (9.14:1 on navy — AAA)
+     ------------------------------------------------------------------------- */
+  --color-ink-900: #0E182A;
+  --color-ink-800: #16243D;
+  --color-ink-700: #1B2A47;
+  --color-ink-600: #24365A;
+  --color-ink-500: #44557A;
+
+  --color-primary: #16243D;        /* navy — primary action colour */
+  --color-primary-dark: #0E182A;   /* pressed */
+  --color-primary-light: #2C3E5E;
+  --color-secondary: #2C3E5E;
+  --color-secondary-dark: #1B2A47;
+  --color-accent: #1B2A47;         /* gradient partner (navy, not gold) */
+  --color-accent-dark: #16243D;
+  --color-gold: #B08421;           /* the star mark */
+  --color-gold-dark: #8A661A;
+  --color-gold-text: #8A661A;      /* body-size gold text */
+  --color-gold-light: #D9A93C;     /* gold on dark surfaces */
+  --color-gold-soft: rgba(176, 132, 33, 0.10);
+  --color-dark: #16243D;
+  --color-dark-light: #24365A;
+  --color-slate: #44557A;
+  /* Body-size secondary text, so it has to clear 4.5:1 on white: 5.31:1. */
+  --color-muted: #5F6B80;
+  --color-light: #FAFBFC;
+  --color-bg: #F3F4F7;
   --color-white: #FFFFFF;
-  --color-border: #E2E8F0;
-  --color-success: #16A34A;
-  --color-danger: #DC2626;
-  --color-warning: #EA580C;
-  --color-info: #2563EB;
+  --color-border: #DDE2EA;
+
+  /* The shop and product pages were written against style.css's token names and
+     carry `var(--text-secondary, #71717a)` throughout. style.css is loaded by a
+     DIFFERENT root template and never alongside this file, so every one of those
+     fell through to the #71717a fallback - 4.39:1 on white, just under the 4.5:1
+     AA wants at those sizes. Declaring the names here is what makes the fallback
+     irrelevant; it reaches the breadcrumbs, pager, spec labels, hero subtitles
+     and section headings in one place. */
+  --text-primary: #16243D;
+  --text-secondary: #5F6B80;
+  --border-color: #DDE2EA;
+  --color-success: #157F4A;
+  --color-danger: #B3261E;
+  --color-warning: #C2410C;        /* pushed orange so it never reads as gold */
+  --color-info: #44546A;
 
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-size-hero: 3.5rem;
-  --font-size-section: 2rem;
-  --font-size-subsection: 1.5rem;
+  /* Fluid type: scales smoothly from mobile to desktop without media queries. */
+  --font-size-hero: clamp(2.25rem, 6vw, 3.5rem);
+  --font-size-section: clamp(1.6rem, 4vw, 2rem);
+  --font-size-subsection: clamp(1.25rem, 2.5vw, 1.5rem);
   --font-size-body: 1rem;
   --font-size-small: 0.875rem;
   --font-weight-normal: 400;
@@ -43,7 +92,7 @@
   --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -2px rgba(0,0,0,0.1);
   --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -4px rgba(0,0,0,0.1);
   --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.1);
-  --shadow-glow: 0 0 20px rgba(200,75,49,0.15);
+  --shadow-glow: 0 0 20px rgba(176, 132, 33, 0.15);
 
   --transition-fast: 0.2s ease;
   --transition-base: 0.3s ease;
@@ -65,8 +114,15 @@ body {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  padding-top: 72px;
+  /* Kept in step with the inline offset in portal/base.html. Both clear the
+     fixed navbar, which measures 82px in its solid state. */
+  padding-top: 82px;
 }
+
+/* The offset above clears the fixed public navbar. The signed-in portal has no
+   fixed navbar — its topbar is sticky inside the content column — so the offset
+   there is just a band of dead space above the shell. */
+body.portal-app { padding-top: 0; }
 
 .portal-main { min-height: calc(100vh - 200px); }
 
@@ -78,17 +134,37 @@ body {
   left: 0;
   right: 0;
   z-index: 1030;
-  background: transparent;
-  padding: 1rem 0;
+  /* Solid dark bar by default so the white brand/links stay readable on the
+     light-background portal pages. The homepage restores a transparent bar over
+     its dark hero via `body.has-hero` below. */
+  background: rgba(22, 36, 61, 0.96);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: var(--shadow-md);
+  padding: 0.75rem 0;
   transition: background var(--transition-base), padding var(--transition-base), box-shadow var(--transition-base);
 }
 
 .portal-navbar.scrolled {
-  background: rgba(15, 23, 42, 0.92);
+  background: rgba(22, 36, 61, 0.92);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   padding: 0.6rem 0;
   box-shadow: var(--shadow-md);
+}
+
+/* The header is ALWAYS solid.
+
+   This used to go transparent over the homepage hero until the user scrolled.
+   It looked good on a wide desktop and badly everywhere else: the brand and
+   links sat on a photograph of a container yard, contrast depended entirely on
+   which part of the image happened to be behind them, and opening the mobile
+   menu at the top of the page dropped the whole expanded panel onto the photo -
+   which is what made the menu unreadable.
+   Only the padding change is kept, so the bar is still a little taller before
+   the user scrolls. */
+body.has-hero .portal-navbar:not(.scrolled) {
+  padding: 1rem 0;
 }
 
 .portal-navbar .navbar-brand {
@@ -98,16 +174,51 @@ body {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
+  /* The brand is the one label that must never be clipped or collide with the
+     nav: it is the site's identity and the link home. flex-shrink keeps it at
+     its natural width, and the margin guarantees a gap to the first nav item
+     rather than leaving it to whatever space happens to be left over. */
+  flex-shrink: 0;
+  margin-right: 1.25rem;
+  white-space: nowrap;
 }
 
 .portal-navbar .brand-icon { font-size: 1.5rem; }
 
+/* The nav's own spacing, moved off the markup.
+
+   This was Bootstrap's `gap-1` utility, which ships with !important and so
+   could not be tuned without an !important war. It matters because the row's
+   width is a budget: eight gaps at 4px is 32px, and the row was 39px over its
+   container. Owning the value here is what lets it be spent deliberately. */
+.portal-navbar .navbar-nav { gap: 2px; }
+
 .portal-navbar .nav-link {
   color: rgba(255,255,255,0.85) !important;
   font-weight: var(--font-weight-medium);
-  padding: 0.5rem 1rem !important;
+
+  /* 0.55rem, not 1rem. Nine items at 1rem needed 1193px of a 1176px container,
+     so the row was over budget at EVERY desktop width — there was no viewport
+     where it fitted, which is why it never looked settled. The narrower gutter
+     buys that back with room to spare, and adjacent labels still clear each
+     other by ~20px. */
+  padding: 0.5rem 0.55rem !important;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+
+  /* A nav link must never wrap, and this is load-bearing rather than cosmetic.
+     The bar is `position: fixed` and the page clears it with a HARD-CODED
+     `padding-top: 72px`. When the row ran out of room, the links wrapped their
+     icon onto a second line, each link grew from 40px to 67px, and the bar grew
+     to 99px — 27px taller than the space reserved for it. The result was the
+     top of every page sitting underneath the header.
+
+     With nowrap the bar's height depends only on the font, so the 72px offset
+     stays true no matter what is added to the nav. If the row ever overflows
+     again it will do so visibly, sideways, instead of silently eating the top
+     of the page. */
+  white-space: nowrap;
 }
 
 .portal-navbar .nav-link:hover {
@@ -122,6 +233,19 @@ body {
   padding: 0.5rem 1.25rem;
   border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
+
+  /* Same reasoning as .nav-link above, and the reason that fix was incomplete:
+     "Customer Login" is a .btn-primary, so it never got the nowrap rule and was
+     the one thing left free to break onto a second line. It did, which took the
+     bar to 90px against the 82px the page reserves — putting the top of every
+     page underneath the header, exactly the failure the .nav-link comment
+     describes.
+
+     flex-shrink: 0 keeps the button at its natural width when the row is tight,
+     so pressure goes into the nav's own spacing rather than squeezing the one
+     element that has to stay readable. */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .portal-navbar .btn-primary:hover {
@@ -133,6 +257,25 @@ body {
 .portal-navbar .navbar-toggler {
   border-color: rgba(255,255,255,0.3);
   filter: invert(1);
+}
+
+/* Desktop spacing for the full horizontal nav.
+
+   No upper bound, and that is the point. It is tempting to treat 1920px as
+   roomier than 1400px and only tighten the narrow end — but .container is
+   capped at 1200px, so EVERY desktop width has the same 1176px to work in. A
+   wider monitor adds margin outside the container, never space inside it.
+   There is therefore one desktop layout problem, not a narrow-band one.
+
+   navbar-expand-xl drops the hamburger at 1200px, which is where the row first
+   has to hold all nine items. Measured with the padding rule live, the row came
+   to 1173px of 1176 — three pixels of slack, which is not a layout, it is a
+   coincidence. These values bring it to ~1110px and leave real room for a
+   longer label or one more link. */
+@media (min-width: 1200px) {
+  .portal-navbar .nav-link { padding: 0.5rem 0.4rem !important; }
+  .portal-navbar .navbar-brand { font-size: 1.1rem; margin-right: 0.75rem; }
+  .portal-navbar .btn-primary { padding: 0.5rem 0.9rem; }
 }
 
 .avatar-sm {
@@ -179,7 +322,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/quality-inspection.webp') center/cover no-repeat;
   opacity: 0.25;
 }
 
@@ -187,7 +330,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(15,23,42,0.92) 0%, rgba(15,23,42,0.7) 50%, rgba(200,75,49,0.4) 100%);
+  background: linear-gradient(135deg, rgba(22, 36, 61, 0.92) 0%, rgba(22, 36, 61, 0.7) 50%, rgba(176, 132, 33, 0.4) 100%);
 }
 
 .hero-v2 .container {
@@ -235,7 +378,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/hero-backdrop.webp') center/cover no-repeat;
   opacity: 0.15;
 }
 
@@ -243,7 +386,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.85) 100%);
+  background: linear-gradient(135deg, rgba(22, 36, 61, 0.95) 0%, rgba(22, 36, 61, 0.85) 100%);
 }
 
 .page-hero .container { position: relative; z-index: 1; }
@@ -304,7 +447,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/hero-backdrop.webp') center/cover no-repeat;
   opacity: 0.08;
 }
 
@@ -370,7 +513,7 @@ body {
   width: 56px;
   height: 56px;
   border-radius: var(--radius-md);
-  background: rgba(200,75,49,0.1);
+  background: rgba(176, 132, 33, 0.1);
   color: var(--color-primary);
   display: flex;
   align-items: center;
@@ -457,7 +600,7 @@ body {
   margin-top: 0.25rem;
 }
 
-.stat-primary .stat-icon { background: rgba(200,75,49,0.1); color: var(--color-primary); }
+.stat-primary .stat-icon { background: rgba(176, 132, 33, 0.1); color: var(--color-primary); }
 .stat-secondary .stat-icon { background: rgba(45,90,39,0.1); color: var(--color-secondary); }
 .stat-accent .stat-icon { background: rgba(245,166,35,0.1); color: var(--color-accent-dark); }
 .stat-dark .stat-icon { background: rgba(30,41,59,0.1); color: var(--color-dark-light); }
@@ -549,7 +692,7 @@ body {
 .img-card .img-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(15,23,42,0.9) 0%, transparent 60%);
+  background: linear-gradient(to top, rgba(22, 36, 61, 0.9) 0%, transparent 60%);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -632,7 +775,27 @@ body {
   background-position: center;
 }
 
-.team-card .team-info { padding: 1.5rem; }
+.team-card .team-info { padding: 1.5rem; text-align: center; }
+
+/* Shown when a team member has no photograph yet: their initials, rather than a
+   silhouette icon that reads as a broken image. */
+.team-card .team-photo-initials {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #1F2933 0%, #3C4A57 100%);
+  color: #E7C56B;
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
+.team-card .team-links a {
+  color: var(--color-dark-light, #3C4A57);
+  font-size: 1.05rem;
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+.team-card .team-links a:hover { color: var(--color-primary, #B08421); }
 
 .process-step-v2 {
   text-align: center;
@@ -650,7 +813,7 @@ body {
   justify-content: center;
   font-size: 1.75rem;
   margin-bottom: 1rem;
-  box-shadow: 0 8px 20px rgba(200,75,49,0.25);
+  box-shadow: 0 8px 20px rgba(22, 36, 61, 0.27);
   position: relative;
 }
 
@@ -682,7 +845,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/hero-backdrop.webp') center/cover no-repeat;
   opacity: 0.1;
 }
 
@@ -830,7 +993,7 @@ body {
 .portfolio-card .portfolio-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(to top, rgba(15,23,42,0.9) 0%, rgba(15,23,42,0.3) 50%, transparent 100%);
+  background: linear-gradient(to top, rgba(22, 36, 61, 0.9) 0%, rgba(22, 36, 61, 0.3) 50%, transparent 100%);
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -889,7 +1052,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/quality-inspection.webp') center/cover no-repeat;
   opacity: 0.08;
 }
 
@@ -929,7 +1092,7 @@ body {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80') center/cover no-repeat;
+  background: url('./images/stock/china-operations.webp') center/cover no-repeat;
   opacity: 0.15;
 }
 
@@ -966,7 +1129,7 @@ body {
 
 .form-control:focus, .form-select:focus {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(200,75,49,0.15);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.15);
 }
 
 .input-group-text {
@@ -1010,6 +1173,38 @@ body {
   color: var(--color-white);
 }
 
+/* ---------------------------------------------------------------------------
+   Primary buttons on DARK surfaces.
+   With a monochrome palette the primary button is solid black, which vanishes
+   against the ink hero, CTA band, footer and glass lead card. On those four
+   surfaces it inverts to a light plate with ink text, keeping the same visual
+   weight without introducing a second brand colour. This is a safety net for
+   the whole dark family — new dark sections inherit it automatically rather
+   than shipping an invisible button.
+   --------------------------------------------------------------------------- */
+.hero-v2 .btn-primary,
+.cta-section .btn-primary,
+.portal-footer .btn-primary,
+.hero-lead-card .btn-primary {
+  background: var(--color-white);
+  color: var(--color-dark);
+}
+
+.hero-v2 .btn-primary:hover,
+.cta-section .btn-primary:hover,
+.portal-footer .btn-primary:hover,
+.hero-lead-card .btn-primary:hover {
+  background: #E8E9ED;
+  color: var(--color-dark);
+}
+
+/* Gold links need the lighter tier once they sit on ink (9.14:1 there, where
+   the body-size gold would only manage 2.6:1). */
+.cta-section a:not(.btn),
+.portal-footer a:not(.btn):hover {
+  color: var(--color-gold-light);
+}
+
 .btn-secondary {
   background: linear-gradient(135deg, var(--color-secondary), var(--color-secondary-dark));
   border: none;
@@ -1022,15 +1217,20 @@ body {
   color: var(--color-white);
 }
 
+/* The standout CTA — and the one place a gold FILL is justified rather than a
+   gold accent. It has to work on the dark hero panel, where the black
+   .btn-primary would disappear entirely. Text is ink, not white: black on this
+   gold is 5.82:1, white on it only 3.40:1 and would fail. */
 .btn-accent {
-  background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark));
+  background: linear-gradient(135deg, var(--color-gold), var(--color-gold-dark));
   border: none;
   color: var(--color-dark);
+  font-weight: var(--font-weight-semibold);
 }
 
 .btn-accent:hover {
   transform: translateY(-1px);
-  box-shadow: 0 0 20px rgba(245,166,35,0.25);
+  box-shadow: 0 0 20px rgba(176, 132, 33, 0.35);
   color: var(--color-dark);
 }
 
@@ -1095,7 +1295,7 @@ body {
 
 .table tbody tr:last-child td { border-bottom: none; }
 
-.table tbody tr:hover { background: rgba(200,75,49,0.03); }
+.table tbody tr:hover { background: rgba(176, 132, 33, 0.03); }
 
 .badge {
   font-weight: var(--font-weight-medium);
@@ -1103,11 +1303,11 @@ body {
   border-radius: var(--radius-sm);
 }
 
-.badge-success { background: rgba(22,163,74,0.1); color: var(--color-success); }
-.badge-danger { background: rgba(220,38,38,0.1); color: var(--color-danger); }
-.badge-warning { background: rgba(234,88,12,0.1); color: var(--color-warning); }
-.badge-info { background: rgba(37,99,235,0.1); color: var(--color-info); }
-.badge-primary { background: rgba(200,75,49,0.1); color: var(--color-primary); }
+.badge-success { background: rgba(21,127,74,0.1); color: var(--color-success); }
+.badge-danger { background: rgba(179,38,30,0.1); color: var(--color-danger); }
+.badge-warning { background: rgba(194,65,12,0.1); color: var(--color-warning); }
+.badge-info { background: rgba(68,84,106,0.1); color: var(--color-info); }
+.badge-primary { background: rgba(176, 132, 33, 0.1); color: var(--color-primary); }
 .badge-secondary { background: rgba(100,116,139,0.1); color: var(--color-muted); }
 
 .card {
@@ -1126,33 +1326,265 @@ body {
 
 .card-body { padding: 1.5rem; }
 
+/* ---------------------------------------------------------------------------
+   PRODUCT CARD
+   ---------------------------------------------------------------------------
+   Markup: portal/includes/product_card.html (one partial, all four catalogue
+   pages). .product-card is also a JavaScript hook — static/portal.js walks up
+   from the Add to Cart button via closest('.product-card') — so the class name
+   is load-bearing and must not be renamed.
+
+   The card is a flex column so the action row can be pushed to the bottom with
+   margin-top:auto. Without that, buttons sit at different heights across a row
+   whose titles wrap to different line counts.
+   --------------------------------------------------------------------------- */
 .product-card {
+  display: flex;
+  flex-direction: column;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-white);
   border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast),
+              transform var(--transition-fast);
   height: 100%;
 }
 
 .product-card:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--shadow-lg);
+  transform: translateY(-3px);
+  border-color: var(--color-gold);
+  box-shadow: 0 10px 26px rgba(22, 36, 61, 0.10);
 }
 
-.product-image-wrapper { position: relative; }
+/* ---- Media ---- */
 
-.product-image-wrapper img {
+.product-card__media {
+  position: relative;
+  /* A fixed aspect ratio keeps every card's image the same height without
+     hard-coding pixels, so the grid stays aligned at any column width. */
+  aspect-ratio: 4 / 3;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.product-card__img {
   width: 100%;
-  height: 200px;
+  height: 100%;
   object-fit: cover;
+  display: block;
+  transition: transform 0.45s ease;
 }
 
-.product-badge {
+.product-card:hover .product-card__img { transform: scale(1.04); }
+
+.product-card__img--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-border);
+  font-size: 2.25rem;
+}
+
+/* ---- Overlay status flags ---- */
+/* Solid, not translucent. The previous glass badges sat over arbitrary supplier
+   photography and were regularly illegible against pale product shots. */
+
+.product-card__flags {
   position: absolute;
-  bottom: 8px;
-  right: 8px;
+  top: 0.6rem;
+  left: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.product-card__flag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.22rem 0.55rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  line-height: 1.4;
+  color: var(--color-white);
+  background: rgba(22, 36, 61, 0.86);
+  backdrop-filter: blur(4px);
+}
+
+/* Gold on near-black: the palette's --color-gold-light tier, 9.14:1, is the
+   only gold legible at this size. */
+.product-card__flag--amazon { color: var(--color-gold-light); }
+.product-card__flag--noon { color: rgba(255, 255, 255, 0.92); }
+
+.product-card__flag--ready {
+  background: var(--color-success);
+  color: var(--color-white);
+}
+
+/* ---- Body ---- */
+
+.product-card__body {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  padding: 0.95rem 1rem 1rem;
+}
+
+.product-card__eyebrow {
+  margin: 0 0 0.2rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.product-card__title {
+  margin: 0 0 0.4rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-primary);
+  /* Clamp to two lines so a long supplier name cannot push the price and
+     button out of alignment with neighbouring cards. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.product-card__price {
+  margin: 0 0 0.55rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.2;
+}
+
+.product-card__currency {
+  margin-left: 0.28rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.product-card__fx {
+  margin: -0.3rem 0 0.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+}
+
+/* ---- Spec list ---- */
+
+.product-card__specs {
+  list-style: none;
+  margin: 0 0 0.7rem;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.product-card__specs li {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--color-slate);
+  white-space: nowrap;
+}
+
+.product-card__specs i {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+
+.product-card__note {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--color-muted);
+}
+
+.product-card__note i { flex-shrink: 0; margin-top: 0.1rem; }
+
+/* ---- Actions ---- */
+
+.product-card__actions {
+  /* Pins the row to the bottom of the card regardless of body length. */
+  margin-top: auto;
+  display: flex;
+  gap: 0.4rem;
+  padding-top: 0.2rem;
+}
+
+.product-card__actions .product-qty-input {
+  width: 62px;
+  flex: 0 0 62px;
+  height: 38px;
+  padding: 0.3rem 0.4rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.product-card__actions .product-qty-input:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px var(--color-gold-soft);
+  outline: none;
+}
+
+.product-card__btn {
+  flex: 1 1 auto;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  background: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  color: var(--color-white);
+  white-space: nowrap;
+}
+
+.product-card__btn:hover {
+  background: var(--color-primary-dark);
+  border-color: var(--color-primary-dark);
+  color: var(--color-white);
+}
+
+.product-card__btn--in-cart,
+.product-card__btn--in-cart:hover {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--color-white);
+  opacity: 1;   /* Bootstrap dims [disabled]; the state is intentional, not inactive */
+}
+
+.product-card__sku {
+  margin: 0.55rem 0 0;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.6875rem;
+  color: var(--color-muted);
 }
 
 .portal-footer {
@@ -1172,10 +1604,31 @@ body {
 
 .hover-primary:hover { color: var(--color-primary) !important; }
 
-.back-to-top {
+/* --------------------------------------------------------------------------
+   Floating quick-actions column
+   --------------------------------------------------------------------------
+   All of the site's own floating buttons live in ONE stack pinned to the bottom
+   LEFT. The bottom RIGHT is deliberately left empty for the Tawk.to chat widget,
+   which is injected by a third-party script we do not control and which always
+   positions itself there. Previously back-to-top also sat bottom-right and the
+   two overlapped.
+
+   The old `.quote-float` (a pill fixed to the bottom centre) has been removed
+   entirely: it covered page content on every screen, and a quote CTA is already
+   present in the navbar and at the end of every page.
+   -------------------------------------------------------------------------- */
+.float-stack {
   position: fixed;
   bottom: 24px;
-  right: 24px;
+  left: 24px;
+  z-index: 1050;
+  display: flex;
+  flex-direction: column-reverse;  /* WhatsApp anchored at the bottom, back-to-top above it */
+  align-items: center;
+  gap: 12px;
+}
+
+.back-to-top {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-full);
@@ -1188,15 +1641,18 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  z-index: 1050;
   opacity: 0;
   visibility: hidden;
-  transform: translateY(20px);
-  transition: all var(--transition-base);
+  transform: translateY(12px);
+  transition: opacity var(--transition-base), transform var(--transition-base), visibility var(--transition-base);
+  /* 44px is the minimum comfortable touch target; anything smaller is a
+     frequent mis-tap on a phone. */
   min-width: 44px;
   min-height: 44px;
 }
 
+/* Revealed by portal.js once the page has been scrolled. Hidden rather than
+   absent so it does not shift the stack when it appears. */
 .back-to-top.visible {
   opacity: 1;
   visibility: visible;
@@ -1205,65 +1661,31 @@ body {
 
 .back-to-top:hover {
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px rgba(200,75,49,0.3);
+  box-shadow: 0 12px 24px rgba(22, 36, 61, 0.32);
 }
 
 .whatsapp-float {
-  position: fixed;
-  bottom: 24px;
-  left: 24px;
   width: 56px;
   height: 56px;
   border-radius: var(--radius-full);
   background: #25d366;
   color: var(--color-white);
   border: none;
-  box-shadow: 0 4px 12px rgba(37,211,102,0.4);
+  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.4);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.75rem;
-  z-index: 1050;
-  transition: all var(--transition-base);
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
   text-decoration: none;
   min-width: 44px;
   min-height: 44px;
 }
 
 .whatsapp-float:hover {
-  transform: scale(1.1) rotate(-5deg);
-  box-shadow: 0 6px 20px rgba(37,211,102,0.5);
-  color: var(--color-white);
-}
-
-.quote-float {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: linear-gradient(135deg, var(--color-primary), var(--color-accent));
-  color: var(--color-white);
-  border: none;
-  border-radius: 50px;
-  padding: 14px 28px;
-  font-weight: var(--font-weight-bold);
-  font-size: 0.95rem;
-  box-shadow: 0 4px 16px rgba(200,75,49,0.4);
-  cursor: pointer;
-  z-index: 1040;
-  display: none;
-  align-items: center;
-  gap: 8px;
-  text-decoration: none;
-  white-space: nowrap;
-  min-height: 44px;
-  transition: all var(--transition-base);
-}
-
-.quote-float:hover {
-  transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 6px 20px rgba(200,75,49,0.5);
+  transform: scale(1.08);
+  box-shadow: 0 6px 20px rgba(37, 211, 102, 0.5);
   color: var(--color-white);
 }
 
@@ -1333,7 +1755,7 @@ img[loading="lazy"].lazy-loaded { opacity: 1; }
 *:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(200,75,49,0.25);
+  box-shadow: 0 0 0 4px rgba(176, 132, 33, 0.25);
 }
 
 a:focus-visible { border-radius: 2px; }
@@ -1342,7 +1764,7 @@ button:focus-visible,
 .btn:focus-visible {
   outline: 2px solid var(--color-primary);
   outline-offset: 2px;
-  box-shadow: 0 0 0 4px rgba(200,75,49,0.25), 0 0 20px rgba(200,75,49,0.38);
+  box-shadow: 0 0 0 4px rgba(176, 132, 33, 0.25), 0 0 20px rgba(176, 132, 33, 0.38);
 }
 
 input:focus-visible,
@@ -1352,7 +1774,7 @@ textarea:focus-visible,
   outline: 2px solid var(--color-primary);
   outline-offset: 0;
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px rgba(200,75,49,0.3);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.3);
 }
 
 @media (max-width: 991.98px) {
@@ -1375,9 +1797,8 @@ textarea:focus-visible,
   .section-py { padding: 60px 0; }
   .trust-item { justify-content: center; }
   .counter-section .counter-value { font-size: 1.75rem; }
-  .quote-float { display: flex; }
-  .back-to-top { bottom: 80px; right: 16px; }
-  .whatsapp-float { bottom: 80px; left: 16px; }
+  /* Tighter inset on small screens; the stack keeps its own spacing. */
+  .float-stack { bottom: 16px; left: 16px; gap: 10px; }
   .auth-card { padding: 1.5rem; }
   .auth-card-split .auth-left,
   .auth-card-split .auth-right { padding: 1.5rem; }
@@ -1398,7 +1819,7 @@ textarea:focus-visible,
 
 @media (prefers-reduced-motion: reduce) {
   .animate-on-scroll { opacity: 1; transform: none; transition: none; }
-  .back-to-top, .whatsapp-float, .quote-float { transition: none; }
+  .back-to-top, .whatsapp-float { transition: none; }
   html { scroll-behavior: auto; }
 }
 
@@ -1419,7 +1840,7 @@ textarea:focus-visible,
   right: -20%;
   width: 300px;
   height: 300px;
-  background: rgba(200,75,49,0.15);
+  background: rgba(176, 132, 33, 0.15);
   border-radius: var(--radius-full);
   filter: blur(60px);
 }
@@ -1523,7 +1944,7 @@ textarea:focus-visible,
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(200,75,49,0.15) 0%, rgba(15,23,42,0.95) 60%);
+  background: linear-gradient(135deg, rgba(176, 132, 33, 0.15) 0%, rgba(22, 36, 61, 0.95) 60%);
   pointer-events: none;
 }
 
@@ -1537,6 +1958,7 @@ textarea:focus-visible,
 .contact-hero,
 .portfolio-hero,
 .testimonials-hero,
+.blog-hero,
 .faq-hero {
   position: relative;
   padding: 140px 0 80px;
@@ -1551,11 +1973,12 @@ textarea:focus-visible,
 .contact-hero::before,
 .portfolio-hero::before,
 .testimonials-hero::before,
+.blog-hero::before,
 .faq-hero::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1600&q=80') center/cover no-repeat;
+  background: url('./images/stock/hero-backdrop.webp') center/cover no-repeat;
   opacity: 0.12;
 }
 
@@ -1564,11 +1987,12 @@ textarea:focus-visible,
 .contact-hero::after,
 .portfolio-hero::after,
 .testimonials-hero::after,
+.blog-hero::after,
 .faq-hero::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,0.85) 100%);
+  background: linear-gradient(135deg, rgba(22, 36, 61, 0.95) 0%, rgba(22, 36, 61, 0.85) 100%);
 }
 
 .about-hero .container,
@@ -1576,6 +2000,7 @@ textarea:focus-visible,
 .contact-hero .container,
 .portfolio-hero .container,
 .testimonials-hero .container,
+.blog-hero .container,
 .faq-hero .container { position: relative; z-index: 1; }
 
 .about-hero .hero-title,
@@ -1583,6 +2008,7 @@ textarea:focus-visible,
 .contact-hero .hero-title,
 .portfolio-hero .hero-title,
 .testimonials-hero .hero-title,
+.blog-hero .hero-title,
 .faq-hero .hero-title {
   color: var(--color-white);
   font-size: 2.5rem;
@@ -1595,9 +2021,12 @@ textarea:focus-visible,
 .contact-hero .hero-subtitle,
 .portfolio-hero .hero-subtitle,
 .testimonials-hero .hero-subtitle,
+.blog-hero .hero-subtitle,
 .faq-hero .hero-subtitle {
   color: rgba(255,255,255,0.75);
   font-size: 1rem;
+  /* The blog hero carries a longer standfirst than the other pages, so it opts
+     out of the 520px cap via the inline max-width on the element itself. */
   max-width: 520px;
   margin: 0 auto;
 }
@@ -1840,11 +2269,11 @@ textarea:focus-visible,
 /* --------------------------------------------------------------------------
    Stat card color variants (admin dashboards)
    -------------------------------------------------------------------------- */
-.stat-blue .stat-icon { background: rgba(37,99,235,0.1); color: #2563EB; }
+.stat-blue .stat-icon { background: rgba(68,84,106,0.1); color: var(--color-info); }
 .stat-info .stat-icon { background: rgba(8,145,178,0.1); color: #0891B2; }
-.stat-green .stat-icon { background: rgba(22,163,74,0.1); color: #16A34A; }
-.stat-red .stat-icon { background: rgba(220,38,38,0.1); color: #DC2626; }
-.stat-amber .stat-icon { background: rgba(234,88,12,0.1); color: #EA580C; }
+.stat-green .stat-icon { background: rgba(21,127,74,0.1); color: var(--color-success); }
+.stat-red .stat-icon { background: rgba(179,38,30,0.1); color: var(--color-danger); }
+.stat-amber .stat-icon { background: rgba(194,65,12,0.1); color: var(--color-warning); }
 
 /* --------------------------------------------------------------------------
    Customer dashboard stat cards
@@ -1875,24 +2304,24 @@ textarea:focus-visible,
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
-  background: rgba(200,75,49,0.1);
+  background: rgba(176, 132, 33, 0.1);
   color: var(--color-primary);
   flex-shrink: 0;
 }
 
 .stat-icon-wrap.red {
-  background: rgba(220,38,38,0.1);
-  color: #DC2626;
+  background: rgba(179,38,30,0.1);
+  color: var(--color-danger);
 }
 
 .stat-icon-wrap.green {
-  background: rgba(22,163,74,0.1);
-  color: #16A34A;
+  background: rgba(21,127,74,0.1);
+  color: var(--color-success);
 }
 
 .stat-icon-wrap.amber {
-  background: rgba(234,88,12,0.1);
-  color: #EA580C;
+  background: rgba(194,65,12,0.1);
+  color: var(--color-warning);
 }
 
 /* --------------------------------------------------------------------------
@@ -1910,8 +2339,8 @@ textarea:focus-visible,
 
 .status-badge.confirmed,
 .status-badge.paid {
-  background: rgba(22,163,74,0.1);
-  color: #16A34A;
+  background: rgba(21,127,74,0.1);
+  color: var(--color-success);
 }
 
 .status-badge.pending {
@@ -1920,13 +2349,13 @@ textarea:focus-visible,
 }
 
 .status-badge.partial {
-  background: rgba(234,88,12,0.1);
-  color: #EA580C;
+  background: rgba(194,65,12,0.1);
+  color: var(--color-warning);
 }
 
 .status-badge.unpaid {
-  background: rgba(220,38,38,0.1);
-  color: #DC2626;
+  background: rgba(179,38,30,0.1);
+  color: var(--color-danger);
 }
 
 /* --------------------------------------------------------------------------
@@ -2005,3 +2434,2780 @@ textarea:focus-visible,
 
   .hero-stat-card .stat-value { font-size: 1.5rem; }
 }
+
+/* =============================================================================
+   SaaS POLISH LAYER (indigo redesign) — portal + public site
+   Appended last: visual depth + responsive safeguards only.
+   ============================================================================= */
+
+/* Buttons get gentle neutral depth and a hover lift. */
+.btn-primary {
+  box-shadow: 0 2px 8px rgba(22, 36, 61, 0.27);
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+}
+.btn-primary:hover { transform: translateY(-1px); box-shadow: 0 8px 20px rgba(22, 36, 61, 0.32); }
+
+/* Consistent, crisp cards. */
+.card { border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+
+/* Never let media or wide content force horizontal scroll on the page body. */
+img, video { max-width: 100%; height: auto; }
+.table-responsive { -webkit-overflow-scrolling: touch; }
+
+/* Small-screen breathing room. */
+@media (max-width: 575.98px) {
+  .card-body { padding: 1rem; }
+  .portal-navbar .navbar-brand { font-size: 1.05rem; }
+}
+
+/* =============================================================================
+   SHIPMENT TRANSIT TIMELINE (customer order detail)
+   ============================================================================= */
+/* One scrolling row, never wrapping. Wrapping put the tenth step ("Delivered")
+   alone on a second line under the first, which read as a separate branch of the
+   journey rather than the end of it. A timeline is a sequence, so it has to stay
+   on one line; where it does not fit, it scrolls. */
+.ship-timeline {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: nowrap;
+  gap: 0;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+.ship-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 88px;
+}
+.ship-dot {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--color-border); border: 2px solid var(--color-border);
+}
+.ship-step.done .ship-dot { background: var(--color-primary); border-color: var(--color-primary); }
+.ship-label { font-size: 11px; color: var(--color-muted); margin-top: 4px; text-align: center; }
+.ship-step.done .ship-label { color: var(--color-primary); font-weight: 600; }
+.ship-line { flex: 1 1 20px; height: 2px; background: var(--color-border); margin: 6px 2px 0; min-width: 14px; }
+.ship-line.done { background: var(--color-primary); }
+
+/* Keep Bootstrap's chevron clear of the text: our padding override above set a
+   uniform 1rem right padding, which let long values run under the arrow. */
+.form-select { padding-right: 2.5rem; }
+
+
+/* ==========================================================================
+   BLOG
+   ==========================================================================
+   Styles for the public blog index and article pages. The article body rules
+   deliberately target bare tags (h2/p/ul/table) inside .blog-article-body,
+   because the content is authored as plain HTML — whoever writes an article
+   should never have to remember a class name for a paragraph.
+   ========================================================================== */
+
+/* --- Topic filter chips on the index ------------------------------------ */
+.blog-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  color: var(--color-secondary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+}
+.blog-chip:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  transform: translateY(-1px);
+}
+.blog-chip.active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-white);
+}
+.blog-chip-count { font-size: 11px; opacity: 0.7; }
+
+/* --- Article cards ------------------------------------------------------- */
+.blog-card {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: transform var(--transition-base), box-shadow var(--transition-base);
+}
+.blog-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+.blog-card-featured {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-glow);
+}
+.blog-card-img-link { display: block; }
+.blog-card-img {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 40 / 21;
+  object-fit: cover;
+  display: block;
+}
+.blog-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 24px;
+}
+.blog-card-cat {
+  align-self: flex-start;
+  margin-bottom: 12px;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  background: rgba(176, 132, 33, 0.08);
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.02em;
+}
+.blog-card-title {
+  margin: 0 0 10px;
+  font-size: 1.15rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.35;
+}
+.blog-card-title a { color: var(--color-dark); text-decoration: none; }
+.blog-card-title a:hover { color: var(--color-primary); }
+.blog-card-excerpt {
+  flex: 1;
+  margin: 0 0 16px;
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-body);
+}
+.blog-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+.blog-meta-sep { opacity: 0.5; }
+.blog-card-link {
+  margin-top: 14px;
+  color: var(--color-primary);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+}
+.blog-card-link:hover { text-decoration: underline; }
+
+/* --- Article page -------------------------------------------------------- */
+.blog-article-header {
+  padding: 128px 0 32px;
+  background: var(--color-light);
+  border-bottom: 1px solid var(--color-border);
+}
+.blog-breadcrumb {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+.blog-breadcrumb a { color: var(--color-muted); text-decoration: none; }
+.blog-breadcrumb a:hover { color: var(--color-primary); }
+
+.blog-article-title {
+  margin-bottom: 16px;
+  font-size: clamp(1.9rem, 4.5vw, 2.9rem);
+  font-weight: var(--font-weight-black);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--color-dark);
+}
+.blog-article-standfirst {
+  margin-bottom: 20px;
+  font-size: 1.15rem;
+  line-height: 1.6;
+  color: var(--color-slate);
+}
+.blog-article-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.blog-article-hero {
+  width: 100%;
+  height: auto;
+  margin: 32px 0 8px;
+  border-radius: var(--radius-lg);
+  object-fit: cover;
+}
+
+/* --- Authored article body ---------------------------------------------- */
+/* Measure is capped near 70 characters: long lines make a reader lose their
+   place between rows, which is the fastest way to lose them from a 2000-word
+   guide. */
+.blog-article-body {
+  max-width: 68ch;
+  margin: 40px auto 0;
+  font-size: 1.06rem;
+  line-height: 1.75;
+  color: var(--color-slate);
+}
+.blog-article-body > *:first-child { margin-top: 0; }
+.blog-article-body h2 {
+  margin: 44px 0 16px;
+  font-size: 1.6rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 1.25;
+  color: var(--color-dark);
+  scroll-margin-top: 90px;   /* keeps anchor links clear of the fixed navbar */
+}
+.blog-article-body h3 {
+  margin: 32px 0 12px;
+  font-size: 1.22rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+  scroll-margin-top: 90px;
+}
+.blog-article-body p { margin: 0 0 20px; }
+.blog-article-body ul,
+.blog-article-body ol { margin: 0 0 22px; padding-left: 22px; }
+.blog-article-body li { margin-bottom: 9px; }
+.blog-article-body a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.blog-article-body strong { color: var(--color-dark); font-weight: var(--font-weight-semibold); }
+.blog-article-body blockquote {
+  margin: 26px 0;
+  padding: 16px 22px;
+  border-left: 4px solid var(--color-primary);
+  background: var(--color-light);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  color: var(--color-secondary);
+}
+.blog-article-body blockquote p:last-child { margin-bottom: 0; }
+
+/* Tables carry the cost/duty/transit-time comparisons. They must scroll inside
+   their own container on a phone rather than forcing the whole page sideways. */
+.blog-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+.blog-article-body table {
+  width: 100%;
+  min-width: 460px;
+  border-collapse: collapse;
+  font-size: var(--font-size-small);
+}
+.blog-article-body th,
+.blog-article-body td {
+  padding: 11px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+.blog-article-body thead th {
+  background: var(--color-light);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-dark);
+  white-space: nowrap;
+}
+.blog-article-body tbody tr:last-child td { border-bottom: none; }
+
+/* Callout box for warnings and key takeaways inside an article. */
+.blog-callout {
+  margin: 26px 0;
+  padding: 18px 22px;
+  border-radius: var(--radius-md);
+  background: rgba(176, 132, 33, 0.06);
+  border: 1px solid rgba(176, 132, 33, 0.18);
+}
+.blog-callout p:last-child { margin-bottom: 0; }
+.blog-callout.warning {
+  background: rgba(234, 88, 12, 0.07);
+  border-color: rgba(234, 88, 12, 0.22);
+}
+
+/* --- In-article conversion block ---------------------------------------- */
+.blog-cta {
+  max-width: 68ch;
+  margin: 48px auto 72px;
+  padding: 28px 30px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-accent) 100%);
+  color: var(--color-white);
+}
+.blog-cta h2 { color: var(--color-white); }
+.blog-cta p { color: rgba(255, 255, 255, 0.9); }
+.blog-cta .btn-primary {
+  background: var(--color-white);
+  border-color: var(--color-white);
+  color: var(--color-primary);
+}
+.blog-cta .btn-primary:hover {
+  background: var(--color-light);
+  border-color: var(--color-light);
+  color: var(--color-primary-dark);
+}
+
+@media (max-width: 575.98px) {
+  .blog-article-header { padding: 108px 0 24px; }
+  .blog-article-body { font-size: 1rem; }
+  .blog-cta { padding: 22px 20px; }
+}
+
+
+/* --------------------------------------------------------------------------
+   Thank-you / conversion page
+   -------------------------------------------------------------------------- */
+.thankyou-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, var(--color-success), #22c55e);
+  color: var(--color-white);
+  font-size: 2.6rem;
+  box-shadow: 0 10px 30px rgba(22, 163, 74, 0.28);
+}
+
+.thankyou-steps {
+  max-width: 560px;
+  padding: 24px 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-white);
+}
+.thankyou-steps ol { padding-left: 20px; }
+.thankyou-steps li { margin-bottom: 10px; color: var(--color-slate); line-height: 1.6; }
+.thankyou-steps li:last-child { margin-bottom: 0; }
+
+.thankyou-fast {
+  padding: 22px;
+  border-radius: var(--radius-lg);
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+/* Inline form validation. Bootstrap ships .invalid-feedback but only reveals it
+   through its own JS validation flow; we render errors server-side, so `d-block`
+   in the template forces them visible and this just handles the colour. */
+.invalid-feedback { color: var(--color-danger); font-size: var(--font-size-small); }
+.form-control.is-invalid {
+  border-color: var(--color-danger);
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+}
+
+
+/* ==========================================================================
+   CUSTOMER ORDERS — list rows, cost summary, commission
+   ==========================================================================
+   Money columns are tabular so digits line up vertically down a column: with
+   proportional figures a 1 is narrower than an 8, and totals in a stack of
+   orders visibly fail to align at the decimal point.
+   ========================================================================== */
+.order-table td,
+.order-table th,
+.summary-row,
+.order-card-breakdown {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Mobile order cards (replace the wide table below lg) ---------------- */
+.order-card {
+  display: block;
+  padding: 1rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.order-card:hover,
+.order-card:focus-visible {
+  border-color: var(--color-primary);
+  box-shadow: var(--shadow-md);
+  color: inherit;
+}
+
+.order-card-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  font-size: 12px;
+  color: var(--color-muted);
+}
+.order-card-breakdown strong {
+  color: var(--color-dark);
+  font-weight: var(--font-weight-semibold);
+}
+
+/* --- Order detail cost summary ------------------------------------------ */
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* The commission line is tinted and ruled off so it reads as a distinct charge
+   rather than blending into the freight lines above it — customers ask what it
+   is, so it should look like something with an explanation attached. */
+.summary-row-commission {
+  margin: 0.5rem -0.5rem;
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  background: var(--color-gold-soft);
+}
+
+.commission-rate-badge {
+  display: inline-block;
+  /* Logical, not margin-left, so it mirrors under dir="rtl" — see portal-rtl.css. */
+  margin-inline-start: 6px;
+  padding: 1px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(176, 132, 33, 0.18);
+  color: var(--color-gold-text);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.5;
+}
+
+.commission-amount { color: var(--color-gold-text); }
+
+.shipment-subtotal-row td {
+  background: var(--color-light);
+  border-top: 1px solid var(--color-border);
+}
+
+/* Keeps the total in view while a long, multi-shipment item table scrolls past.
+   Only above lg, where the summary is a genuine sidebar; below that it is
+   stacked underneath the items and stickiness would do nothing useful. */
+@media (min-width: 992px) {
+  .order-summary-sticky {
+    /* 90px cleared the old fixed marketing navbar. Inside the app shell the
+       sticky topbar is ~58px, so the card now parks just under it. */
+    position: sticky;
+    top: 74px;
+  }
+}
+
+
+/* ==========================================================================
+   SIGNED-IN PORTAL SHELL  (portal/app_base.html)
+   ==========================================================================
+   Sidebar + topbar + content column for every page behind the customer login.
+   Scoped under .portal-app so none of it can reach the public marketing pages,
+   which still use the navbar in portal/base.html.
+
+   The sidebar is ink with gold accents rather than another white panel: the
+   content area is a field of white cards, and a white sidebar against it gave
+   the navigation no edge at all. --color-gold-light is the correct gold on a
+   dark ground (9.14:1 on ink — AAA); --color-gold would fail there.
+
+   Everything directional uses logical properties (inline-start/end) so the
+   shell mirrors under dir="rtl" — see portal-rtl.css.
+   ========================================================================== */
+.portal-app { background: var(--color-bg); }
+
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* --- Sidebar ------------------------------------------------------------- */
+.app-sidebar {
+  position: fixed;
+  inset-block: 0;
+  inset-inline-start: 0;
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  width: 258px;
+  background: var(--color-dark);
+  color: rgba(255, 255, 255, 0.72);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.app-sidebar-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 1rem 1.15rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+.app-sidebar-brand-text {
+  color: var(--color-white);
+  font-weight: var(--font-weight-bold);
+  font-size: 0.95rem;
+  letter-spacing: 0.01em;
+}
+.app-sidebar-close {
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 4px;
+}
+
+.app-sidebar-nav {
+  flex: 1;
+  padding: 0.75rem 0.65rem 1rem;
+}
+
+.app-nav-group-label {
+  padding: 0 0.6rem;
+  margin: 1.1rem 0 0.35rem;
+  color: rgba(255, 255, 255, 0.38);
+  font-size: 10.5px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.app-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.6rem;
+  margin-bottom: 2px;
+  border-radius: var(--radius-sm);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.app-nav-link i {
+  font-size: 1rem;
+  width: 18px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.app-nav-link span { flex: 1; min-width: 0; }
+.app-nav-link:hover,
+.app-nav-link:focus-visible {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--color-white);
+}
+
+/* The active item gets a gold bar as well as the tint, because colour alone
+   would be the only cue for anyone who cannot distinguish it. */
+.app-nav-link.active {
+  position: relative;
+  background: rgba(217, 169, 60, 0.14);
+  color: var(--color-gold-light);
+  font-weight: var(--font-weight-semibold);
+}
+.app-nav-link.active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -0.65rem;
+  inset-block: 6px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-gold-light);
+}
+.app-nav-link.subtle { color: rgba(255, 255, 255, 0.5); font-weight: var(--font-weight-normal); }
+
+.app-nav-badge {
+  flex: 0 0 auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.16);
+  color: var(--color-white);
+  font-size: 11px;
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+.app-nav-badge.danger { background: var(--color-danger); }
+
+.app-sidebar-foot {
+  padding: 0.65rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* --- Content column ------------------------------------------------------ */
+.app-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  /* min-width:0 stops a wide table inside this flex child from forcing the
+     whole shell wider than the viewport and scrolling the page sideways. */
+  min-width: 0;
+  margin-inline-start: 258px;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.7rem 1.5rem;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-topbar-heading { flex: 1; min-width: 0; }
+.app-topbar-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-topbar-sub {
+  margin: 1px 0 0;
+  font-size: 12.5px;
+  color: var(--color-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.app-sidebar-toggle {
+  border: 1px solid var(--color-border);
+  background: var(--color-white);
+  border-radius: var(--radius-sm);
+  width: 38px;
+  height: 38px;
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--color-dark);
+  flex-shrink: 0;
+}
+
+.app-icon-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-sm);
+  color: var(--color-secondary);
+  font-size: 1.05rem;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+.app-icon-btn:hover { background: var(--color-bg); color: var(--color-dark); }
+
+.app-icon-badge {
+  position: absolute;
+  top: 3px;
+  inset-inline-end: 2px;
+  min-width: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-size: 9.5px;
+  font-weight: var(--font-weight-bold);
+  line-height: 16px;
+  text-align: center;
+}
+.app-icon-badge.danger { background: var(--color-danger); }
+
+.app-account-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 4px 8px 4px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-full);
+  background: transparent;
+  color: var(--color-dark);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+}
+.app-account-btn:hover { background: var(--color-bg); border-color: var(--color-border); }
+.app-account-name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.app-content {
+  flex: 1;
+  width: 100%;
+  max-width: 1320px;
+  padding: 1.5rem;
+}
+
+.app-footer {
+  padding: 1rem 1.5rem 1.75rem;
+  color: var(--color-muted);
+  font-size: 12.5px;
+}
+.app-footer a { color: var(--color-muted); }
+.app-footer-sep { opacity: 0.5; margin: 0 4px; }
+
+/* --- Mobile: the sidebar becomes an off-canvas drawer -------------------- */
+.app-sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(22, 36, 61, 0.5);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity var(--transition-fast), visibility var(--transition-fast);
+}
+
+@media (max-width: 991.98px) {
+  .app-sidebar {
+    transform: translateX(-100%);
+    transition: transform var(--transition-base);
+    box-shadow: var(--shadow-lg);
+  }
+  .app-sidebar.open { transform: translateX(0); }
+  .app-main { margin-inline-start: 0; }
+  .app-sidebar-backdrop.show { opacity: 1; visibility: visible; }
+  .app-topbar { padding-inline: 1rem; }
+  .app-content { padding: 1rem; }
+  .app-footer { padding-inline: 1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-sidebar { transition: none; }
+}
+
+
+/* --- Neutralising the old page wrappers ---------------------------------
+   Every portal page was built as <section class="py-4"><div class="container">
+   because it used to sit directly under the public navbar and had to supply its
+   own gutter and measure. .app-content now owns both, so left alone each page
+   contributed a second 1.5rem of vertical padding and a narrower centred column
+   inside an already-padded one.
+
+   Handled here rather than by editing seventeen templates: the markup is doing
+   no harm, only the spacing is, and a rule is far less likely to break a page
+   than seventeen structural edits. Pages that set an inline max-width for a
+   deliberately narrow measure (notifications, support forms) keep it — an
+   inline style outranks this rule, which is exactly what we want. */
+.app-content > section { padding-top: 0 !important; padding-bottom: 0 !important; }
+.app-content .container,
+.app-content .container-fluid {
+  width: 100%;
+  max-width: none;
+  padding-inline: 0;
+  margin-inline: 0;
+}
+
+
+/* ==========================================================================
+   PAGE PRIMITIVES used across the portal pages
+   ========================================================================== */
+/* Section heading inside a page, for pages with more than one block. */
+.app-section-title {
+  margin: 0 0 0.85rem;
+  font-size: 0.95rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+}
+
+/* Shared empty state — every list page had its own ad-hoc centred div. */
+.app-empty {
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+.app-empty-icon {
+  font-size: 2rem;
+  color: var(--color-muted);
+  opacity: 0.55;
+}
+.app-empty-title {
+  margin: 0.85rem 0 0.25rem;
+  font-size: 1rem;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-dark);
+}
+.app-empty-text {
+  margin: 0 auto 1.1rem;
+  max-width: 420px;
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+}
+
+/* ===========================================================================
+   CATALOGUE FILTER BAR
+   Search box + category/subcategory chips, shared by My Products, Marketplace,
+   Amazon and Noon. Markup lives in portal/includes/catalog_filters.html.
+
+   Colour use follows the brand rules documented at the top of this file: the
+   monochrome palette carries the UI, and gold is reserved for the selected
+   state so that "which filter am I on" is the one thing the eye is drawn to.
+   The active chip uses --color-primary as its ground with white text (a
+   near-black-on-white pairing, comfortably AAA) rather than a gold fill, which
+   at 3.40:1 could not carry chip-sized text.
+   =========================================================================== */
+
+.catalog-filters {
+  margin-bottom: 1.75rem;
+}
+
+/* ---- Search ------------------------------------------------------------ */
+
+.catalog-search {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.catalog-search-field {
+  position: relative;
+  flex: 1 1 260px;   /* grows to fill, but never narrower than a usable box */
+  min-width: 0;      /* lets the field shrink inside the flex row on mobile */
+}
+
+.catalog-search-icon {
+  position: absolute;
+  left: 0.85rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-muted);
+  pointer-events: none;  /* the icon must never swallow a click meant for the input */
+  font-size: 0.95rem;
+}
+
+.catalog-search-input {
+  padding-left: 2.4rem;  /* clears the icon */
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  height: 42px;
+}
+
+.catalog-search-input:focus {
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px var(--color-gold-soft);
+  outline: none;
+}
+
+/* Chrome and Safari add their own clear affordance to type=search; we provide
+   an explicit Clear button, so hide theirs to avoid two "x" controls. */
+.catalog-search-input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.catalog-search-btn,
+.catalog-clear-btn {
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: var(--radius-sm);
+}
+
+/* ---- Summary line ------------------------------------------------------ */
+
+.catalog-filter-summary {
+  margin: 0.6rem 0 0;
+  font-size: var(--font-size-small);
+  color: var(--color-muted);
+}
+
+.catalog-filter-summary strong {
+  color: var(--color-primary);
+}
+
+.catalog-filter-remove {
+  display: inline-block;
+  margin-left: 0.15rem;
+  padding: 0 0.3rem;
+  color: var(--color-muted);
+  text-decoration: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  border-radius: var(--radius-sm);
+}
+
+.catalog-filter-remove:hover {
+  color: var(--color-danger);
+}
+
+@media (max-width: 575.98px) {
+  /* On the narrowest screens the search button drops below a full-width field
+     rather than squeezing both onto one cramped line. */
+  .catalog-search-field { flex-basis: 100%; }
+  .catalog-search-btn { flex: 1 1 auto; justify-content: center; }
+}
+
+/* ===========================================================================
+   CATALOGUE LAYOUT — category rail + product grid
+   Markup: portal/includes/catalog_sidebar.html and the four catalogue pages.
+   =========================================================================== */
+
+.catalog-layout {
+  display: grid;
+  /* Single column by default; the rail becomes a real column only once there
+     is width to spare for it (see the lg breakpoint below). */
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+  align-items: start;
+}
+
+@media (min-width: 992px) {
+  .catalog-layout {
+    /* Fixed rail, fluid grid. minmax(0,1fr) rather than 1fr so a long
+       unbreakable product name cannot force the grid column wider than its
+       share and push the rail off-screen. */
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: 1.75rem;
+  }
+
+  .catalog-layout__aside {
+    position: sticky;
+    /* Clears the fixed topbar so the rail does not slide underneath it. */
+    top: 88px;
+    /* Long category lists scroll within the rail instead of the page. */
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+}
+
+.catalog-layout__main { min-width: 0; }
+
+/* ---- Product grid ------------------------------------------------------ */
+/* auto-fill + minmax lets the column count follow the available width, so the
+   grid reflows correctly inside the narrowed main column without a separate
+   set of breakpoints for the sidebar and non-sidebar cases. */
+.product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(215px, 1fr));
+  gap: 1.1rem;
+}
+
+/* ---- Phone grid -------------------------------------------------------- */
+/* Phones get a fixed two-up grid rather than the auto-fill track above. On a
+   375px screen the content box is ~343px, and auto-fill with a 215px minimum
+   can only fit ONE column there (2 x 215 + gap = 448px), which left a single
+   full-width card per row. Asking for two equal columns outright — with a
+   tighter gap to buy back space — matches what every marketplace app does at
+   this width. minmax(0, 1fr) keeps a long product name from widening a track.
+   The card itself is condensed to suit the ~165px result; see below. */
+@media (max-width: 575.98px) {
+  .product-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.65rem;
+  }
+}
+
+@media (max-width: 329.98px) {
+  /* Two-up below this leaves ~145px per card, at which point the price and
+     button start to collide. Very old/small handsets get a single column. */
+  .product-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---- Sidebar ----------------------------------------------------------- */
+
+.catalog-sidebar__panel {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.55rem;
+}
+
+.catalog-sidebar__heading {
+  margin: 0.35rem 0.6rem 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.catalog-sidebar__list,
+.catalog-sidebar__sublist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.catalog-sidebar__link,
+.catalog-sidebar__sublink {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  color: var(--color-slate);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.3;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.catalog-sidebar__link:hover,
+.catalog-sidebar__sublink:hover {
+  background: var(--color-bg);
+  color: var(--color-primary);
+}
+
+.catalog-sidebar__link.is-active {
+  background: var(--color-primary);
+  color: var(--color-white);
+  font-weight: 600;
+}
+
+.catalog-sidebar__link:focus-visible,
+.catalog-sidebar__sublink:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: -2px;
+}
+
+.catalog-sidebar__label {
+  min-width: 0;
+  overflow-wrap: anywhere;   /* long category names wrap rather than overflow */
+}
+
+.catalog-sidebar__count {
+  flex-shrink: 0;
+  min-width: 1.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.catalog-sidebar__link.is-active .catalog-sidebar__count {
+  background: rgba(255, 255, 255, 0.22);
+  color: var(--color-white);
+}
+
+/* ---- Subcategories ---- */
+/* Indented behind a rule so the nesting is visible without relying on the
+   indent alone; only the active category renders these. */
+.catalog-sidebar__sublist {
+  margin: 0.15rem 0 0.35rem 0.75rem;
+  padding-left: 0.4rem;
+  border-left: 2px solid var(--color-border);
+}
+
+.catalog-sidebar__sublink {
+  padding: 0.36rem 0.5rem;
+  font-size: 0.78125rem;
+  color: var(--color-muted);
+}
+
+.catalog-sidebar__sublink.is-active {
+  color: var(--color-gold-text);   /* body-size gold tier, 5.26:1 on white */
+  font-weight: 700;
+  background: var(--color-gold-soft);
+}
+
+/* ---- Mobile disclosure ---- */
+
+.catalog-sidebar__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: 0.75rem;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.catalog-sidebar__toggle-current {
+  margin-left: auto;
+  font-weight: 500;
+  font-size: 0.8125rem;
+  color: var(--color-gold-text);
+}
+
+.catalog-sidebar__toggle-chevron {
+  margin-left: auto;
+  font-size: 0.75rem;
+  transition: transform var(--transition-fast);
+}
+
+/* When a category is already selected the label takes the auto margin, so the
+   chevron needs its own reset to stay tight against it. */
+.catalog-sidebar__toggle-current + .catalog-sidebar__toggle-chevron { margin-left: 0.5rem; }
+
+.catalog-sidebar__toggle[aria-expanded="true"] .catalog-sidebar__toggle-chevron {
+  transform: rotate(180deg);
+}
+
+/* ---- Marketplace source switch ---------------------------------------- */
+/* A segmented control rather than three separate buttons: the options are
+   mutually exclusive, and the shared border makes that obvious. */
+
+.catalog-source-switch {
+  display: flex;
+  margin-bottom: 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-white);
+}
+
+.catalog-source-switch__btn {
+  flex: 1 1 0;
+  padding: 0.45rem 0.5rem;
+  text-align: center;
+  text-decoration: none;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-slate);
+  border-right: 1px solid var(--color-border);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.catalog-source-switch__btn:last-child { border-right: 0; }
+
+.catalog-source-switch__btn:hover {
+  background: var(--color-bg);
+  color: var(--color-primary);
+}
+
+.catalog-source-switch__btn.is-active {
+  background: var(--color-primary);
+  color: var(--color-white);
+}
+
+/* ---- Empty state ------------------------------------------------------- */
+
+.catalog-empty {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.catalog-empty i {
+  font-size: 2rem;
+  color: var(--color-border);
+}
+
+.catalog-empty p {
+  margin: 0.75rem 0 0;
+  color: var(--color-muted);
+  font-size: var(--font-size-small);
+}
+
+.catalog-empty .btn { margin-top: 1rem; }
+
+/* When a page has nothing to filter the rail is not rendered at all, so the
+   grid takes the full width instead of leaving a 232px gap where it was. */
+@media (min-width: 992px) {
+  .catalog-layout--bare { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ---------------------------------------------------------------------------
+   PRODUCT CARD — phone sizing
+   ---------------------------------------------------------------------------
+   At two-up on a 375px screen each card is roughly 165px wide. The desktop
+   paddings and the side-by-side action row do not survive that: the quantity
+   box alone is 62px, leaving under 90px for a button reading "Add to Cart".
+   Everything below trades horizontal space for vertical, which phones have.
+   --------------------------------------------------------------------------- */
+@media (max-width: 575.98px) {
+
+  .product-card__body { padding: 0.7rem 0.7rem 0.75rem; }
+
+  .product-card__eyebrow {
+    font-size: 0.625rem;
+    /* One line only — a wrapped two-line eyebrow above a two-line title pushed
+       the price below the fold of a short card. */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .product-card__title { font-size: 0.875rem; }
+
+  .product-card__price { font-size: 1rem; margin-bottom: 0.45rem; }
+
+  .product-card__specs { gap: 0.25rem; margin-bottom: 0.55rem; }
+
+  .product-card__specs li {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.625rem;
+  }
+
+  /* Icons are dropped from the spec chips at this size. With them, "MOQ 100"
+     and "36.000 KG" measure 71px and 78px against a 144px content box, so only
+     one chip fit per row and a four-spec card ran to four extra rows. The icon
+     plus its gap is ~16px of that; without it two chips sit side by side and
+     the card stays short. The label alone still reads unambiguously. */
+  .product-card__specs i { display: none; }
+
+  /* Stacked, full-width, and both still 38px tall so they stay comfortable
+     touch targets. */
+  .product-card__actions {
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+
+  .product-card__actions .product-qty-input {
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .product-card__btn {
+    width: 100%;
+    font-size: 0.75rem;
+  }
+
+  .product-card__flags { top: 0.4rem; left: 0.4rem; gap: 0.25rem; }
+
+  .product-card__flag {
+    padding: 0.18rem 0.4rem;
+    font-size: 0.625rem;
+  }
+
+  .product-card__note { font-size: 0.6875rem; }
+
+  .product-card__sku { font-size: 0.625rem; }
+}
+
+/* ---------------------------------------------------------------------------
+   PUBLIC CATALOGUE (/shop/)
+   ---------------------------------------------------------------------------
+   The public-facing product grid and detail page. Kept in one block, prefixed
+   .shop-* and .pdp-*, so it cannot bleed into the signed-in portal catalogue
+   which shares this stylesheet.
+   --------------------------------------------------------------------------- */
+
+.shop-hero { padding: 40px 0 26px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08)); }
+.shop-crumbs { font-size: 13px; color: var(--text-secondary, #71717a); display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.shop-crumbs a { color: inherit; text-decoration: none; }
+.shop-crumbs a:hover { text-decoration: underline; }
+.shop-hero__title { font-size: clamp(26px, 4vw, 38px); font-weight: 800; margin: 0 0 6px; }
+.shop-hero__sub { color: var(--text-secondary, #71717a); margin: 0 0 20px; max-width: 62ch; }
+
+.shop-search { display: flex; gap: 0; max-width: 540px; }
+.shop-search input { flex: 1 1 auto; min-width: 0; padding: 11px 15px; font-size: 15px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15)); border-right: 0;
+  border-radius: 10px 0 0 10px; background: var(--bg-input, #fff); color: inherit; }
+.shop-search button { flex: 0 0 auto; padding: 0 20px; border: 0; border-radius: 0 10px 10px 0;
+  background: var(--color-gold); color: var(--color-ink-900); cursor: pointer; font-size: 15px; }
+
+.shop-body { padding: 26px 0 60px; }
+
+/* Auto-fill, not fixed columns: the grid stays dense on a wide monitor and
+   collapses to one column on a phone without a media query per breakpoint. */
+.shop-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+@media (max-width: 420px) { .shop-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; } }
+
+.shop-card { display: flex; flex-direction: column; overflow: hidden; height: 100%;
+  border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 14px; background: var(--bg-card, #fff);
+  transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease; }
+.shop-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.09); border-color: var(--color-gold, #B08421); }
+
+.shop-card__media { position: relative; display: block; aspect-ratio: 1 / 1; background: var(--bg-input, #f4f4f5); overflow: hidden; }
+.shop-card__img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .3s ease; }
+.shop-card:hover .shop-card__img { transform: scale(1.04); }
+.shop-card__img--empty { display: flex; align-items: center; justify-content: center; font-size: 30px; color: var(--text-secondary, #a1a1aa); }
+
+.shop-card__flags { position: absolute; left: 8px; top: 8px; display: flex; gap: 5px; flex-wrap: wrap; }
+.shop-card__flag { font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: rgba(0,0,0,.72); color: #fff; letter-spacing: .01em; }
+/* Opaque, not 92%. The flag was written to sit over a product photo, where the
+   translucency reads as a tint; the product page now shows it on the white meta
+   line, and white-on-92%-green over white is 4.40:1 - under AA for 10.5px text.
+   At full strength it is 5.04:1 wherever it lands, photo or page. */
+.shop-card__flag--ready { background: var(--color-success, #157F4A); }
+
+.shop-card__body { padding: 12px 13px 14px; display: flex; flex-direction: column; flex: 1 1 auto; }
+.shop-card__eyebrow { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-secondary, #71717a); margin: 0 0 5px; font-weight: 600; }
+.shop-card__title { font-size: 13.5px; font-weight: 600; line-height: 1.35; margin: 0 0 8px; }
+.shop-card__title a { color: inherit; text-decoration: none;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.shop-card__title a:hover { color: var(--color-gold-text, #8A661A); }
+
+.shop-card__price { font-size: 18px; font-weight: 800; margin: 0 0 8px; }
+.shop-card__from { font-size: 11px; font-weight: 500; color: var(--text-secondary, #71717a); }
+.shop-card__cur { font-size: 14px; font-weight: 700; margin-right: 2px; }
+
+.shop-card__specs { list-style: none; padding: 0; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 4px 10px;
+  font-size: 11.5px; color: var(--text-secondary, #71717a); }
+
+/* mt-auto equivalent: keeps the button on the baseline across a row of cards
+   whose titles run to different lengths. */
+.shop-card__actions { margin-top: auto; display: flex; gap: 8px; }
+.shop-card__btn { flex: 1 1 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 12px; border-radius: 9px; font-size: 12.5px; font-weight: 700; text-decoration: none;
+  background: var(--color-gold); color: var(--color-ink-900); border: 1px solid transparent; cursor: pointer; text-align: center; }
+.shop-card__btn:hover { filter: brightness(1.06); color: var(--color-ink-900); }
+.shop-card__btn--outline { background: transparent; color: var(--text-primary, #16243D); border-color: var(--border-color, rgba(0,0,0,.18)); }
+.shop-card__btn--outline:hover { border-color: var(--color-gold, #B08421); color: var(--color-gold-text, #8A661A); }
+.shop-card__btn--muted { background: rgba(0,0,0,.06); color: var(--text-secondary, #71717a); cursor: default; }
+
+.shop-pager { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 34px; font-size: 14px; }
+/* Gold at body size takes the darker tier: #B08421 is 3.10:1 here, --color-gold-text
+   is 5.26:1. The old --accent-3 fallback also resolved to charcoal anywhere
+   style.css is loaded, so the link was never reliably gold in the first place. */
+.shop-pager a { color: var(--color-gold-text, #8A661A); text-decoration: none; font-weight: 600; }
+.shop-pager__status { color: var(--text-secondary, #71717a); }
+
+.shop-empty { text-align: center; padding: 70px 20px; color: var(--text-secondary, #71717a); }
+.shop-empty i { font-size: 38px; opacity: .4; display: block; margin-bottom: 14px; }
+.shop-empty p { margin-bottom: 16px; }
+.shop-empty .shop-card__btn { display: inline-flex; flex: 0 0 auto; }
+
+/* Sidebar facets added for the public catalogue. */
+.catalog-facet { margin: 4px 0 18px; }
+.catalog-facet__row { display: flex; align-items: center; gap: 7px; }
+.catalog-facet__input { width: 100%; min-width: 0; padding: 7px 9px; font-size: 13px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15)); border-radius: 7px;
+  background: var(--bg-input, #fff); color: inherit; }
+.catalog-facet__dash { color: var(--text-secondary, #71717a); }
+.catalog-facet__apply { margin-top: 8px; width: 100%; padding: 7px; font-size: 12.5px; font-weight: 700;
+  border: 1px solid var(--border-color, rgba(0,0,0,.18)); border-radius: 7px;
+  background: transparent; color: inherit; cursor: pointer; }
+.catalog-facet__apply:hover { border-color: var(--color-gold, #B08421); color: var(--color-gold-text, #8A661A); }
+.catalog-facet__clear { display: inline-block; margin-top: 6px; font-size: 12.5px; color: #B3261E; text-decoration: none; }
+
+/* Public product detail */
+.pdp-public { padding: 26px 0 60px; }
+.pdp-public__title { font-size: clamp(21px, 3vw, 29px); font-weight: 800; margin: 0 0 12px; line-height: 1.25; }
+.shop-related { margin-top: 54px; }
+
+/* Detail-page layout, shared by the public product page. The signed-in portal's
+   product page carries its own copy inline; these selectors are identical so the
+   two look the same, and the inline block wins where both apply. */
+.pdp-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 34px; align-items: start; }
+@media (max-width: 900px) { .pdp-layout { grid-template-columns: 1fr; gap: 24px; } }
+
+.pdp-gallery__main { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 14px;
+  border: 1px solid var(--border-color, rgba(0,0,0,.1)); background: var(--bg-input, #f4f4f5); display: block; }
+.pdp-gallery__empty { display: flex; align-items: center; justify-content: center; font-size: 42px; color: var(--text-secondary, #71717a); }
+.pdp-thumbs { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.pdp-thumb { width: 68px; height: 68px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: none; padding: 0; cursor: pointer; }
+.pdp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pdp-thumb.is-active { border-color: var(--color-gold, #B08421); }
+
+.pdp-price { font-size: 31px; font-weight: 800; margin: 0 0 2px; }
+.pdp-price__cur { font-size: 20px; font-weight: 700; margin-right: 3px; }
+.pdp-moq { color: var(--text-secondary, #71717a); margin: 0 0 20px; font-size: 14px; }
+.pdp-flags { margin: 0 0 12px; }
+
+/* Two columns on wide screens: a spec sheet reads faster as a short double
+   column than as one long ladder the eye has to travel.
+
+   MULTI-COLUMN, NOT GRID. A grid couples the two cells of each row to a shared
+   height, so one 150-character value ("Color classification" on a scraped 1688
+   listing wraps to five lines) held its neighbour's row open to 131px and left
+   that row's underline floating ~90px below the single line of text it belonged
+   to. Columns flow each row independently, so a long value only ever affects
+   itself. Reading order becomes down-then-across, which is what a spec sheet
+   wants anyway. */
+.pdp-specs { columns: 2; column-gap: 34px; margin: 0 0 22px; }
+@media (max-width: 560px) { .pdp-specs { columns: 1; } }
+
+/* Label and value as two columns INSIDE the row, rather than shoved to opposite
+   edges. `justify-content: space-between` put 227px of nothing between "Brand"
+   and "Komi" in a 296px column - the eye had to cross the whole column to pair a
+   label with its value, on 27 of this listing's 35 rows. */
+.pdp-spec { break-inside: avoid; display: grid;
+  /* Tuned against a real scraped listing: this pair of tracks was the only one
+     that kept the longest LABEL ("Is it a dedicated source for cross-border
+     exports?") to four lines and the longest VALUE to six, without making the
+     block taller. Widening the value further starts wrapping the labels instead. */
+  grid-template-columns: minmax(0, .9fr) minmax(0, 1.35fr); gap: 2px 12px;
+  align-items: baseline; padding: 9px 0;
+  border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08)); font-size: 14px; }
+.pdp-spec__k { color: var(--text-secondary, #71717a); }
+/* Flush left. A wrapped value set flush RIGHT is ragged down its left edge -
+   the edge you read from - which is what made the long values hard to scan.
+   overflow-wrap rather than word-break: only break a word that cannot fit,
+   instead of chopping every value mid-word at the column edge. */
+.pdp-spec__v { font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+
+.pdp-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-secondary, #71717a); margin: 26px 0 10px; }
+
+.pdp-variants { max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 12px; }
+.pdp-variant { display: flex; align-items: center; gap: 11px; padding: 9px 12px; cursor: pointer;
+  border-bottom: 1px solid var(--border-color, rgba(0,0,0,.07)); margin: 0; }
+.pdp-variant:last-child { border-bottom: 0; }
+.pdp-variant:hover { background: rgba(0,0,0,.03); }
+.pdp-variant:has(input:checked) { background: rgba(176,132,33,.10); }
+.pdp-variant__img { width: 40px; height: 40px; object-fit: cover; border-radius: 7px; flex: 0 0 auto; }
+.pdp-variant__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.pdp-variant__name { font-size: 13px; font-weight: 600; }
+.pdp-variant__price { font-weight: 700; font-size: 14px; white-space: nowrap; }
+
+.pdp-actions { display: flex; gap: 10px; align-items: center; margin-top: 22px; flex-wrap: wrap; }
+.pdp-actions .product-qty-input { max-width: 120px; flex: 0 0 auto; }
+.pdp-actions .shop-card__btn { flex: 0 1 auto; }
+.pdp-note { font-size: 13px; color: var(--text-secondary, #71717a); margin-top: 14px; display: flex; gap: 7px; align-items: flex-start; }
+
+/* Share buttons (portal/includes/share_buttons.html) */
+.share-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 20px;
+  padding-top: 18px; border-top: 1px solid var(--border-color, rgba(0,0,0,.08)); }
+.share-row__label { font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--text-secondary, #71717a); margin-right: 2px; }
+.share-btn { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px;
+  border-radius: 8px; font-size: 12.5px; font-weight: 600; text-decoration: none; cursor: pointer;
+  border: 1px solid var(--border-color, rgba(0,0,0,.15)); background: transparent;
+  color: var(--text-primary, #16243D); transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.share-btn i { font-size: 15px; }
+.share-btn--fb:hover { background: #1877F2; border-color: #1877F2; color: #fff; }
+.share-btn--tt:hover { background: #000; border-color: #000; color: #fff; }
+.share-btn--copy:hover { border-color: var(--color-gold, #B08421); color: var(--color-gold-text, #8A661A); }
+@media (max-width: 420px) { .share-btn span { display: none; } .share-btn { padding: 8px 11px; } }
+
+/* =============================================================================
+   STAFF-ONLY SUPPLIER LINK
+   =============================================================================
+   Rendered on public catalogue pages, but only for viewers who already have the
+   products permission (see portal/includes/_supplier_link.html).
+
+   It is styled to look deliberately unlike the customer UI - amber, dashed
+   border, small - because it appears on pages that get screen-shared, demoed and
+   screenshotted. Something that reads as "internal" is far less likely to end up
+   in a screenshot sent to a customer than a button that looks like it belongs.
+   ========================================================================== */
+.supplier-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    border: 1px dashed #B08421;
+    border-radius: var(--radius-full, 9999px);
+    background: rgba(176, 132, 33, 0.08);
+    color: #8A661A;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.supplier-link:hover,
+.supplier-link:focus-visible {
+    background: #8A661A;
+    border-style: solid;
+    border-color: #8A661A;
+    color: #fff;
+    text-decoration: none;
+}
+
+/* Sits above the card's own click target so it opens the supplier rather than
+   the product, on cards where the whole tile is a link. */
+.shop-card .supplier-link,
+.product-card .supplier-link {
+    position: relative;
+    z-index: 2;
+    margin-top: 8px;
+    align-self: flex-start;
+}
+
+/* The icon is directional; the label is not. Nothing here needs mirroring in
+   RTL beyond the flex direction the parent already handles, but the arrow glyph
+   would point the wrong way against Arabic text, so it is dropped there. */
+[dir="rtl"] .supplier-link i { display: none; }
+
+/* The label is deliberately NOT collapsed to an icon on narrow screens, unlike
+   the share buttons above. Measured at 375px the labelled button is 87px inside
+   a 168px card, so it fits - and collapsing it produced a 32x26 tap target,
+   well under the 44px minimum, on the one control here that opens an external
+   site. A staff utility that is hard to hit accurately is worse than a slightly
+   wider card row. */
+.supplier-link {
+    min-height: 32px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+}
+
+/* ===========================================================================
+   PUBLIC SHIPMENT TRACKING  (/track/)
+   ---------------------------------------------------------------------------
+   Reuses .ship-timeline / .ship-step / .ship-line from the customer portal's
+   order page, so a shipment reads identically whether the viewer is signed in
+   or following a shared tracking link.
+   =========================================================================== */
+.track-form .form-control { text-align: center; letter-spacing: .06em; font-weight: 600; }
+
+.track-empty { padding: 34px 20px; border: 1px dashed var(--border-color, rgba(0,0,0,.16));
+  border-radius: 14px; color: var(--text-secondary, #71717a); }
+.track-empty .bi { font-size: 30px; }
+
+.track-result { margin-top: 6px; }
+
+.track-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px;
+  padding: 16px 18px; border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 14px;
+  margin-bottom: 16px; flex-wrap: wrap; }
+.track-head__label { font-size: 11px; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--text-secondary, #71717a); margin: 0 0 2px; }
+.track-head__value { font-size: 17px; font-weight: 700; margin: 0; letter-spacing: .03em; }
+
+.track-banner { display: flex; align-items: center; gap: 9px; padding: 11px 15px;
+  border-radius: 11px; font-weight: 600; font-size: 14px; margin-bottom: 16px; }
+.track-banner--done { background: rgba(74,222,128,.16); color: #157f4a; }
+
+.track-block { border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 14px;
+  padding: 18px; margin-bottom: 16px; }
+.track-block__head { display: flex; justify-content: space-between; align-items: center;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+.track-block__title { font-size: 16px; font-weight: 700; margin: 0; }
+
+.track-badge { font-size: 11px; font-weight: 700; letter-spacing: .02em; border-radius: 999px;
+  padding: 4px 11px; background: rgba(0,0,0,.06); white-space: nowrap; }
+.track-badge--done { background: rgba(74,222,128,.18); color: #157f4a; }
+.track-badge--idle { color: var(--text-secondary, #71717a); }
+
+.track-meta { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 0;
+  margin: 0 0 14px; font-size: 13px; color: var(--text-secondary, #71717a); }
+.track-meta li { position: relative; }
+.track-meta li + li::before { content: '·'; position: absolute; left: -9px; }
+
+.track-note { font-size: 13px; margin: 10px 0 0; color: var(--text-secondary, #71717a); }
+.track-updated { font-size: 12px; color: var(--text-secondary, #71717a); margin: 8px 0 0; }
+
+.track-items { width: 100%; margin: 14px 0 0; border-collapse: collapse; font-size: 14px; }
+.track-items th { font-size: 11px; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text-secondary, #71717a); font-weight: 700; text-align: left;
+  padding: 0 0 6px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.1)); }
+.track-items td { padding: 8px 0; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.06));
+  vertical-align: top; }
+.track-items tr:last-child td { border-bottom: 0; }
+.track-variant { display: block; font-size: 12px; color: var(--text-secondary, #71717a); }
+
+.track-block__thumb { width: 52px; height: 52px; border-radius: 10px; object-fit: cover;
+  border: 1px solid var(--border-color, rgba(0,0,0,.1)); background: rgba(0,0,0,.03);
+  flex-shrink: 0; }
+/* The title takes the leftover width so the status badge stays hard right,
+   where it was before the thumbnail joined the row. */
+.track-block__head .track-block__title { flex: 1 1 auto; min-width: 0; }
+
+.track-items__cell { display: flex; align-items: center; gap: 10px; }
+.track-item__thumb { width: 38px; height: 38px; border-radius: 7px; object-fit: cover;
+  border: 1px solid var(--border-color, rgba(0,0,0,.1)); background: rgba(0,0,0,.03);
+  flex-shrink: 0; }
+.track-item__thumb--empty { display: inline-flex; align-items: center; justify-content: center;
+  color: var(--text-secondary, #71717a); font-size: 15px; }
+.track-item__name { min-width: 0; }
+
+.track-privacy { font-size: 12px; color: var(--text-secondary, #71717a); text-align: center;
+  margin: 18px 0 0; }
+
+/* The timeline is a long horizontal ladder; on a phone it must scroll inside
+   its own box rather than widening the page. */
+@media (max-width: 640px) {
+  .track-block .ship-timeline { overflow-x: auto; padding-bottom: 6px; }
+}
+
+/* =============================================================================
+   MARKETPLACE SHELL
+   =============================================================================
+   The catalogue previously read as "a services site that also has products":
+   agency copy first, a 1200px column, four 216px cards, and a search box that
+   existed only on /shop/. These rules move it toward a marketplace — you can
+   search from anywhere, the grid is dense enough to scan, and price is the
+   loudest thing on a card.
+   ========================================================================== */
+
+/* ---- Header search ------------------------------------------------------- */
+/* Sits between the brand and the nav links, and takes the slack so it grows on
+   a wide screen instead of the nav links drifting apart. */
+/* The bar itself: a full-width row under the navbar, so the search is not
+   competing with eight nav links for space. */
+/* Solid and explicitly coloured, not a translucent tint. The homepage hero is
+   pulled up under the transparent navbar, so a see-through bar here sat on top
+   of a dark photograph with near-black placeholder text on it - invisible on the
+   one page that matters most. z-index keeps it above that hero. */
+.search-bar {
+  position: relative;
+  z-index: 1020;
+  background: #141416;
+  border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+.search-bar > .container { display: flex; align-items: center; gap: 18px; padding-top: 10px; padding-bottom: 10px; }
+.search-bar__link {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  font-size: 13px; font-weight: 600; text-decoration: none;
+  color: var(--text-secondary, #9a9aa4);
+}
+.search-bar__link:hover { color: var(--color-gold-text, #8A661A); }
+@media (max-width: 767.98px) {
+  /* The two shortcuts duplicate links already in the collapsed menu; on a phone
+     the search field alone is worth the width. */
+  .search-bar__link { display: none; }
+}
+
+.navbar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  max-width: 620px;
+}
+.navbar-search__icon {
+  position: absolute;
+  left: 14px;
+  font-size: 14px;
+  color: var(--text-secondary, #71717a);
+  pointer-events: none;
+}
+.navbar-search__input {
+  width: 100%;
+  height: 42px;
+  padding: 0 96px 0 38px;          /* room for the icon left, the button right */
+  border-radius: 999px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, .18));
+  background: rgba(255, 255, 255, .07);
+  color: inherit;
+  font-size: 14px;
+  outline: none;
+}
+.navbar-search__input { color: #f4f4f5; }
+.navbar-search__input::placeholder { color: rgba(255, 255, 255, .5); }
+.navbar-search__input:focus {
+  border-color: var(--color-gold, #B08421);
+  background: rgba(255, 255, 255, .12);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, .22);
+}
+/* Chrome draws its own clear button on type=search; it collides with ours. */
+.navbar-search__input::-webkit-search-decoration,
+.navbar-search__input::-webkit-search-cancel-button { -webkit-appearance: none; }
+.navbar-search__btn {
+  position: absolute;
+  right: 5px;
+  height: 32px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 999px;
+  /* Gold fill takes DARK text, not white. White on #B08421 is 3.40:1 - this
+     button failed AA from the day it was gold, and the navy ink on it is
+     5.82:1. The token is named rather than the old --accent-3 fallback, which
+     resolves to charcoal anywhere style.css is loaded. */
+  background: var(--color-gold);
+  color: var(--color-ink-900);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.navbar-search__btn:hover { filter: brightness(1.08); }
+
+/* Below the navbar's breakpoint the collapse stacks, so the search becomes a
+   full-width row of its own rather than fighting the links for space. */
+@media (max-width: 1199.98px) {
+  .navbar-search { flex: 1 1 100%; max-width: none; margin: 12px 0; }
+}
+
+/* ---- Wider catalogue ----------------------------------------------------- */
+/* 1200px gave four 216px cards on a 1400px screen, with 200px of dead margin
+   either side. A marketplace earns trust partly through density: more of the
+   catalogue visible without scrolling reads as "there is a lot here". */
+.shop-body .container,
+.catalog-layout { max-width: 1480px; }
+.shop-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+
+/* ---- Card: price first --------------------------------------------------- */
+/* Price was 18px against a 13.5px title — legible, but not the anchor. On a
+   marketplace the price is what the eye should land on after the photo. */
+.shop-card__price { font-size: 21px; font-weight: 800; letter-spacing: -.02em; }
+.shop-card__cur { font-size: 13px; font-weight: 600; opacity: .75; margin-right: 2px; }
+.shop-card__from { font-size: 11px; font-weight: 600; text-transform: uppercase;
+                   letter-spacing: .05em; opacity: .6; }
+.shop-card__title { font-size: 13.5px; line-height: 1.35; }
+
+/* ---- Results toolbar ----------------------------------------------------- */
+/* Count, active filters and sort in one row above the grid. Sorting lived only
+   as links in the sidebar, below the categories, where it was easy to miss. */
+.shop-toolbar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 0 0 14px; margin-bottom: 4px;
+  border-bottom: 1px solid var(--border-color, rgba(0, 0, 0, .08));
+}
+.shop-toolbar__count { font-size: 14px; font-weight: 600; }
+.shop-toolbar__count span { color: var(--text-secondary, #71717a); font-weight: 500; }
+.shop-toolbar__spacer { margin-left: auto; }
+.shop-toolbar__sort {
+  height: 36px; border-radius: 9px; font-size: 13px; padding: 0 30px 0 10px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, .14));
+  background: var(--bg-input, #fff); color: inherit; cursor: pointer;
+}
+.shop-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 999px;
+  background: rgba(176, 132, 33, .12); color: var(--color-gold-text, #8A661A);
+  text-decoration: none;
+}
+.shop-chip:hover { background: rgba(176, 132, 33, .2); color: var(--color-gold-text, #8A661A); }
+.shop-chip i { font-size: 10px; }
+
+/* ---- Category tiles ------------------------------------------------------ */
+/* Visual browsing. A marketplace homepage answers "what do you sell?" with
+   pictures of departments, not a paragraph about sourcing. */
+.cat-tiles {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  margin-bottom: 8px;
+}
+.cat-tile {
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 104px; padding: 15px 16px; border-radius: 14px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, .1));
+  background: var(--bg-input, #f7f7f8);
+  text-decoration: none; color: inherit;
+  transition: transform .14s ease, box-shadow .14s ease, border-color .14s ease;
+}
+.cat-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-gold, #B08421);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .09);
+  color: inherit;
+}
+.cat-tile__icon { font-size: 22px; color: var(--color-gold-text, #8A661A); line-height: 1; }
+.cat-tile__name { font-weight: 700; font-size: 14px; margin-top: 10px; }
+.cat-tile__count { font-size: 12px; color: var(--text-secondary, #71717a); }
+
+/* =============================================================================
+   MOBILE MENU LEGIBILITY
+   =============================================================================
+   `body.has-hero .portal-navbar:not(.scrolled)` deliberately makes the bar
+   transparent over the homepage hero. Opening the hamburger at the top of that
+   page therefore dropped the whole expanded panel onto the photograph — white
+   links over a bright, busy container yard, effectively unreadable.
+
+   The panel gets its own opaque surface. Styling the PANEL rather than relying
+   on :has() to re-solidify the bar means it works the same in a browser without
+   :has() support, and it keeps the transparent-over-hero effect for the closed
+   state, which was the point of that rule.
+   ========================================================================== */
+@media (max-width: 1199.98px) {
+  .portal-navbar .navbar-collapse.show,
+  .portal-navbar .navbar-collapse.collapsing {
+    background: rgba(22, 36, 61, .98);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    margin: 14px -4px -6px;
+    padding: 10px 14px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    box-shadow: 0 20px 46px rgba(0, 0, 0, .55);
+    max-height: calc(100vh - 110px);
+    overflow-y: auto;
+  }
+
+  /* Full-width rows with a real tap target, and a rule between them so the list
+     reads as a menu rather than floating words. */
+  .portal-navbar .navbar-collapse.show .nav-item { width: 100%; }
+  .portal-navbar .navbar-collapse.show .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 8px;
+    font-size: 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, .07);
+  }
+  .portal-navbar .navbar-collapse.show .nav-item:last-child .nav-link { border-bottom: 0; }
+
+  /* White, and !important to match the header rule it is overriding.
+
+     The header now paints .nav-link with the navy ink, which is right on the
+     white bar and exactly wrong here: this panel is a DARK surface on purpose
+     (see the note above this block), so those links came out navy on navy and
+     the whole menu read as an empty box. The panel keeps its dark surface -
+     it has to, it opens over the hero photograph - and the text flips instead. */
+  .portal-navbar .navbar-collapse.show .nav-link,
+  .portal-navbar .navbar-collapse.collapsing .nav-link {
+    color: rgba(255, 255, 255, .92) !important;
+  }
+  .portal-navbar .navbar-collapse.show .nav-link:hover,
+  .portal-navbar .navbar-collapse.show .nav-link:focus {
+    color: var(--color-gold-light) !important;
+    background: rgba(255, 255, 255, .07);
+  }
+  .portal-navbar .navbar-collapse.show .btn-primary {
+    display: block;
+    width: 100%;
+    margin-top: 12px;
+    text-align: center;
+  }
+  /* The dropdown nests INSIDE the dark panel, so it needs the same treatment -
+     the site-wide rule gives it a white sheet and navy items, which is correct
+     where it hangs off the white bar and invisible where it hangs off this. */
+  .portal-navbar .navbar-collapse.show .dropdown-menu {
+    background: rgba(255, 255, 255, .05);
+    border: 0;
+    box-shadow: none;
+    margin: 4px 0 4px 12px;
+  }
+  .portal-navbar .navbar-collapse.show .dropdown-item {
+    color: rgba(255, 255, 255, .88);
+  }
+  .portal-navbar .navbar-collapse.show .dropdown-item:hover,
+  .portal-navbar .navbar-collapse.show .dropdown-item:focus {
+    background: rgba(255, 255, 255, .10);
+    color: var(--color-white);
+  }
+  /* The sub-labels under each dropdown entry are .text-secondary, which the
+     site-wide rule paints muted navy for a white page - 2.35:1 here. Needs
+     !important to beat that rule, which carries one of its own. */
+  .portal-navbar .navbar-collapse.show .text-secondary {
+    color: rgba(255, 255, 255, .68) !important;
+  }
+}
+
+/* =============================================================================
+   PRODUCT PAGE
+   =============================================================================
+   Measured before these rules, on a 1400x1000 desktop: the order button sat at
+   y=981 — below the fold, after six options and two spec tables. This is the
+   page paid traffic lands on, so the single most important change was moving
+   the decision above the scroll. The template does that; these rules make it
+   look like the decision rather than another row of links.
+   ========================================================================== */
+
+/* Match the catalogue's width. The shell was widened to 1480px there and this
+   page stayed at 1200, so moving between them shifted the whole layout. */
+.pdp-public > .container { max-width: 1480px; }
+
+/* -----------------------------------------------------------------------------
+   The offer block: price, range, and the facts an importer checks first.
+
+   SCOPED TO .pdp-public ON PURPOSE. The signed-in portal's product page uses the
+   same .pdp-* class names with its own inline <style> block, and it even orders
+   the price the other way round (amount, then currency). That block only wins
+   for the properties it actually declares, so an unscoped `display: flex` here
+   would half-apply to a template that never asked for it.
+   -------------------------------------------------------------------------- */
+
+/* `contain`, not `cover`. Product photos arrive from 1688 and Alibaba listings
+   in whatever ratio the supplier shot them, and a square crop of a tall product
+   cuts the ends off the thing being sold - in the one image a buyer judges from.
+   Padding over a white ground reads as a studio backdrop rather than a
+   letterbox. */
+.pdp-public .pdp-gallery__main {
+  object-fit: contain;
+  background: var(--color-white, #fff);
+  padding: 12px;
+}
+/* --accent-3 is charcoal wherever style.css is loaded; only this page's lack of
+   it made the fallback gold. Name the gold token and stop depending on that. */
+.pdp-public .pdp-thumb.is-active { border-color: var(--color-gold, #B08421); }
+
+/* Identity line under the name: the code a buyer quotes back in an enquiry, and
+   the route to similar products. Both were rows in a table below the fold. */
+.pdp-public .pdp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px 14px;
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: var(--color-muted, #6A6A6C);
+}
+.pdp-public .pdp-meta__sku { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+.pdp-public .pdp-meta a {
+  color: var(--color-muted, #6A6A6C);
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 0, 0, .18);
+}
+.pdp-public .pdp-meta a:hover {
+  color: var(--color-dark, #16243D);
+  border-bottom-color: currentColor;
+}
+
+.pdp-public .pdp-offer { margin: 0 0 6px; }
+
+/* The currency is a label, not a second number. A 31px amount beside a 20px
+   "AED" on a shared baseline read as two figures of nearly equal weight; set
+   small, uppercase, muted, and aligned to the TOP of the digits, it reads as one
+   price. The unit is stated because every price on this site is per piece and
+   the page never said so - against a 50-piece minimum that is the difference
+   between a 22 AED decision and an 1,100 AED one. */
+.pdp-public .pdp-price {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 0;
+  font-weight: 800;
+  line-height: 1;
+}
+.pdp-public .pdp-price__cur {
+  align-self: flex-start;
+  margin: 5px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  color: var(--color-muted, #6A6A6C);
+}
+.pdp-public .pdp-price__amt {
+  font-size: clamp(30px, 3.6vw, 42px);
+  letter-spacing: -.02em;
+  font-variant-numeric: tabular-nums;
+}
+.pdp-public .pdp-price__unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-muted, #6A6A6C);
+}
+.pdp-public .pdp-range {
+  margin: 9px 0 0;
+  font-size: 13px;
+  color: var(--color-muted, #6A6A6C);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Minimum order, pieces per carton, unit weight, carton volume: the four
+   numbers that decide whether an importer can use this product at all. They
+   were grey small print and a spec table sitting AFTER the order button.
+
+   Hairlines come from a 1px grid gap over a border-coloured ground rather than
+   per-cell borders, so a row that wraps to fewer columns leaves no stray edge. */
+.pdp-public .pdp-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+  gap: 1px;
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+  background: var(--color-border, #DFE1E6);
+  border: 1px solid var(--color-border, #DFE1E6);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.pdp-public .pdp-fact {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  background: var(--color-white, #fff);
+}
+.pdp-public .pdp-fact__v {
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.pdp-public .pdp-fact__u {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-muted, #6A6A6C);
+}
+.pdp-public .pdp-fact__k {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--color-muted, #6A6A6C);
+}
+
+/* The option count as a badge, rather than "Options - 4" set in the heading. */
+.pdp-public .pdp-count {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, .07);
+  color: var(--color-slate, #3F3F42);
+  font-size: 11px;
+  letter-spacing: 0;
+}
+
+/* The chosen option should be unmistakable: a 10% tint alone is easy to miss on
+   a white card, so the selection carries a gold edge as well. */
+.pdp-public .pdp-variants { max-height: 340px; }
+.pdp-public .pdp-variant { padding: 10px 13px; }
+.pdp-public .pdp-variant input[type="radio"] {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-gold, #B08421);
+}
+.pdp-public .pdp-variant:has(input:checked) {
+  background: rgba(176, 132, 33, .09);
+  box-shadow: inset 3px 0 0 var(--color-gold, #B08421);
+}
+.pdp-public .pdp-variant__price { font-variant-numeric: tabular-nums; }
+
+/* The buy panel: a surface, not three loose links.
+
+   flex-direction IS DECLARED HERE ON PURPOSE. This panel used to carry the
+   .product-card class as well, purely to borrow the card look - and inherited
+   .product-card{flex-direction:column} with it, so every control inside stacked
+   into a centred column and the "order" button came out 150px wide, floating in
+   the middle of a 745px panel. That is what made three buttons read as three
+   equal stacked links. The class is gone from the template; this keeps the row
+   if anyone reaches for it again. */
+.pdp-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 22px 0 4px;
+  padding: 16px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, .12));
+  border-radius: 14px;
+  background: var(--bg-input, #f7f7f8);
+}
+.pdp-actions .product-qty-input { max-width: 110px; flex: 0 0 auto; }
+.pdp-actions .shop-card__btn { flex: 1 1 auto; min-width: 150px; }
+/* The escape hatches - register, ask a question - are links under the panel
+   rather than buttons inside it. Three full-size controls of equal weight left
+   none of them looking like the next step, and on a phone the panel is pinned
+   to the bottom of the screen, where every extra button is permanently spent
+   space. */
+.pdp-actions-alt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 13px 0 0;
+  font-size: 13.5px;
+  color: var(--color-muted, #6A6A6C);
+}
+.pdp-actions-alt a {
+  color: var(--color-dark, #16243D);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(0, 0, 0, .25);
+}
+.pdp-actions-alt a:hover { border-bottom-color: var(--color-dark, #16243D); }
+
+/* Freight line. The page carried the weight and the CBM and said nothing about
+   shipping, which is the first question a Gulf or Pakistan importer asks. */
+.pdp-freight {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-secondary, #71717a);
+  margin: 14px 0 0;
+}
+.pdp-freight i { color: var(--color-gold, #B08421); }
+.pdp-freight strong { color: var(--text-primary, #16243D); font-weight: 600; }
+/* Gold at body size has to be the darker tier. #B08421 is 3.40:1 on white,
+   which carries a shape but fails AA for text; --color-gold-text is 5.26:1. */
+.pdp-freight a { color: var(--color-gold-text, #8A661A); font-weight: 600; white-space: nowrap; }
+
+/* The photo follows you down the specifications.
+   A spec sheet is long and the thing being read about scrolls away from it;
+   keeping the image in view is why every marketplace pins it. Only above the
+   point where the layout is still two columns — stuck to the top of a single
+   column would cover the text it is meant to accompany. */
+@media (min-width: 901px) {
+  .pdp-public .pdp-gallery { position: sticky; top: 96px; align-self: start; }
+}
+
+/* On a phone the gallery stacks above everything, so the buy panel starts at
+   y≈1158 — a full screen and a half down. Meta and TikTok traffic is
+   overwhelmingly mobile, so that is the majority of paid visitors scrolling
+   past the price to find out they can order.
+   `position: sticky; bottom: 0` keeps the panel in normal flow and pins it to
+   the bottom edge only while it would otherwise be off-screen — no duplicated
+   markup, and nothing overlaps the content it belongs to. */
+@media (max-width: 900px) {
+  .pdp-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 20;
+    margin-bottom: 0;
+    border-radius: 14px 14px 0 0;
+    background: var(--bg-body, #fff);
+    box-shadow: 0 -8px 22px rgba(0, 0, 0, .14);
+  }
+}
+
+/* =============================================================================
+   COUNTRY LANDING PAGES
+   ========================================================================== */
+.market-hero { padding: 46px 0 34px; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.08)); }
+.market-hero__title { font-size: clamp(28px, 4vw, 42px); font-weight: 800; letter-spacing: -.02em;
+  line-height: 1.1; text-wrap: balance; margin: 14px 0 12px; max-width: 20ch; }
+.market-hero__lead { font-size: 17px; color: var(--text-secondary, #71717a); max-width: 62ch; margin: 0 0 22px; }
+.market-hero__lead strong { color: var(--text-primary, #16243D); font-weight: 600; }
+.market-cta { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.market-body { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 44px; align-items: start; }
+@media (max-width: 900px) { .market-body { grid-template-columns: 1fr; gap: 30px; } }
+.market-main .section-title { font-size: 22px; margin: 34px 0 12px; }
+.market-main .section-title:first-child { margin-top: 0; }
+.market-list { margin: 0 0 8px; padding-left: 20px; }
+.market-list li { margin-bottom: 10px; }
+
+.market-aside { position: sticky; top: 96px; display: flex; flex-direction: column; gap: 22px; }
+@media (max-width: 900px) { .market-aside { position: static; } }
+.market-facts, .market-others {
+  border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 14px;
+  padding: 18px; background: var(--bg-input, #f7f7f8);
+}
+.market-others__list { list-style: none; margin: 0; padding: 0; }
+.market-others__list li { padding: 7px 0; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.07)); }
+.market-others__list li:last-child { border-bottom: 0; }
+.market-others__list a { text-decoration: none; font-size: 14px; font-weight: 600; }
+
+
+/* ===========================================================================
+   LIGHT HOMEPAGE  (body.theme-light)
+   ===========================================================================
+   The homepage was black: a dark hero, a dark call-to-action band, and a dark
+   bar over both. This turns it light WITHOUT touching any other page, because
+   the navbar, the search bar and the footer are shared with every public page
+   - restyling them globally would have changed About, Services, the shop and
+   the blog as a side effect of a homepage request.
+
+   Everything below is therefore scoped to `body.theme-light`, which only
+   front_page.html sets. Removing that one class reverts the whole thing.
+
+   Colours come from the existing palette rather than new ones, so the page
+   still reads as the same brand:
+     ink        --color-dark (#16243D)      14.6:1 on white
+     body       --color-dark-light (#24365A) 11.4:1 on white
+     gold text  --color-gold-text (#8A661A)   5.26:1 on white  (AA)
+     gold shape --color-gold (#B08421)        icons, rules, borders only
+   The gold SPLIT matters: #B08421 is only 2.6:1 on white and must never carry
+   body text, which is why the palette already distinguishes the two.
+   ======================================================================== */
+
+/* --- The header -----------------------------------------------------------
+   White, on every public page.
+
+   This began as a homepage-only override: the hero there went light, and white
+   links on a white hero are invisible, so the bar had to flip. It is no longer
+   scoped to .theme-light, because the header is the one element a visitor sees
+   on every page and carries from one to the next - and a white bar on the home
+   page that turned navy on the services page was the inconsistency you notice
+   the moment you click anything.
+
+   Safe to broaden because the inner pages never ran a TRANSPARENT bar: theirs
+   was a solid navy (96%), so nothing was showing through it that a white fill
+   now covers. The only pages whose hero sits under the bar are .has-hero ones,
+   and those heroes are dark photographs, which a solid white bar reads
+   cleanly against. */
+.portal-navbar,
+.portal-navbar.scrolled {
+  background: rgba(255, 255, 255, 0.97);
+  border-bottom: 1px solid rgba(22, 36, 61, 0.08);
+  box-shadow: 0 1px 2px rgba(22, 36, 61, .04), 0 8px 24px -18px rgba(22, 36, 61, .25);
+}
+
+.portal-navbar .navbar-brand,
+.portal-navbar .nav-link {
+  color: var(--color-dark) !important;
+}
+
+.portal-navbar .nav-link:hover,
+.portal-navbar .nav-link:focus {
+  color: var(--color-gold-text) !important;
+  background: rgba(22, 36, 61, 0.05);
+}
+
+/* The hamburger is a white-on-dark SVG by default; invert it so it shows. */
+.portal-navbar .navbar-toggler {
+  border-color: rgba(22, 36, 61, 0.2);
+}
+.portal-navbar .navbar-toggler-icon {
+  filter: invert(1);
+}
+
+/* No background on .navbar-collapse. It used to be set white here "for the
+   collapsed menu panel on phones", but the phone panel is styled dark in the
+   MOBILE MENU LEGIBILITY block below, which wins for both .show and
+   .collapsing - so this only ever painted a white sheet behind an element that
+   is either zero-height or already on a white bar. Leaving it in made the
+   panel's real colour impossible to find by reading. */
+
+/* The dropdown panels hang off a white bar now, so they are light too. */
+.portal-navbar .dropdown-menu {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  box-shadow: 0 18px 40px -22px rgba(22, 36, 61, .40);
+}
+.portal-navbar .dropdown-item { color: var(--color-ink-600); }
+.portal-navbar .dropdown-item:hover,
+.portal-navbar .dropdown-item:focus {
+  background: var(--color-bg);
+  color: var(--color-ink-900);
+}
+
+/* --- Search bar -----------------------------------------------------------
+   Follows the header out to every page, for the same reason: it is the strip
+   directly under the bar, and a white header sitting on a navy search row was
+   a two-tone band at the top of every inner page. */
+.search-bar {
+  background: var(--color-bg);
+  border-bottom: 1px solid rgba(22, 36, 61, 0.07);
+}
+.search-bar input,
+.search-bar .form-control {
+  background: #FFFFFF;
+  border: 1px solid rgba(22, 36, 61, 0.12);
+  color: var(--color-dark);
+}
+.search-bar input::placeholder { color: #6B7280; }
+/* The two shortcut links beside the field were white-on-navy. */
+.search-bar a:not(.btn) { color: var(--color-ink-600); }
+.search-bar a:not(.btn):hover { color: var(--color-gold-text); }
+
+/* --- Hero -----------------------------------------------------------------
+   The photograph stays, at a much lower opacity. On the dark hero it sat at
+   0.25 under a near-opaque black wash; the same image at the same strength
+   over white turns the text to mud, so it drops to a faint texture and the
+   wash inverts to white. */
+body.theme-light .hero-v2 {
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--color-bg) 100%);
+}
+
+body.theme-light .hero-v2::before {
+  opacity: 0.08;
+}
+
+body.theme-light .hero-v2::after {
+  background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.90) 0%,
+      rgba(255, 255, 255, 0.78) 55%,
+      rgba(176, 132, 33, 0.10) 100%);
+}
+
+body.theme-light .hero-v2 .hero-title {
+  color: var(--color-dark);
+}
+
+body.theme-light .hero-v2 .hero-subtitle {
+  color: var(--color-dark-light);
+}
+
+body.theme-light .hero-checklist {
+  color: var(--color-dark-light);
+}
+
+/* The tick marks carry the accent. Gold as a SHAPE is fine at any size; gold
+   as body text would not be. */
+body.theme-light .hero-checklist li i,
+body.theme-light .hero-checklist li svg {
+  color: var(--color-gold);
+}
+
+/* --- The "Based in China" pill -------------------------------------------- */
+body.theme-light .hero-v2 .badge,
+body.theme-light .hero-badge {
+  background: rgba(176, 132, 33, 0.10) !important;
+  color: var(--color-gold-text) !important;
+  border: 1px solid rgba(176, 132, 33, 0.28);
+}
+
+/* --- Buttons --------------------------------------------------------------
+   These were white-on-dark because they sat on a black hero. On white that is
+   invisible, so the fill and the text swap. */
+body.theme-light .hero-v2 .btn-primary,
+body.theme-light .cta-section .btn-primary,
+body.theme-light .hero-lead-card .btn-primary {
+  background: var(--color-dark);
+  color: var(--color-white);
+  border-color: var(--color-dark);
+}
+
+body.theme-light .hero-v2 .btn-primary:hover,
+body.theme-light .cta-section .btn-primary:hover,
+body.theme-light .hero-lead-card .btn-primary:hover {
+  background: #24365A;
+  color: var(--color-white);
+}
+
+body.theme-light .hero-v2 .btn-outline-light,
+body.theme-light .cta-section .btn-outline-light {
+  color: var(--color-dark);
+  border-color: rgba(22, 36, 61, 0.25);
+  background: transparent;
+}
+
+body.theme-light .hero-v2 .btn-outline-light:hover,
+body.theme-light .cta-section .btn-outline-light:hover {
+  background: var(--color-dark);
+  color: var(--color-white);
+  border-color: var(--color-dark);
+}
+
+/* --- The quote form card --------------------------------------------------
+   Was frosted white-on-dark. On a light ground that reads as nothing at all,
+   so it becomes a solid card that lifts off the page with a border and a
+   shadow instead of with transparency. */
+body.theme-light .hero-lead-card {
+  background: #FFFFFF;
+  border: 1px solid rgba(22, 36, 61, 0.10);
+  box-shadow: 0 1px 2px rgba(22, 36, 61, .04), 0 18px 40px -24px rgba(22, 36, 61, .35);
+  backdrop-filter: none;
+}
+
+body.theme-light .hero-lead-card,
+body.theme-light .hero-lead-card label,
+body.theme-light .hero-lead-card h1,
+body.theme-light .hero-lead-card h2,
+body.theme-light .hero-lead-card h3,
+body.theme-light .hero-lead-card h4 {
+  color: var(--color-dark);
+}
+
+body.theme-light .hero-lead-card p,
+body.theme-light .hero-lead-card small {
+  color: var(--color-dark-light);
+}
+
+body.theme-light .hero-lead-card .form-control,
+body.theme-light .hero-lead-card .form-select,
+body.theme-light .hero-lead-card textarea {
+  background: var(--color-bg);
+  border: 1px solid rgba(22, 36, 61, 0.12);
+  color: var(--color-dark);
+}
+
+body.theme-light .hero-lead-card .form-control::placeholder,
+body.theme-light .hero-lead-card textarea::placeholder {
+  color: #6B7280;
+}
+
+body.theme-light .hero-lead-card .form-control:focus,
+body.theme-light .hero-lead-card .form-select:focus,
+body.theme-light .hero-lead-card textarea:focus {
+  background: #FFFFFF;
+  border-color: var(--color-gold);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.18);
+}
+
+/* --- Closing call to action ----------------------------------------------
+   Kept as a distinct band rather than plain white: a page with no tonal
+   change at all reads as one long scroll with nothing to mark the end. The
+   band is now a warm light tint instead of black. */
+body.theme-light .cta-section {
+  background: var(--color-bg);
+  color: var(--color-dark);
+}
+
+body.theme-light .cta-section::before {
+  background: linear-gradient(135deg,
+      rgba(176, 132, 33, 0.12) 0%,
+      rgba(243, 244, 247, 0.65) 60%);
+}
+
+body.theme-light .cta-section h1,
+body.theme-light .cta-section h2,
+body.theme-light .cta-section h3 {
+  color: var(--color-dark);
+}
+
+body.theme-light .cta-section p {
+  color: var(--color-dark-light);
+}
+
+/* Gold links were lightened for dark grounds; on white they need the darker
+   tier to stay legible (5.26:1 rather than 2.6:1). */
+body.theme-light .cta-section a:not(.btn) {
+  color: var(--color-gold-text);
+}
+
+/* --- Skip link ------------------------------------------------------------
+   Only visible when focused, but it is the first thing a keyboard user meets. */
+body.theme-light .skip-link {
+  background: var(--color-dark);
+  color: var(--color-white);
+}
+
+/* --- White-text utilities left stranded on the light ground ---------------
+   Two bits of text were written for a dark hero and keep their own colour
+   regardless of what is behind them:
+
+     .text-white-50  a Bootstrap utility, so it carries !important and beat the
+                     `.cta-section p` rule above - it measured 1.05:1.
+     .whatsapp-banner  tinted at only 12% green, which read as a dark panel on
+                     the old hero and as plain white on this one, leaving its
+                     white text at 1.09:1.
+
+   Both are overridden here rather than edited in the templates, so the markup
+   stays shared with the pages that are still dark. */
+body.theme-light .cta-section .text-white-50,
+body.theme-light .cta-section .text-white,
+body.theme-light .hero-v2 .text-white-50 {
+  color: var(--color-dark-light) !important;
+}
+
+body.theme-light .whatsapp-banner {
+  /* Deeper tint so the banner still reads as a banner on white. */
+  background: rgba(37, 211, 102, 0.14);
+  border: 1px solid rgba(21, 128, 61, 0.28);
+}
+
+body.theme-light .whatsapp-banner,
+body.theme-light .whatsapp-banner * {
+  color: #14532D !important;   /* 8.9:1 on the tinted ground */
+}
+
+body.theme-light .whatsapp-banner a:not(.btn) {
+  color: #14532D !important;
+  text-decoration: underline;
+}
+
+/* --- The quote card's black header band -----------------------------------
+   `.lead-card-header` is a black gradient with white text, and it stays black:
+   a dark band at the top of a white card anchors the form and keeps the brand
+   colour on an otherwise white page.
+
+   It needs an explicit exception because the rule above turns every heading in
+   this card dark, which on a black band produced black-on-black. Stated here
+   rather than by narrowing that selector, so the reason survives. */
+body.theme-light .hero-lead-card .lead-card-header,
+body.theme-light .hero-lead-card .lead-card-header h1,
+body.theme-light .hero-lead-card .lead-card-header h2,
+body.theme-light .hero-lead-card .lead-card-header h3,
+body.theme-light .hero-lead-card .lead-card-header h4,
+body.theme-light .hero-lead-card .lead-card-header p,
+body.theme-light .hero-lead-card .lead-card-header small,
+body.theme-light .hero-lead-card .lead-card-header * {
+  color: var(--color-white);
+}
+
+/* =============================================================================
+   NAVY + GOLD THEME
+   =============================================================================
+   The look asked for: a white page with a photographic hero under a navy wash,
+   a navy panel of capabilities riding the seam between the hero and the page,
+   and gold used only as an accent - rules, icons, and the second line of the
+   headline.
+
+   This block comes last in the file deliberately. The homepage's `theme-light`
+   rules above turned the hero into a WHITE panel with dark text, and those
+   rules are still correct for everything below the hero. Rather than unpick
+   them, the hero is handed back to the dark treatment here at equal or higher
+   specificity, which keeps the two intentions readable side by side instead of
+   leaving a half-edited block nobody can follow.
+   ========================================================================== */
+
+/* --- The header ------------------------------------------------------------
+   Solid white rather than the 86% wash it used over a light hero: the hero is
+   now a dark photograph, and a translucent bar over it turns the dark nav text
+   to mud exactly where the logo sits. */
+.has-hero .portal-navbar:not(.scrolled) {
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 1px 2px rgba(22, 36, 61, .05);
+}
+
+/* The "Get a Quote" pill in the bar. Gold carries DARK text, never white:
+   #B08421 is 3.0:1 against white and 5.8:1 against the navy ink, so this is
+   the one pairing that is both on-brand and legible. */
+/* !important throughout, because .portal-navbar .btn-primary above declares
+   `background: var(--color-primary) !important`. Without it the fill stayed
+   navy while the text colour below still applied - navy on navy, 1.1:1, a
+   button you could only find by hovering. */
+.portal-navbar .btn-primary,
+body.theme-light .portal-navbar .btn-primary {
+  background: var(--color-gold) !important;
+  border-color: var(--color-gold) !important;
+  color: var(--color-ink-900) !important;
+}
+.portal-navbar .btn-primary:hover,
+body.theme-light .portal-navbar .btn-primary:hover {
+  background: var(--color-gold-dark) !important;
+  border-color: var(--color-gold-dark) !important;
+  color: var(--color-white) !important;
+}
+
+/* --- The hero --------------------------------------------------------------
+   The photograph carried a 0.08 opacity under a white wash. Here it is the
+   subject, so it comes up to full strength under a navy gradient that stays
+   heavy on the left - where the headline sits - and thins towards the gold on
+   the right, which is what gives the sunset edge in the reference. */
+body.theme-light .hero-v2 {
+  background: var(--color-ink-800);
+}
+body.theme-light .hero-v2::before {
+  opacity: 0.58;
+}
+/* The wash stays heavy across the left half, where the headline, the subtitle
+   and the checklist sit and white has to clear 4.5:1 against whatever the
+   photograph happens to be doing there. It thins from 64% rightwards, which is
+   past the edge of the text column, so the picture is readable as a picture
+   without any of it being bought from the copy. */
+body.theme-light .hero-v2::after {
+  background: linear-gradient(104deg,
+      rgba(14, 24, 42, .92) 0%,
+      rgba(14, 24, 42, .80) 46%,
+      rgba(22, 36, 61, .50) 64%,
+      rgba(176, 132, 33, .28) 100%);
+}
+
+body.theme-light .hero-v2 .hero-title { color: var(--color-white); }
+body.theme-light .hero-v2 .hero-subtitle { color: rgba(255, 255, 255, .86); }
+body.theme-light .hero-checklist { color: rgba(255, 255, 255, .88); }
+
+/* Gold on navy takes the LIGHT tier. --color-gold is 3.4:1 on white and only
+   2.7:1 on this navy; --color-gold-light is 9.1:1 on it. */
+body.theme-light .hero-checklist li i,
+body.theme-light .hero-checklist li svg {
+  color: var(--color-gold-light);
+}
+
+/* The second line of the headline, in gold - the one piece of the reference
+   that is pure typography. Set as a block so it always breaks onto its own
+   line rather than wherever the measure happens to fall. */
+.hero-title__accent {
+  display: block;
+  color: var(--color-gold-light);
+}
+
+body.theme-light .hero-v2 .badge,
+body.theme-light .hero-badge {
+  background: rgba(255, 255, 255, .12) !important;
+  color: var(--color-white) !important;
+  border: 1px solid rgba(255, 255, 255, .26);
+}
+
+/* --- Hero buttons ----------------------------------------------------------
+   Primary goes gold, which is the reference's call to action. The outline
+   button returns to white-on-dark, since the surface under it is dark again. */
+body.theme-light .hero-v2 .btn-primary,
+body.theme-light .cta-section .btn-primary,
+body.theme-light .hero-lead-card .btn-primary {
+  background: var(--color-gold);
+  border-color: var(--color-gold);
+  color: var(--color-ink-900);
+}
+body.theme-light .hero-v2 .btn-primary:hover,
+body.theme-light .cta-section .btn-primary:hover,
+body.theme-light .hero-lead-card .btn-primary:hover {
+  background: var(--color-gold-dark);
+  border-color: var(--color-gold-dark);
+  color: var(--color-white);
+}
+
+body.theme-light .hero-v2 .btn-outline-light {
+  color: var(--color-white);
+  border-color: rgba(255, 255, 255, .55);
+  background: transparent;
+}
+body.theme-light .hero-v2 .btn-outline-light:hover {
+  background: var(--color-white);
+  border-color: var(--color-white);
+  color: var(--color-ink-800);
+}
+
+/* The WhatsApp strip sits inside the hero, so it follows the hero's surface
+   rather than the page's. Scoped under .hero-v2 so the light treatment still
+   applies to any copy of it further down the page. */
+body.theme-light .hero-v2 .whatsapp-banner {
+  background: rgba(255, 255, 255, .10);
+  border: 1px solid rgba(255, 255, 255, .22);
+}
+body.theme-light .hero-v2 .whatsapp-banner,
+body.theme-light .hero-v2 .whatsapp-banner * {
+  color: rgba(255, 255, 255, .92) !important;
+}
+body.theme-light .hero-v2 .whatsapp-banner i { color: #5BD97E !important; }
+
+/* --- The capability panel --------------------------------------------------
+   This was a thin white strip of four labels under the hero. In the reference
+   it is the hinge of the whole design: a navy card lifted onto the seam
+   between the photograph and the page, which is what stops the hero ending in
+   a hard horizontal edge.
+
+   The lift is a negative margin on the section rather than absolute
+   positioning, so the card still takes its own height in the flow and the
+   content below it is never overlapped. */
+.trust-bar {
+  background: transparent;
+  border-bottom: 0;
+  padding: 0;
+  position: relative;
+  z-index: 3;
+  margin-top: -64px;
+}
+
+.trust-panel {
+  background: var(--color-ink-800);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 26px 52px -28px rgba(14, 24, 42, .62);
+  overflow: hidden;
+}
+
+.trust-col {
+  border-left: 1px solid rgba(255, 255, 255, .10);
+}
+/* Four across on desktop, so only the first of each row of four loses its
+   divider; two across below that, so every odd one does. */
+.trust-col:nth-child(4n + 1) { border-left: 0; }
+@media (max-width: 991.98px) {
+  .trust-col:nth-child(2n + 1) { border-left: 0; }
+}
+
+.trust-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  text-align: left;
+  padding: 22px 24px;
+  color: rgba(255, 255, 255, .74);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-normal);
+  height: 100%;
+}
+
+.trust-item i {
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--color-gold-light);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.trust-item__body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.trust-item__title {
+  color: var(--color-white);
+  font-weight: var(--font-weight-semibold);
+  font-size: 0.95rem;
+  line-height: 1.3;
+}
+
+.trust-item__desc {
+  color: rgba(255, 255, 255, .72);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+@media (max-width: 575.98px) {
+  /* On a phone the panel would otherwise sit half off the photograph with four
+     cramped columns under it; flat to the page and full width reads better. */
+  .trust-bar { margin-top: 0; }
+  .trust-panel { border-radius: var(--radius-md); }
+  .trust-item { padding: 16px 18px; }
+}
+
+/* --- Section headings ------------------------------------------------------
+   A short gold rule above the heading, which is how the reference separates
+   one band of the page from the next without a horizontal line across the
+   full width. */
+.section-title::before {
+  content: '';
+  display: block;
+  width: 44px;
+  height: 3px;
+  margin-bottom: 16px;
+  border-radius: 2px;
+  background: var(--color-gold);
+}
+
+/* Centred headings need the rule centred with them. Bootstrap's text-center
+   can sit on the heading itself or on any wrapper above it. */
+.text-center .section-title::before,
+.section-title.text-center::before {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --- The band under the panel ---------------------------------------------
+   The capability panel is navy and the proof strip directly beneath it was
+   navy too, so the two ran together into one slab with a rounded corner
+   floating in the middle of it. In the reference the navy panel is the ONLY
+   dark element between the hero and the page, which is what makes it read as
+   lifted. So this band goes light, and gains top padding to clear the half of
+   the panel that hangs below the hero. */
+body.theme-light .proof-strip {
+  background: var(--color-white);
+  color: var(--color-ink-600);
+  border-bottom: 1px solid var(--color-border);
+  padding: 4.25rem 0 2.75rem;
+}
+body.theme-light .proof-strip::before { opacity: 0.035; }
+body.theme-light .proof-item .proof-icon { color: var(--color-gold); }
+body.theme-light .proof-item .proof-value { color: var(--color-ink-800); }
+body.theme-light .proof-item .proof-label { color: var(--color-muted); }
+
+/* --- Bootstrap's greys -----------------------------------------------------
+   Two of Bootstrap's defaults land just under AA on white and neither belongs
+   to this palette anyway: .text-secondary is #6c757d at 4.26:1, and the
+   secondary outline button uses the same grey. Both move onto the palette's
+   muted navy at 5.31:1. The footer keeps its own lighter .text-secondary,
+   which is a more specific selector and still wins there. */
+.text-secondary { color: var(--color-muted) !important; }
+
+.btn-outline-secondary {
+  --bs-btn-color: var(--color-ink-600);
+  --bs-btn-border-color: var(--color-border);
+  --bs-btn-hover-bg: var(--color-ink-800);
+  --bs-btn-hover-border-color: var(--color-ink-800);
+  --bs-btn-hover-color: var(--color-white);
+  --bs-btn-active-bg: var(--color-ink-900);
+  --bs-btn-active-border-color: var(--color-ink-900);
+}
+
+/* --- The eyebrow label on dark bands ---------------------------------------
+   .section-label is --color-primary, which is the page's darkest ink. On a
+   white section that is the point; inside a dark hero it painted the label the
+   same colour as the band behind it, so "What We Do" above "Our Services" has
+   simply never been visible. Gold is the accent these bands already use. */
+.about-hero .section-label,
+.blog-hero .section-label,
+.contact-hero .section-label,
+.faq-hero .section-label,
+.page-hero .section-label,
+.portfolio-hero .section-label,
+.service-hero .section-label,
+.testimonials-hero .section-label,
+.cta-section .section-label,
+.proof-strip .section-label {
+  color: var(--color-gold-light);
+}
+/* Enumerated rather than matched on a pattern. `[class$="-hero"]` looks like
+   the tidy version and is a trap: <body> carries .has-hero on every one of
+   these pages, so the pattern would also catch the labels sitting on the LIGHT
+   sections further down and turn them gold on near-white (2.1:1). The two
+   light `-hero` bands, .shop-hero and .market-hero, are left out for the same
+   reason - they keep the dark ink. */

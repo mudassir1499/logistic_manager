@@ -16,6 +16,225 @@
  * All functions are designed to work with the Django backend's JSON API responses.
  */
 
+// =============================================================================
+// LOADING OVERLAY
+// =============================================================================
+// A single overlay shown while any server request is in flight.
+//
+// Before this, most actions gave no feedback at all. ajaxSubmit swapped the
+// submit button for a spinner, but that only covers forms - and only forms with
+// a findable submit button. Everything else (bulk actions, delete, confirm
+// order, toggle private, the modal-populating GETs, CSV and photo uploads) ran
+// silently. On a fast local machine that is invisible. On a shared host with a
+// bulk action now able to cover the entire filtered catalogue, it is seconds of
+// a frozen-looking page, and people click the button again.
+//
+// Design notes, each one there for a reason:
+//
+//   * Reference counted. Two requests in flight, one finishes, the overlay must
+//     stay up for the other. A plain boolean hides too early.
+//
+//   * Delayed appearance. Showing instantly means a 40ms request produces a
+//     flash of overlay, which reads as a glitch. Nothing appears unless the
+//     request is still running after APPEAR_DELAY_MS.
+//
+//   * Safety timeout. If a request never settles - a dropped connection that
+//     the browser does not time out promptly, a promise that is never resolved -
+//     a blocking overlay would trap the user with no way out. After
+//     MAX_VISIBLE_MS it clears itself and says so.
+// =============================================================================
+var AppLoading = (function () {
+    var APPEAR_DELAY_MS = 250;
+    var MAX_VISIBLE_MS = 60000;
+
+    var pending = 0;
+    var appearTimer = null;
+    var safetyTimer = null;
+    var overlay = null;
+    var textEl = null;
+
+    function build() {
+        if (overlay) return;
+        overlay = document.createElement('div');
+        overlay.className = 'app-loading-overlay';
+        // Announced politely so a screen reader says what is happening without
+        // interrupting whatever it is currently reading.
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+        overlay.innerHTML =
+            '<div class="app-loading-card">' +
+            '<div class="app-loading-spinner"></div>' +
+            '<div class="app-loading-text"></div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+        textEl = overlay.querySelector('.app-loading-text');
+    }
+
+    function paint(message) {
+        build();
+        textEl.textContent = message;
+        overlay.classList.add('is-visible');
+    }
+
+    function clear() {
+        pending = 0;
+        if (appearTimer) { clearTimeout(appearTimer); appearTimer = null; }
+        if (safetyTimer) { clearTimeout(safetyTimer); safetyTimer = null; }
+        if (overlay) overlay.classList.remove('is-visible');
+    }
+
+    return {
+        /**
+         * Register the start of one operation.
+         *
+         * Args:
+         *     message (string): What to show if it runs long enough to appear.
+         */
+        begin: function (message) {
+            pending += 1;
+            if (pending > 1) return;   // already counting down or visible
+
+            appearTimer = setTimeout(function () {
+                appearTimer = null;
+                // The first message wins for the whole burst. Rewriting the text
+                // as concurrent requests start and finish is just flicker.
+                paint(message || 'Working...');
+
+                safetyTimer = setTimeout(function () {
+                    clear();
+                    if (typeof showToast === 'function') {
+                        showToast('That is taking longer than expected. The page has been unlocked - reload if it did not finish.', 'error');
+                    }
+                }, MAX_VISIBLE_MS);
+            }, APPEAR_DELAY_MS);
+        },
+
+        /** Register the end of one operation. Hides once nothing is outstanding. */
+        end: function () {
+            pending = Math.max(0, pending - 1);
+            if (pending === 0) clear();
+        },
+
+        /** Force everything down. For error paths that need the UI back now. */
+        reset: clear
+    };
+})();
+
+/**
+ * Show the loading overlay for work this file does not drive through fetch.
+ *
+ * Pair every call with hideLoading(), including on the failure path, or the
+ * overlay stays up until the safety timeout releases it.
+ *
+ * Args:
+ *     message (string): Optional label. Defaults to "Working...".
+ */
+function showLoading(message) { AppLoading.begin(message); }
+
+/** Counterpart to showLoading(). */
+function hideLoading() { AppLoading.end(); }
+
+
+// =============================================================================
+// CSRF PROTECTION FOR ALL AJAX REQUESTS
+// =============================================================================
+// Django rejects state-changing requests that arrive without a CSRF token. The
+// back-office worked around that by putting @csrf_exempt on ~36 views —
+// including order create/edit/delete and settings updates. That disabled a real
+// protection: any page a logged-in admin visited could POST to those endpoints
+// on their behalf, and the browser would attach their session cookie.
+//
+// Most of this app's fetch() calls already sent the token by hand, but ten did
+// not, which is why the exemptions could not simply be deleted. Rather than
+// patch ten call sites and hope none are missed later, fetch is wrapped once
+// here: every same-origin, state-changing request gets the header automatically.
+//
+// This only ADDS a header. Calls that already set their own X-CSRFToken keep it,
+// cross-origin requests are left completely untouched, and GET/HEAD/OPTIONS —
+// which Django does not check — are passed straight through.
+// =============================================================================
+(function () {
+    var SAFE_METHODS = { GET: 1, HEAD: 1, OPTIONS: 1, TRACE: 1 };
+    var nativeFetch = window.fetch;
+    if (!nativeFetch) return;
+
+    // Requests the user did not ask for. A background poll or a keystroke-driven
+    // lookup must never throw a blocking overlay over the page - the notification
+    // bell alone would do it every 60 seconds.
+    var QUIET_URLS = [
+        '/portal/notification-counts/',
+        '/orders/admin-stats/',
+        '/accounts/search/'
+    ];
+
+    function isQuiet(url, init) {
+        if (init && init.quiet) return true;
+        for (var i = 0; i < QUIET_URLS.length; i++) {
+            if (url.indexOf(QUIET_URLS[i]) !== -1) return true;
+        }
+        return false;
+    }
+
+    function readCsrfCookie() {
+        var match = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
+        return match ? decodeURIComponent(match[2]) : null;
+    }
+
+    function isSameOrigin(url) {
+        try {
+            // Relative URLs resolve against the current origin, so they are same-origin
+            // by definition. Absolute ones are compared properly.
+            return new URL(url, window.location.href).origin === window.location.origin;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    window.fetch = function (input, init) {
+        init = init || {};
+        var method = (init.method || (input && input.method) || 'GET').toUpperCase();
+        var url = (typeof input === 'string') ? input : (input && input.url) || '';
+
+        if (!SAFE_METHODS[method] && isSameOrigin(url)) {
+            var token = readCsrfCookie();
+            if (token) {
+                // Headers may arrive as a Headers instance, an array of pairs, or a
+                // plain object. Normalising to Headers handles all three without
+                // clobbering anything the caller already set.
+                var headers = new Headers(init.headers || (input && input.headers) || {});
+                if (!headers.has('X-CSRFToken')) {
+                    headers.set('X-CSRFToken', token);
+                }
+                init = Object.assign({}, init, { headers: headers });
+                // Same-origin credentials so the session cookie still rides along.
+                if (!init.credentials) { init.credentials = 'same-origin'; }
+            }
+        }
+
+        var request = nativeFetch.call(this, input, init);
+        if (isQuiet(url, init)) return request;
+
+        // Callers can name the operation with `loadingMessage`; otherwise the
+        // method decides, because "Saving..." over a GET that is populating a
+        // modal is simply wrong.
+        AppLoading.begin(
+            (init && init.loadingMessage) ||
+            (SAFE_METHODS[method] ? 'Loading...' : 'Working...')
+        );
+
+        // then/catch rather than .finally so this keeps working on older
+        // browsers, and re-throwing preserves the rejection for the caller.
+        //
+        // This settles when the response headers arrive, not when the body has
+        // been read. Every endpoint here returns small JSON, and the wait being
+        // covered is the server's, so that is the right moment.
+        return request.then(
+            function (response) { AppLoading.end(); return response; },
+            function (error) { AppLoading.end(); throw error; }
+        );
+    };
+})();
+
 // ===== Sidebar Toggle =====
 // This section handles the collapsible left sidebar navigation.
 // On desktop, it toggles a 'collapsed' class for a compact view.
@@ -39,23 +258,35 @@ document.addEventListener('DOMContentLoaded', function () {
         toggle.addEventListener('click', function () {
             // When the user clicks the toggle button...
             
-            // Also toggle the overlay if it exists (for mobile sidebar)
             var overlay = document.getElementById('sidebarOverlay');
-            if (overlay) {
-                overlay.classList.toggle('active');
-            }
-            
+
             if (window.innerWidth <= 768) {
-                // Check if the viewport is mobile (768px is the standard Bootstrap breakpoint).
-                // On mobile, we don't collapse—we show/hide the sidebar as an overlay.
+                // Mobile: the sidebar slides in OVER the page, so the dimming
+                // overlay belongs with it — it is what the user taps to close.
                 sidebar.classList.toggle('mobile-open');
-                // 'mobile-open' class typically slides the sidebar into view from the left.
-                // 'toggle' means: if it's open, close it; if closed, open it.
+                if (overlay) {
+                    overlay.classList.toggle('active');
+                }
             } else {
-                // On desktop (screens wider than 768px)...
+                // Desktop: the sidebar narrows to icons IN PLACE. Nothing is
+                // covered, so there is nothing to dim.
+                //
+                // The overlay used to be toggled above this branch, i.e. on every
+                // click at every width. Collapsing the sidebar on a desktop
+                // therefore dropped a fixed, full-screen rgba(15,23,42,.35) sheet
+                // with a 2px blur over the whole page at z-index 1035 — the page
+                // greyed out, and because the sheet takes pointer events, every
+                // field under it stopped responding. Measured on the Noon Label
+                // screen: labelQty, cartonQty and labelMark all received the click
+                // on .sidebar-overlay instead of themselves, so the form could not
+                // be filled in at all.
                 sidebar.classList.toggle('collapsed');
-                // 'collapsed' class usually narrows the sidebar to show only icons,
-                // giving more horizontal space to the main content area.
+                // remove(), not toggle(): if the viewport was resized from mobile
+                // to desktop while the sidebar was open, the overlay is already
+                // active and toggling would leave it stuck on.
+                if (overlay) {
+                    overlay.classList.remove('active');
+                }
             }
         });
     }
@@ -119,8 +350,8 @@ function showToast(message, type) {
     var icons = { success: 'bi-check-circle-fill', error: 'bi-x-circle-fill', info: 'bi-info-circle-fill' };
     
     // Lookup table for icon colors. These hex codes match the project's color palette.
-    // Green (#10b981) for success, Red (#ef4444) for error, Blue (#3b82f6) for info.
-    var colors = { success: '#10b981', error: '#ef4444', info: '#3b82f6' };
+    // Green (#157F4A) for success, red (#B3261E) for error, slate (#44546A) for info.
+    var colors = { success: '#157F4A', error: '#B3261E', info: '#44546A' };
 
     var toast = document.createElement('div');
     // Create a new <div> element in memory. It is not yet visible on the page.
@@ -178,6 +409,39 @@ function showToast(message, type) {
  *     data asynchronously, shows a toast message, and optionally refreshes only the relevant part
  *     of the page or redirects programmatically.
  */
+/**
+ * Turn an HTTP status that produced a non-JSON body into a message that says
+ * what to do about it.
+ *
+ * Every one of these used to surface as "Network error. Please try again.",
+ * which is wrong in all of them and actively misleading in most: retrying a 413
+ * with the same file fails identically every time.
+ *
+ * Args:
+ *     status (number): The HTTP status code of the response.
+ *
+ * Returns:
+ *     string: A message naming the likely cause.
+ */
+function describeNonJsonResponse(status) {
+    if (status === 413) {
+        return 'That file is too large for the server to accept. Try an image under 2 MB.';
+    }
+    if (status === 403) {
+        return 'Session expired or permission denied. Reload the page and sign in again.';
+    }
+    if (status === 404) {
+        return 'That address does not exist on the server (404).';
+    }
+    if (status === 502 || status === 503 || status === 504) {
+        return 'The server is not responding (' + status + '). It may be restarting — wait a moment and retry.';
+    }
+    if (status >= 500) {
+        return 'The server hit an error (' + status + '). The details are in the server error log.';
+    }
+    return 'Unexpected reply from the server (' + status + '). See the browser console for details.';
+}
+
 function ajaxSubmit(formId, url, onSuccess) {
     var form = document.getElementById(formId);
     // Look up the form element in the DOM using its unique ID.
@@ -198,58 +462,76 @@ function ajaxSubmit(formId, url, onSuccess) {
         // FormData automatically handles text inputs, textareas, selects, and file uploads.
         // It preserves the 'name' attributes of each field, which Django expects.
         
-        var submitBtn = form.querySelector('[type="submit"]');
-        // Find the submit button inside the form so we can disable it during submission.
-        // This prevents the user from accidentally double-clicking and submitting twice.
-        
+        // Find the submit button. It may live inside the form OR outside it (e.g. a
+        // modal footer button associated via form="<id>"), so fall back to a
+        // document-wide lookup by the form attribute.
+        var submitBtn = form.querySelector('[type="submit"]') ||
+                        document.querySelector('[type="submit"][form="' + formId + '"]');
+        // Remember the original label so we can restore it (not a hardcoded "Save",
+        // which would wrongly relabel a "Create Order" button).
+        var submitBtnLabel = submitBtn ? submitBtn.innerHTML : '';
+
         if (submitBtn) {
-            // Only modify the button if we found one.
             submitBtn.disabled = true;
-            // Disable the button. It becomes grayed out and unclickable.
-            
             submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
-            // Replace the button text with a small Bootstrap spinner icon and the word "Saving...".
-            // This gives the user immediate visual feedback that their request is being processed.
         }
 
         // Send the form data to the Django backend using the modern fetch() API.
-        fetch(url, { method: 'POST', body: data })
-            // The first .then() receives the raw HTTP Response object.
-            // We call .json() to parse the response body as JSON.
-            // Django views that handle AJAX usually return JsonResponse.
-            .then(function (r) { return r.json(); })
-            
-            // The second .then() receives the parsed JavaScript object.
-            .then(function (data) {
+        // Read the body as TEXT, then try to parse it as JSON.
+        //
+        // Calling r.json() directly looks tidier but hides the most common real
+        // failures. When the web server rejects an upload it replies with an
+        // HTML error page, not JSON — a 413 when the file exceeds the server's
+        // request-body limit, or a 500 when Django could not write the file to
+        // MEDIA_ROOT. r.json() then throws a SyntaxError, which lands in the
+        // same .catch() as a genuine connection failure, and every one of those
+        // very different problems was reported to the user as "Network error".
+        // That message sent people looking at their internet connection while
+        // the actual cause sat in the server error log.
+        fetch(url, { method: 'POST', body: data, loadingMessage: 'Saving...' })
+            .then(function (r) {
+                return r.text().then(function (text) {
+                    var parsed = null;
+                    try { parsed = JSON.parse(text); } catch (e) { /* not JSON */ }
+                    return { ok: r.ok, status: r.status, data: parsed, text: text };
+                });
+            })
+            .then(function (res) {
                 // Re-enable the submit button regardless of success or failure.
                 // The user might want to correct errors and try again.
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = 'Save';
+                    submitBtn.innerHTML = submitBtnLabel;
                 }
-                
-                if (data.success) {
-                    // If the Django view returned {'success': true, ...}
-                    showToast(data.message || 'Action completed!', 'success');
-                    // Display the success message from the server, or a generic fallback.
-                    
-                    if (onSuccess) onSuccess(data);
-                    // If the caller provided a callback function, execute it now.
-                    // This is used for custom behavior like closing a modal, redirecting, or updating a table.
-                } else {
-                    // If the server returned {'success': false, ...} (e.g., validation errors).
-                    showToast(data.message || 'Something went wrong', 'error');
+
+                if (res.data) {
+                    if (res.data.success) {
+                        showToast(res.data.message || 'Action completed!', 'success');
+                        if (onSuccess) onSuccess(res.data);
+                        // If the caller provided a callback function, execute it now.
+                        // This is used for custom behavior like closing a modal, redirecting, or updating a table.
+                    } else {
+                        // The view returned {'success': false, ...} (e.g. validation errors).
+                        showToast(res.data.message || 'Something went wrong', 'error');
+                    }
+                    return;
                 }
+
+                // A reply the server produced, but not one this code can use.
+                // Name the status so the cause is actionable.
+                showToast(describeNonJsonResponse(res.status), 'error');
+                console.error('Expected JSON from ' + url + ', got HTTP ' + res.status + ':',
+                              res.text.slice(0, 2000));
             })
-            // The .catch() block handles network-level errors.
-            // This fires if the user is offline, the server is down, or the request times out.
-            .catch(function () {
-                // Re-enable the button so the user can retry.
+            // Reached only when the request never completed: offline, DNS
+            // failure, the connection dropped, or the request was aborted.
+            .catch(function (err) {
                 if (submitBtn) {
                     submitBtn.disabled = false;
-                    submitBtn.innerHTML = 'Save';
+                    submitBtn.innerHTML = submitBtnLabel;
                 }
-                showToast('Network error. Please try again.', 'error');
+                showToast('Could not reach the server. Check your connection and try again.', 'error');
+                console.error('Request to ' + url + ' failed:', err);
             });
     });
 }
@@ -284,7 +566,8 @@ function confirmDelete(url, itemName) {
         // We use POST (not DELETE) for broader compatibility and because Django forms often expect POST.
         fetch(url, {
             method: 'POST',
-            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+            headers: { 'X-CSRFToken': getCookie('csrftoken') },
+            loadingMessage: 'Deleting...'
         })
             .then(function (r) { return r.json(); })
             // Parse the JSON response from Django.
@@ -471,11 +754,50 @@ function initNotificationBell() {
     var countLabel = document.getElementById('notificationCount');
     if (!badge) return;
 
+    /**
+     * Renders one clickable row in the notification dropdown.
+     *
+     * These used to be plain <div>s, so seeing "3 Pending Order(s)" told you a
+     * number and then made you go and find the page yourself. They are links now:
+     * the notification IS the way into the work.
+     */
+    function notificationRow(href, icon, colour, title, description) {
+        var a = document.createElement('a');
+        a.className = 'notification-item';
+        a.href = href;
+        a.innerHTML =
+            '<i class="bi ' + icon + '" style="color:' + colour + '"></i>' +
+            '<div class="notification-body">' +
+                '<div class="notification-title">' + title + '</div>' +
+                '<div class="notification-desc">' + description + '</div>' +
+            '</div>';
+        return a;
+    }
+
+    /**
+     * Mirrors a count onto a sidebar badge, hiding it at zero.
+     * Keeps the sidebar and the bell telling the same story.
+     */
+    function setSidebarBadge(id, count) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (count > 0) {
+            el.textContent = count > 99 ? '99+' : count;
+            el.hidden = false;
+        } else {
+            el.hidden = true;
+        }
+    }
+
     function loadCounts() {
-        fetch('/portal/notifications/')
+        fetch('/portal/notification-counts/')
             .then(function (r) { return r.json(); })
             .then(function (data) {
-                var total = (data.pending_requests || 0) + (data.pending_orders || 0);
+                var leads = data.new_leads || 0;
+                var requests = data.pending_requests || 0;
+                var orders = data.pending_orders || 0;
+                var total = leads + requests + orders;
+
                 if (total > 0) {
                     badge.textContent = total > 99 ? '99+' : total;
                     badge.style.display = 'flex';
@@ -485,30 +807,31 @@ function initNotificationBell() {
                 if (countLabel) {
                     countLabel.textContent = total + ' unread';
                 }
-                // Build dropdown list
+
+                setSidebarBadge('leadsBadge', leads);
+                setSidebarBadge('requestsBadge', requests);
+
                 if (list) {
                     list.innerHTML = '';
-                    if (data.pending_requests > 0) {
-                        var item = document.createElement('div');
-                        item.className = 'notification-item';
-                        item.innerHTML =
-                            '<i class="bi bi-clipboard-check" style="color:#a78bfa"></i>' +
-                            '<div class="notification-body">' +
-                                '<div class="notification-title">' + data.pending_requests + ' Product Request(s)</div>' +
-                                '<div class="notification-desc">Pending review from customers</div>' +
-                            '</div>';
-                        list.appendChild(item);
+                    // Leads first: they are the only item here where a slow reply
+                    // loses the business money rather than just delaying work.
+                    if (leads > 0) {
+                        list.appendChild(notificationRow(
+                            '/portal/admin/leads/', 'bi-inbox', '#C2410C',
+                            leads + ' website ' + (leads === 1 ? 'enquiry' : 'enquiries'),
+                            'Awaiting a reply'));
                     }
-                    if (data.pending_orders > 0) {
-                        var item = document.createElement('div');
-                        item.className = 'notification-item';
-                        item.innerHTML =
-                            '<i class="bi bi-cart-check" style="color:#f59e0b"></i>' +
-                            '<div class="notification-body">' +
-                                '<div class="notification-title">' + data.pending_orders + ' Pending Order(s)</div>' +
-                                '<div class="notification-desc">Not yet placed with supplier</div>' +
-                            '</div>';
-                        list.appendChild(item);
+                    if (requests > 0) {
+                        list.appendChild(notificationRow(
+                            '/portal/admin/requests/', 'bi-clipboard-check', '#B08421',
+                            requests + ' product request' + (requests === 1 ? '' : 's'),
+                            'Pending review from customers'));
+                    }
+                    if (orders > 0) {
+                        list.appendChild(notificationRow(
+                            '/orders/?placed=no', 'bi-cart-check', '#44546A',
+                            orders + ' order' + (orders === 1 ? '' : 's') + ' not placed',
+                            'Not yet placed with supplier'));
                     }
                     if (total === 0) {
                         list.innerHTML = '<div class="notification-empty">All caught up!</div>';
@@ -748,3 +1071,58 @@ function initProductImagePreview() {
 document.addEventListener('DOMContentLoaded', function () {
     initProductImagePreview();
 });
+
+/* =============================================================================
+   GLOBAL SEARCH (Ctrl+K) — extends the sidebar section search with live server
+   results (orders / customers / products) from /accounts/search/. Results are
+   appended into the same dropdown under a divider, and respect the current
+   user's module permissions server-side.
+   ============================================================================= */
+(function () {
+    var input = document.getElementById('sidebarSearchInput');
+    var results = document.getElementById('sidebarSearchResults');
+    if (!input || !results) return;
+
+    // Ctrl+K / Cmd+K focuses the search from anywhere in the back office.
+    document.addEventListener('keydown', function (e) {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
+            e.preventDefault();
+            var sidebar = document.getElementById('sidebar');
+            if (sidebar) sidebar.classList.remove('collapsed');
+            input.focus();
+            input.select();
+        }
+    });
+    input.setAttribute('placeholder', 'Search…  (Ctrl+K)');
+
+    var timer = null;
+    input.addEventListener('input', function () {
+        var q = this.value.trim();
+        if (timer) clearTimeout(timer);
+        if (q.length < 2) return;
+        timer = setTimeout(function () {
+            fetch('/accounts/search/?q=' + encodeURIComponent(q), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function (r) { return r.ok ? r.json() : { results: [] }; })
+            .then(function (data) {
+                // Stale response guard: only render if the query hasn't changed.
+                if (input.value.trim() !== q || !data.results || !data.results.length) return;
+                var divider = document.createElement('div');
+                divider.className = 'nav-section-title';
+                divider.style.padding = '8px 12px 4px';
+                divider.textContent = 'Data';
+                results.appendChild(divider);
+                data.results.forEach(function (hit) {
+                    var a = document.createElement('a');
+                    a.href = hit.url;
+                    a.innerHTML = '<i class="bi ' + hit.icon + '"></i> <span class="link-text">' +
+                        hit.label.replace(/</g, '&lt;') + ' <small style="opacity:.6">' + hit.section + '</small></span>';
+                    results.appendChild(a);
+                });
+                results.classList.add('active');
+            })
+            .catch(function () { /* search is best-effort */ });
+        }, 250);
+    });
+})();

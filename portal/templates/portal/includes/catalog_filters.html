@@ -1,0 +1,61 @@
+{% load catalog_tags %}
+{% comment %}
+Search box and active-filter summary for the catalogue pages.
+
+The category chips that used to live here have moved into
+portal/includes/catalog_sidebar.html. This partial now covers only the
+page-level controls that sit above the product grid.
+
+Context this expects (supplied by _build_filter_context in portal/views.py):
+    filter_q                 current search string
+    filter_selected_category the active Category object, or None
+    filters_active           True when any filter is applied
+    result_count             number of products after filtering; every view
+                             that includes this partial must pass it
+{% endcomment %}
+
+<div class="catalog-filters">
+
+    {% comment %}A GET form, so a search is a normal bookmarkable URL. The
+       hidden inputs carry the current category and source through the submit,
+       which a bare form would otherwise discard.{% endcomment %}
+    <form method="get" class="catalog-search" role="search">
+        {% catalog_hidden_inputs 'q' %}
+        <div class="catalog-search-field">
+            <i class="bi bi-search catalog-search-icon" aria-hidden="true"></i>
+            <input type="search"
+                   name="q"
+                   value="{{ filter_q }}"
+                   class="form-control catalog-search-input"
+                   placeholder="Search by product name or SKU…"
+                   aria-label="Search products by name or SKU">
+        </div>
+        <button type="submit" class="btn btn-primary catalog-search-btn">Search</button>
+        {% if filters_active %}
+        {% comment %}Clears everything at once, including the category held in
+           the sidebar. Individual filters are cleared from the sidebar's "All
+           products" row and the × on the search term below.{% endcomment %}
+        <a href="{% catalog_query q='' category='' subcategory='' %}"
+           class="btn btn-outline-secondary catalog-clear-btn">
+            <i class="bi bi-x-lg me-1" aria-hidden="true"></i>Clear
+        </a>
+        {% endif %}
+    </form>
+
+    {% comment %}aria-live so screen readers hear the new result count after a
+       search, which is otherwise a silent page change.{% endcomment %}
+    {% if filters_active %}
+    <p class="catalog-filter-summary" aria-live="polite">
+        <strong>{{ result_count }}</strong> product{{ result_count|pluralize }} found
+        {% if filter_q %}
+        for “<strong>{{ filter_q }}</strong>”
+        <a href="{% catalog_query q='' %}" class="catalog-filter-remove"
+           aria-label="Remove search term">&times;</a>
+        {% endif %}
+        {% if filter_selected_category %}
+        in <strong>{{ filter_selected_category.name }}</strong>
+        {% endif %}
+    </p>
+    {% endif %}
+
+</div>

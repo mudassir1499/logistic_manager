@@ -1,0 +1,292 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}--------------------------------------------------------------------
+   ARABIC HOMEPAGE  —  /ar/
+   ---------------------------------------------------------------------------
+   TRANSLATION NOTE FOR THE OWNER:
+   This copy is Modern Standard Arabic, written to match the meaning of the
+   English homepage rather than translated word for word — a literal translation
+   of marketing copy reads badly in Arabic. It uses Gulf business vocabulary
+   (توريد, تخليص جمركي, معاينة) and Western numerals, which is what commercial
+   writing in the UAE normally uses.
+
+   Have a native Arabic speaker from your target market read it before you
+   promote this page. Machine-quality Arabic on a trust-led sales page does more
+   damage than no Arabic at all, and a native reader will catch tone issues that
+   are invisible to a non-speaker.
+-----------------------------------------------------------------------{% endcomment %}
+
+{% block html_lang %}ar{% endblock %}
+{% block html_dir %}rtl{% endblock %}
+{% block body_class %}has-hero{% endblock %}
+
+{% block extra_css %}
+<link rel="preload" href="{% static 'vendor/fonts/cairo-arabic.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% static 'vendor/fonts-ar.css' %}">
+<link rel="stylesheet" href="{% static 'portal-rtl.css' %}">
+{% endblock %}
+
+{% block title %}وكيل توريد من الصين للإمارات والشرق الأوسط | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}نستورد لك من الصين بدون مخاطر. نتحقق من المصانع على أرض الواقع، ونفاوض على الأسعار، ونفحص البضائع قبل الشحن، وننسّق الشحن إلى الإمارات والخليج. عرض سعر مجاني خلال 24 ساعة.{% endblock %}
+{% block meta_keywords %}وكيل شراء من الصين، الاستيراد من الصين، توريد من الصين الى الامارات، فحص البضائع في الصين، شحن من الصين الى دبي{% endblock %}
+{% block og_title %}استورد من الصين بدون مخاطر{% endblock %}
+{% block og_description %}فريقنا موجود في الصين. نزور المصانع، ونتحقق من الموردين، ونفحص البضائع قبل شحنها إلى الإمارات والخليج.{% endblock %}
+{% block twitter_title %}استورد من الصين بدون مخاطر{% endblock %}
+{% block twitter_description %}فريقنا موجود في الصين. نزور المصانع، ونتحقق من الموردين، ونفحص البضائع قبل شحنها إلى الإمارات والخليج.{% endblock %}
+
+{% block canonical_url %}{{ settings.base_url }}{% url 'ar_home' %}{% endblock %}
+
+{% comment %}Both URLs in the pair must be declared here AND on the English page,
+   plus x-default naming the version served when no language matches.{% endcomment %}
+{% block hreflang %}
+<link rel="alternate" hreflang="en" href="{{ settings.base_url }}{% url 'front_page' %}">
+<link rel="alternate" hreflang="ar" href="{{ settings.base_url }}{% url 'ar_home' %}">
+<link rel="alternate" hreflang="x-default" href="{{ settings.base_url }}{% url 'front_page' %}">
+{% endblock %}
+
+{% comment %}Arabic navigation and footer. The nav include also carries the
+   switch back to English, so the shared lang_switch block is left empty here
+   to avoid rendering the language link twice.{% endcomment %}
+{% block public_nav %}{% url 'front_page' as lang_switch_target %}{% include 'portal/ar/_nav.html' %}{% endblock %}
+{% block lang_switch %}{% endblock %}
+{% block footer_columns %}{% include 'portal/ar/_footer.html' %}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "{{ settings.company_name|default:"LogiManager"|escapejs }}",
+  "url": "{{ settings.base_url }}{% url 'ar_home' %}",
+  "inLanguage": "ar",
+  "about": {"@id": "{{ settings.base_url }}/#business"}
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="hero-v2">
+    <div class="container">
+        <div class="row g-4 g-lg-5 align-items-center">
+            <div class="col-lg-7">
+                <span class="hero-badge">مقرّنا في الصين — نخدم الإمارات والشرق الأوسط</span>
+                {% comment %}Split on the same seam as the English homepage: what we do,
+                   then the promise, with the promise in gold.{% endcomment %}
+                <h1 class="hero-title">استورد من الصين<span class="hero-title__accent">بدون مخاطر</span></h1>
+                <p class="hero-subtitle">
+                    نبحث لك عن المصانع الموثوقة، ونتحقق منها على أرض الواقع، ونفاوض للحصول على أسعار أفضل،
+                    وندير عملية الشحن — لتتفرّغ أنت لتنمية تجارتك في الإمارات والخليج.
+                </p>
+                <ul class="hero-checklist list-unstyled mb-4">
+                    <li><i class="bi bi-check-circle-fill"></i> زيارة المصانع والتحقق من الموردين ميدانياً</li>
+                    <li><i class="bi bi-check-circle-fill"></i> فحص الجودة قبل الشحن مع تقرير مصوّر</li>
+                    <li><i class="bi bi-check-circle-fill"></i> تنسيق الشحن الجوي والبحري حتى بابك</li>
+                    <li><i class="bi bi-check-circle-fill"></i> عرض سعر مجاني خلال 24 ساعة</li>
+                </ul>
+                <div class="d-flex gap-3 flex-wrap hero-cta-row">
+                    <a href="{% url 'ar_services_page' %}" class="btn btn-primary btn-lg">تعرّف على خدماتنا</a>
+                    <a href="{% url 'contact_page' %}" class="btn btn-outline-light btn-lg" onclick="window.gtagEvent('quote_cta_click',{location:'ar_hero'});">اطلب عرض سعر</a>
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="hero-lead-card">
+                    <div class="lead-card-header">
+                        <h2 class="h4 mb-1">احصل على عرض سعر مجاني</h2>
+                        <p class="mb-0">أخبرنا بما تحتاجه وسنرد عليك خلال 24 ساعة.</p>
+                    </div>
+                    <form method="post" action="{% url 'contact_page' %}" data-lead-form="ar_homepage_hero">
+                        {% csrf_token %}
+                        {% comment %}Same spam defences as the English hero form - this
+                           one posts to the same view and had none of them.{% endcomment %}
+                        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;opacity:0;">
+                            <label for="{{ antispam_field }}_ar">Company website</label>
+                            <input type="text" id="{{ antispam_field }}_ar"
+                                   name="{{ antispam_field }}" tabindex="-1" autocomplete="off">
+                        </div>
+                        <input type="hidden" name="form_started_at" value="{{ form_started_at }}">
+                        <input type="hidden" name="subject" value="طلب من الصفحة العربية">
+                        <div class="mb-3">
+                            <label for="arLeadName" class="form-label">الاسم الكامل</label>
+                            <input type="text" class="form-control" id="arLeadName" name="name" autocomplete="name" placeholder="اسمك" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="arLeadEmail" class="form-label">البريد الإلكتروني</label>
+                            <input type="email" class="form-control" id="arLeadEmail" name="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="arLeadPhone" class="form-label">واتساب / رقم الهاتف</label>
+                            <input type="tel" class="form-control" id="arLeadPhone" name="phone" autocomplete="tel" inputmode="tel" placeholder="+971 50 123 4567" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="arLeadMessage" class="form-label">ما المنتج الذي تبحث عنه؟</label>
+                            <textarea class="form-control" id="arLeadMessage" name="message" rows="3" placeholder="اسم المنتج، الكمية، وجهة الشحن..." required></textarea>
+                        </div>
+                        {% include 'portal/includes/captcha_field.html' with suffix='ar' lang='ar' %}
+                        <button type="submit" class="btn btn-accent btn-lg w-100">أرسل الطلب</button>
+                        <p class="small text-center mt-2 mb-0" style="color:rgba(255,255,255,0.7)"><i class="bi bi-shield-lock me-1"></i>بياناتك محفوظة ولن تُشارك مع أي جهة.</p>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="proof-strip">
+    <div class="container">
+        <div class="row g-4 text-center justify-content-center">
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-geo-alt-fill proof-icon"></i>
+                    <div class="proof-value">في الصين</div>
+                    <div class="proof-label">مكتبنا في مدينة شوجو وليس مركز اتصال</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-building-check proof-icon"></i>
+                    <div class="proof-value">زيارة ميدانية</div>
+                    <div class="proof-label">نزور المصنع قبل أن تدفع أي مبلغ</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-camera-fill proof-icon"></i>
+                    <div class="proof-value">تقرير مصوّر</div>
+                    <div class="proof-label">صور وفيديو للبضاعة قبل الشحن</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="proof-item">
+                    <i class="bi bi-clock-fill proof-icon"></i>
+                    <div class="proof-value">{% if settings.stat_response_time %}24 ساعة{% else %}سريع{% endif %}</div>
+                    <div class="proof-label">المدة المعتادة للرد بعرض سعر</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">ماذا نقدّم</span>
+            <h2 class="section-title">خدماتنا</h2>
+            <p class="section-subtitle mx-auto">حلول توريد متكاملة من الصين مصمّمة لتجّار الإمارات والخليج</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon"><i class="bi bi-search"></i></div>
+                    <h3 class="h5 fw-bold mb-2">البحث عن المنتجات</h3>
+                    <p class="text-secondary small mb-0">نجد لك المصنع المناسب في الصين حسب مواصفات منتجك بدقة.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon"><i class="bi bi-shield-check"></i></div>
+                    <h3 class="h5 fw-bold mb-2">التحقق من المورّد</h3>
+                    <p class="text-secondary small mb-0">نزور المصنع، ونتحقق من السجل التجاري والقدرة الإنتاجية قبل الدفع.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon"><i class="bi bi-clipboard-check"></i></div>
+                    <h3 class="h5 fw-bold mb-2">فحص الجودة</h3>
+                    <p class="text-secondary small mb-0">معاينة ما قبل الشحن في المصنع لضمان مطابقة البضاعة للمواصفات المتفق عليها.</p>
+                </div>
+            </div>
+            <div class="col-md-6 col-lg-3">
+                <div class="service-card">
+                    <div class="service-icon"><i class="bi bi-truck"></i></div>
+                    <h3 class="h5 fw-bold mb-2">تنسيق الشحن</h3>
+                    <p class="text-secondary small mb-0">شحن جوي وبحري من الصين إلى الإمارات والخليج مع تجهيز مستندات التصدير.</p>
+                </div>
+            </div>
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'ar_services_page' %}" class="btn btn-outline-primary">عرض كل الخدمات</a>
+        </div>
+    </div>
+</section>
+
+<section class="feature-section section-padding">
+    <div class="container">
+        <div class="row g-4 g-lg-5 align-items-center">
+            <div class="col-lg-6">
+                {% if site_images.home_feature %}
+                <img src="{{ site_images.home_feature.image.url }}" alt="{{ site_images.home_feature.alt_text|default:'فريقنا أثناء زيارة أحد المصانع في الصين' }}"
+                     class="about-image img-fluid w-100" width="1200" height="800" loading="lazy" decoding="async">
+                {% else %}
+                <img src="{% static 'images/stock/china-operations.webp' %}" alt="عمليات التوريد والشحن في الصين"
+                     class="about-image img-fluid w-100" width="1200" height="800" loading="lazy" decoding="async">
+                {% endif %}
+            </div>
+            <div class="col-lg-6">
+                <span class="section-label">لماذا نحن</span>
+                <h2 class="section-title">نحن موجودون في الصين فعلياً</h2>
+                <p class="section-subtitle mb-4">
+                    بينما يعمل غيرنا من الوكلاء عن بُعد، مكتبنا في مدينة شوجو الصينية — نزور المصانع بأنفسنا،
+                    ونلتقي المورّدين وجهاً لوجه، ونعاين البضائع قبل مغادرتها الصين.
+                </p>
+                <div class="feature-list-item">
+                    <div class="feature-icon"><i class="bi bi-globe"></i></div>
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">حضور ميداني</h3>
+                        <p class="text-secondary small mb-0">فريقنا في الصين يزور المصانع شخصياً، لا عبر البريد الإلكتروني.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon"><i class="bi bi-shield-fill"></i></div>
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">حماية من المخاطر</h3>
+                        <p class="text-secondary small mb-0">التحقق من المورّد والمعاينة قبل الشحن يحميانك من الاحتيال والبضاعة المعيبة.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon"><i class="bi bi-graph-up"></i></div>
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">متابعة مستمرة</h3>
+                        <p class="text-secondary small mb-0">تابع كل مرحلة — زيارة المصنع، العينات، الإنتاج، الفحص، والشحن — من حسابك.</p>
+                    </div>
+                </div>
+                <div class="feature-list-item">
+                    <div class="feature-icon"><i class="bi bi-currency-dollar"></i></div>
+                    <div>
+                        <h3 class="h6 fw-bold mb-1">تسعير واضح</h3>
+                        <p class="text-secondary small mb-0">لا رسوم خفية. تعرف تكلفة المنتج ورسوم التوريد والشحن مسبقاً.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8">
+                <h2 class="fw-bold mb-3">جاهز للاستيراد من الصين؟</h2>
+                <p class="text-white-50 fs-5 mb-4">
+                    أرسل لنا تفاصيل المنتج الذي تريده وسنعود إليك بعرض سعر مفصّل خلال 24 ساعة، دون أي التزام.
+                </p>
+                <div class="d-flex gap-3 justify-content-center flex-wrap">
+                    <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg" onclick="window.gtagEvent('quote_cta_click',{location:'ar_footer_cta'});">اطلب عرض سعر مجاني</a>
+                    {% with wa_number=settings.whatsapp_number|default:settings.company_phone|default:"" %}
+                    {% if wa_number %}
+                    <a href="https://wa.me/{{ wa_number|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}" target="_blank" rel="noopener noreferrer" class="btn btn-success btn-lg">
+                        <i class="bi bi-whatsapp me-2"></i>تواصل عبر واتساب
+                    </a>
+                    {% endif %}
+                    {% endwith %}
+                </div>
+                {% if settings.company_phone %}
+                <p class="text-white-50 mt-4 mb-0"><i class="bi bi-telephone-fill me-2"></i>{{ settings.company_phone }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

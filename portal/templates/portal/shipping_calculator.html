@@ -1,0 +1,502 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% block title %}Shipping Cost Calculator — China to UAE Air &amp; Sea Freight | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Work out what it costs to ship from China to the UAE. Enter your carton size and weight for an instant air or sea freight estimate, including volumetric weight.{% endblock %}
+{% block meta_keywords %}shipping calculator China to UAE, air freight cost calculator, sea freight CBM calculator, volumetric weight calculator, China to Dubai shipping cost{% endblock %}
+{% block og_title %}Shipping Cost Calculator — China to UAE{% endblock %}
+{% block og_description %}Enter your carton size and weight for an instant air or sea freight estimate from China to the UAE.{% endblock %}
+{% block twitter_title %}Shipping Cost Calculator — China to UAE{% endblock %}
+{% block twitter_description %}Enter your carton size and weight for an instant air or sea freight estimate from China to the UAE.{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Shipping Calculator", "item": "{{ settings.base_url }}/shipping-calculator/"}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* The chosen mode reads as a pressed button rather than a radio dot: it is
+       the single most consequential choice on the page and needs to be obvious
+       at a glance on a phone. */
+    .mode-option input { position: absolute; opacity: 0; pointer-events: none; }
+    .mode-option .mode-card {
+        border: 2px solid var(--bs-border-color, #dee2e6);
+        border-radius: .75rem; padding: 1rem; cursor: pointer;
+        display: flex; align-items: center; gap: .75rem; height: 100%;
+        transition: border-color .15s ease, background-color .15s ease;
+    }
+    .mode-option input:checked + .mode-card {
+        border-color: #b8860b; background-color: rgba(184, 134, 11, .07);
+    }
+    .mode-option input:focus-visible + .mode-card { outline: 2px solid #b8860b; outline-offset: 2px; }
+    .mode-option .mode-card i { font-size: 1.5rem; }
+
+    .item-row { border: 1px solid var(--bs-border-color, #dee2e6); border-radius: .75rem; }
+    .quote-total { font-size: 2.25rem; font-weight: 800; line-height: 1.1; }
+    .breakdown-row { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0; }
+    .breakdown-row + .breakdown-row { border-top: 1px dashed var(--bs-border-color, #dee2e6); }
+    /* Fixed-width figures stop the numbers jittering as they change. */
+    .breakdown-row .value { font-variant-numeric: tabular-nums; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<section class="py-5 bg-light border-bottom">
+    <div class="container text-center">
+        <span class="section-label">Freight Estimate</span>
+        <h1 class="hero-title">Shipping Calculator</h1>
+        <p class="hero-subtitle mb-0">
+            Tell us the size and weight of your cartons and we will price the shipment
+            from China. No account needed.
+        </p>
+    </div>
+</section>
+
+<section class="py-5">
+<div class="container">
+<div class="row g-4">
+
+    <!-- ================= FORM ================= -->
+    <div class="col-lg-7">
+    <form id="quoteForm" novalidate>
+        {% csrf_token %}
+
+        <!-- Step 1: how it travels -->
+        <h2 class="h5 fw-bold mb-3"><span class="text-muted me-2">1.</span>How should it travel?</h2>
+        <div class="row g-3 mb-4">
+            <div class="col-6">
+                <label class="mode-option d-block m-0">
+                    <input type="radio" name="method" value="sea" checked>
+                    <span class="mode-card">
+                        <i class="bi bi-water text-primary"></i>
+                        <span>
+                            <span class="d-block fw-bold">By Sea</span>
+                            <small class="text-muted">Cheapest. 25–40 days.</small>
+                        </span>
+                    </span>
+                </label>
+            </div>
+            <div class="col-6">
+                <label class="mode-option d-block m-0">
+                    <input type="radio" name="method" value="air">
+                    <span class="mode-card">
+                        <i class="bi bi-airplane text-primary"></i>
+                        <span>
+                            <span class="d-block fw-bold">By Air</span>
+                            <small class="text-muted">Fastest. 5–10 days.</small>
+                        </span>
+                    </span>
+                </label>
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+                <label class="form-label fw-semibold" for="destination">Destination</label>
+                <select class="form-select" id="destination" name="destination">
+                    {% for d in destinations %}
+                        <option value="{{ d.code }}"{% if forloop.first %} selected{% endif %}>{{ d.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-sm-6">
+                <label class="form-label fw-semibold" for="cargo_type">Type of goods</label>
+                {% comment %}Asked because it changes the price, not for paperwork.
+                   A branded item is held longer at customs; anything with a lithium
+                   cell is dangerous goods; cosmetics are restricted by air. All are
+                   priced separately, and a customer who picks the wrong one gets a
+                   quote that cannot be honoured.
+
+                   The list comes from the database, so adding a category is data
+                   entry rather than a template edit.{% endcomment %}
+                <select class="form-select" id="cargo_type" name="cargo_type">
+                    {% for c in cargo_types %}
+                        <option value="{{ c.slug }}"{% if forloop.first %} selected{% endif %}
+                                data-description="{{ c.description }}">{{ c.name }}</option>
+                    {% endfor %}
+                </select>
+                <div class="form-text" id="cargoHelp"></div>
+            </div>
+        </div>
+
+        <!-- Step 2: what is in the box -->
+        <h2 class="h5 fw-bold mb-1"><span class="text-muted me-2">2.</span>What are you shipping?</h2>
+        <p class="text-muted small mb-3">
+            Measure the <strong>outer carton</strong>, not the product, and give the weight of
+            one full carton.
+        </p>
+
+        <div id="itemRows"></div>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm mb-4" id="addItem">
+            <i class="bi bi-plus-lg me-1"></i>Add another item
+        </button>
+
+        <div>
+            <button type="submit" class="btn btn-primary btn-lg w-100" id="calcBtn">
+                <i class="bi bi-calculator me-2"></i>Calculate shipping cost
+            </button>
+        </div>
+
+        <div class="alert alert-danger mt-3 d-none" id="quoteError" role="alert"></div>
+    </form>
+    </div>
+
+    <!-- ================= RESULT ================= -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm position-sticky" style="top: 96px;">
+            <div class="card-body p-4">
+
+                <div id="quotePlaceholder" class="text-center text-muted py-5">
+                    <i class="bi bi-calculator" style="font-size:2.5rem;opacity:.35"></i>
+                    <p class="mb-0 mt-3">Fill in your carton details and your estimate appears here.</p>
+                </div>
+
+                <div id="quoteLoading" class="text-center py-5 d-none">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Calculating…</span>
+                    </div>
+                    <p class="mb-0 mt-3 text-muted">Comparing freight rates…</p>
+                </div>
+
+                <div id="quoteResult" class="d-none">
+                    <div class="text-muted text-uppercase small fw-bold">Estimated freight cost</div>
+                    <div class="quote-total text-dark my-2">
+                        <span id="qCurrency"></span> <span id="qTotal"></span>
+                    </div>
+                    <p class="text-muted small mb-4" id="qSummary"></p>
+
+                    <h3 class="h6 fw-bold text-uppercase text-muted mb-2">How this was worked out</h3>
+                    <div class="mb-3">
+                        <div class="breakdown-row">
+                            <span>Cartons</span><span class="value" id="qCartons"></span>
+                        </div>
+                        <div class="breakdown-row" id="rowActual">
+                            <span>Actual weight</span><span class="value" id="qActual"></span>
+                        </div>
+                        <div class="breakdown-row" id="rowVolumetric">
+                            <span>Volumetric weight</span><span class="value" id="qVolumetric"></span>
+                        </div>
+                        <div class="breakdown-row" id="rowCbm">
+                            <span>Volume</span><span class="value" id="qCbm"></span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span id="qBilledLabel">Charged on</span><span class="value" id="qBilled"></span>
+                        </div>
+                        <div class="breakdown-row">
+                            <span>Rate</span><span class="value" id="qRate"></span>
+                        </div>
+                    </div>
+
+                    <!-- Shown only when volume, not weight, is driving the price.
+                         It is the one piece of the breakdown a customer can act on. -->
+                    <div class="alert alert-info small d-none" id="qVolNote">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Your cartons are <strong>bulky rather than heavy</strong>, so air freight
+                        is charged on the space they take up. Packing the same goods into smaller
+                        cartons would reduce this cost.
+                    </div>
+
+                    <div class="alert alert-warning small d-none" id="qMinNote">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <span id="qMinText"></span>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'request_quote' %}" class="btn btn-primary">
+                            <i class="bi bi-file-earmark-text me-1"></i>Get a firm quotation
+                        </a>
+                        {% if settings.whatsapp_digits %}
+                        <a href="https://wa.me/{{ settings.whatsapp_digits }}" target="_blank" rel="noopener"
+                           class="btn btn-outline-success">
+                            <i class="bi bi-whatsapp me-1"></i>Ask us about this shipment
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div id="quoteManual" class="d-none text-center py-4">
+                    <i class="bi bi-chat-square-text text-primary" style="font-size:2rem"></i>
+                    <p class="mt-3" id="qManualText"></p>
+                    <a href="{% url 'contact_page' %}" class="btn btn-primary">Send us the details</a>
+                </div>
+
+                {% comment %}An estimate presented without its limits gets quoted back
+                   at you as a promise. Duty, VAT and delivery inside the destination
+                   country are genuinely not in this figure, and freight rates move
+                   week to week — saying so here costs nothing and prevents an
+                   argument later.{% endcomment %}
+                <p class="text-muted mt-4 mb-0" style="font-size:.75rem;line-height:1.5">
+                    Estimate only, for freight from China to the destination port or airport.
+                    It excludes customs duty, VAT, and delivery within the destination country.
+                    Rates move with the market{% if settings.quote_validity_days %}; a written
+                    quotation from us holds for {{ settings.quote_validity_days }} days{% endif %}.
+                </p>
+
+            </div>
+        </div>
+    </div>
+
+</div>
+</div>
+</section>
+
+<!-- One blank item row, cloned by the Add button. Kept in a <template> so the
+     markup lives with the rest of the page instead of inside a JS string. -->
+<template id="itemTemplate">
+    <div class="item-row p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span class="fw-semibold small text-muted item-label">Item 1</span>
+            <button type="button" class="btn btn-sm btn-link text-danger p-0 remove-item d-none">
+                <i class="bi bi-x-lg"></i><span class="visually-hidden">Remove item</span>
+            </button>
+        </div>
+        <div class="row g-2">
+            <div class="col-12">
+                <input type="text" class="form-control form-control-sm" name="description" aria-label="Item description"
+                       placeholder="What is it? (optional)" maxlength="120">
+            </div>
+            <div class="col-4">
+                <label for="id_length_cm" class="form-label small mb-1">Length (cm)</label>
+                <input id="id_length_cm" type="number" class="form-control" name="length_cm" min="0" step="0.1" inputmode="decimal">
+            </div>
+            <div class="col-4">
+                <label for="id_width_cm" class="form-label small mb-1">Width (cm)</label>
+                <input id="id_width_cm" type="number" class="form-control" name="width_cm" min="0" step="0.1" inputmode="decimal">
+            </div>
+            <div class="col-4">
+                <label for="id_height_cm" class="form-label small mb-1">Height (cm)</label>
+                <input id="id_height_cm" type="number" class="form-control" name="height_cm" min="0" step="0.1" inputmode="decimal">
+            </div>
+            <div class="col-6">
+                <label for="id_weight_kg" class="form-label small mb-1">Weight per carton (kg)</label>
+                <input id="id_weight_kg" type="number" class="form-control" name="weight_kg" min="0" step="0.01" inputmode="decimal">
+            </div>
+            <div class="col-6">
+                <label for="id_quantity" class="form-label small mb-1">Number of cartons</label>
+                <input id="id_quantity" type="number" class="form-control" name="quantity" min="1" step="1" value="1" inputmode="numeric">
+            </div>
+        </div>
+    </div>
+</template>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    'use strict';
+
+    var MAX_LINES = {{ max_lines }};
+
+    var form        = document.getElementById('quoteForm');
+    var rows        = document.getElementById('itemRows');
+    var template    = document.getElementById('itemTemplate');
+    var addBtn      = document.getElementById('addItem');
+    var calcBtn     = document.getElementById('calcBtn');
+    var errorBox    = document.getElementById('quoteError');
+    var placeholder = document.getElementById('quotePlaceholder');
+    var loading     = document.getElementById('quoteLoading');
+    var result      = document.getElementById('quoteResult');
+    var manual      = document.getElementById('quoteManual');
+
+    function addRow() {
+        if (rows.children.length >= MAX_LINES) { return; }
+        rows.appendChild(template.content.cloneNode(true));
+        renumber();
+    }
+
+    /* Keep the visible numbering contiguous after a removal, and hide the
+       remove button on a lone row so the form can never be emptied. */
+    function renumber() {
+        var items = rows.querySelectorAll('.item-row');
+        items.forEach(function (row, i) {
+            row.querySelector('.item-label').textContent = 'Item ' + (i + 1);
+            row.querySelector('.remove-item').classList.toggle('d-none', items.length < 2);
+        });
+        addBtn.disabled = items.length >= MAX_LINES;
+    }
+
+    addBtn.addEventListener('click', addRow);
+
+    /* Show the selected category's own description. Each cargo type carries its
+       own line ("power banks, cordless tools, anything with a lithium cell"),
+       which is what stops someone picking General for a box of power banks and
+       being quoted a price we cannot honour. */
+    var cargoSelect = document.getElementById('cargo_type');
+    var cargoHelp = document.getElementById('cargoHelp');
+
+    function showCargoHelp() {
+        if (!cargoSelect || !cargoHelp) { return; }
+        var chosen = cargoSelect.options[cargoSelect.selectedIndex];
+        cargoHelp.textContent = chosen ? (chosen.getAttribute('data-description') || '') : '';
+    }
+
+    if (cargoSelect) { cargoSelect.addEventListener('change', showCargoHelp); }
+    showCargoHelp();
+
+    /* Delegated, because rows are added after this handler is bound. */
+    rows.addEventListener('click', function (e) {
+        var btn = e.target.closest('.remove-item');
+        if (!btn) { return; }
+        btn.closest('.item-row').remove();
+        renumber();
+    });
+
+    function collect() {
+        var lines = [];
+        rows.querySelectorAll('.item-row').forEach(function (row) {
+            function val(name) {
+                var field = row.querySelector('[name="' + name + '"]');
+                return field ? field.value.trim() : '';
+            }
+            lines.push({
+                description: val('description'),
+                length_cm:   val('length_cm'),
+                width_cm:    val('width_cm'),
+                height_cm:   val('height_cm'),
+                weight_kg:   val('weight_kg'),
+                quantity:    val('quantity') || '1'
+            });
+        });
+        return {
+            method:      (form.querySelector('[name="method"]:checked') || {}).value || 'sea',
+            destination: document.getElementById('destination').value,
+            cargo_type:  document.getElementById('cargo_type').value,
+            lines:       lines
+        };
+    }
+
+    function show(panel) {
+        [placeholder, loading, result, manual].forEach(function (el) {
+            if (el) { el.classList.toggle('d-none', el !== panel); }
+        });
+    }
+
+    function fail(message) {
+        if (errorBox) {
+            errorBox.textContent = message;
+            errorBox.classList.remove('d-none');
+        } else if (placeholder) {
+            /* The error box itself can be missing (see the note on setText).
+               Falling back to the results panel means the visitor still reads
+               why nothing was calculated instead of watching the form do
+               nothing at all. */
+            placeholder.textContent = message;
+        }
+        show(placeholder);
+    }
+
+    /* setText and toggle skip an element that is not there rather than throwing.
+       That is not defensive padding for its own sake: ad blockers and privacy
+       extensions strip elements out of the response before the page is parsed,
+       and several of the nodes below carry the class "alert", which some filter
+       lists match. One missing node used to throw part-way through render() and
+       abort the rest of it - including the call that swaps the spinner for the
+       answer - so the visitor sat watching it spin forever with a perfectly good
+       quote already in hand. A slightly incomplete breakdown beats no price. */
+    function setText(id, value) {
+        var el = document.getElementById(id);
+        if (el) { el.textContent = value; }
+    }
+
+    function toggle(id, hidden) {
+        var el = document.getElementById(id);
+        if (el) { el.classList.toggle('d-none', hidden); }
+    }
+
+    function render(data) {
+        var sym = data.currency_symbol || data.currency || '';
+        var air = data.method === 'air';
+
+        setText('qCurrency', sym);
+        setText('qTotal', data.total);
+        setText('qCartons', data.cartons);
+        setText('qActual', data.actual_kg + ' kg');
+        setText('qVolumetric', data.volumetric_kg + ' kg');
+        setText('qCbm', data.cbm + ' CBM');
+        setText('qBilled', data.billed + ' ' + data.unit);
+        setText('qRate', sym + ' ' + data.rate + ' / ' + data.unit);
+        setText('qBilledLabel', air ? 'Chargeable weight' : 'Charged volume');
+        setText('qSummary',
+            (air ? 'Air freight' : 'Sea freight') + ' to ' + data.destination_label +
+            ', ' + data.cartons + (data.cartons === 1 ? ' carton' : ' cartons') + '.');
+
+        /* Air is priced on weight and sea on volume, so showing all three lines
+           in both modes invites the customer to ask why they are being charged
+           for a number that had no part in the price. */
+        toggle('rowActual', !air);
+        toggle('rowVolumetric', !air);
+        toggle('rowCbm', air);
+
+        toggle('qVolNote', !data.volumetric_applied);
+        toggle('qMinNote', !data.minimum_applied);
+        if (data.minimum_applied) {
+            setText('qMinText',
+                'This shipment is below our minimum of ' + data.minimum + ' ' + data.unit +
+                ', so it is charged at the minimum.');
+        }
+
+        show(result);
+    }
+
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (errorBox) { errorBox.classList.add('d-none'); }
+        show(loading);
+        calcBtn.disabled = true;
+        calcBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Calculating…';
+
+        var token = form.querySelector('[name="csrfmiddlewaretoken"]').value;
+
+        fetch(window.location.pathname, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': token },
+            body: JSON.stringify(collect())
+        })
+            /* Read as TEXT and parse by hand. A 413 or a 500 comes back as an
+               HTML error page, and calling .json() on it throws a parse error
+               that surfaces to the visitor as "Network error" — which sends
+               them to check their wifi over a server-side problem. */
+            .then(function (r) {
+                return r.text().then(function (body) {
+                    try { return { ok: r.ok, status: r.status, data: JSON.parse(body) }; }
+                    catch (err) { return { ok: false, status: r.status, data: null }; }
+                });
+            })
+            .then(function (res) {
+                if (!res.data) {
+                    fail('Something went wrong at our end (error ' + res.status + '). Please try again, or contact us and we will quote it manually.');
+                    return;
+                }
+                if (res.data.success) { render(res.data); return; }
+                if (res.data.needs_manual_quote) {
+                    document.getElementById('qManualText').textContent = res.data.error;
+                    show(manual);
+                    return;
+                }
+                fail(res.data.error || 'Please check the details you entered.');
+            })
+            .catch(function () {
+                fail('We could not reach the server. Please check your connection and try again.');
+            })
+            .then(function () {
+                calcBtn.disabled = false;
+                calcBtn.innerHTML = '<i class="bi bi-calculator me-2"></i>Calculate shipping cost';
+            });
+    });
+
+    addRow();
+}());
+</script>
+{% endblock %}

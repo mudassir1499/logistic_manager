@@ -1,0 +1,47 @@
+{% comment %}
+Staff-only supplier link, shown on the PUBLIC catalogue pages.
+
+Usage:
+    {% include "portal/includes/_supplier_link.html" with product=data.product %}
+
+WHY THIS IS SAFE TO PUT ON A PUBLIC PAGE
+
+product.source_url is the 1688 listing the goods are bought from. Showing a
+customer where we source is showing them how to skip us, which is why every
+other customer-facing template deliberately omits it (see the note at the top of
+portal/product_detail.html).
+
+The gate is a server-side {% templatetag openblock %} if {% templatetag closeblock %}, not CSS. When the viewer is not
+entitled to it, the URL is never written into the response at all - there is
+nothing to find in view-source, nothing in the DOM, and nothing for a scraper or
+a cached copy to pick up. Hiding it with a class would leak it to everyone who
+pressed Ctrl+U.
+
+THE GATE IS nav_perms.products, NOT "is logged in as staff"
+
+That is the same permission that controls the staff Products screens, where
+source_url is already visible. Using it means this button can never reveal
+something the viewer could not already look up in the admin:
+
+    admin                      -> always true
+    staff with perm_products   -> true
+    support without it         -> false
+    customer                   -> false
+    anonymous                  -> false (nav_perms is all-false)
+
+CACHING
+
+These views are not cached. If a page cache is ever added in front of the public
+catalogue, it MUST vary on the session cookie, or one admin page view could be
+served to every customer afterwards - with the supplier links in it.
+{% endcomment %}
+{% if nav_perms.products and product.source_url %}
+<a href="{{ product.source_url }}"
+   target="_blank" rel="noopener noreferrer"
+   class="supplier-link"
+   title="Supplier listing — staff only, customers never see this"
+   aria-label="Open the supplier listing for {{ product.name }} in a new tab">
+    <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+    <span>Supplier</span>
+</a>
+{% endif %}

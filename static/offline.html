@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offline</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; min-height: 100vh; display: flex; align-items: center;
+    justify-content: center; background: #F3F4F7; color: #0A0A0A;
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; padding: 24px;
+  }
+  .box { text-align: center; max-width: 340px; }
+  .mark { font-size: 44px; color: #B08421; line-height: 1; }
+  h1 { font-size: 20px; margin: 16px 0 8px; }
+  p { font-size: 14px; color: #3F3F42; margin: 0 0 20px; line-height: 1.55; }
+  button {
+    background: #0A0A0A; color: #fff; border: 0; border-radius: 6px;
+    padding: 11px 22px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="box">
+    <div class="mark">&#10022;</div>
+    <h1>No connection</h1>
+    <!-- Deliberately explicit that nothing is stored: staff should not go
+         hunting for an offline copy of an order that was never cached. -->
+    <p>
+      This app needs a connection &mdash; order and product data is never stored
+      on the device. Reconnect and try again.
+    </p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{% comment %}--------------------------------------------------------------------
+   Arabic public navigation — included via {% block public_nav %}.
+   Mirrors the English structure exactly (Services, About, Marketplace,
+   Resources, Contact, language switch, login) so the two versions stay in step.
+
+   Links that lead to pages which exist only in English (Marketplace, the guides,
+   portfolio, testimonials, FAQ) still point at the English URLs, because sending
+   someone to a 404 would be worse. They are labelled in Arabic so the navigation
+   itself reads correctly.
+-----------------------------------------------------------------------{% endcomment %}
+
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'ar_services_page' %}"><i class="bi bi-briefcase me-1"></i>خدماتنا</a>
+</li>
+
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'about_page' %}"><i class="bi bi-info-circle me-1"></i>من نحن</a>
+</li>
+
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'shop_index' %}"><i class="bi bi-grid me-1"></i>المنتجات</a>
+</li>
+
+<li class="nav-item dropdown">
+    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="bi bi-journal-text me-1"></i>مصادر</a>
+    <ul class="dropdown-menu dropdown-menu-end shadow">
+        <li>
+            <a class="dropdown-item py-2" href="{% url 'blog_index' %}">
+                <i class="bi bi-journal-text me-2"></i><strong>أدلة الاستيراد</strong>
+                <span class="d-block small text-secondary" lang="en">In English</span>
+            </a>
+        </li>
+        <li><hr class="dropdown-divider"></li>
+        <li><a class="dropdown-item" href="{% url 'portfolio_page' %}"><i class="bi bi-collection-play me-2"></i>أعمالنا</a></li>
+        <li><a class="dropdown-item" href="{% url 'testimonials_page' %}"><i class="bi bi-chat-quote me-2"></i>آراء العملاء</a></li>
+        <li><a class="dropdown-item" href="{% url 'faq_page' %}"><i class="bi bi-question-circle me-2"></i>أسئلة شائعة</a></li>
+    </ul>
+</li>
+
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'contact_page' %}"><i class="bi bi-envelope me-1"></i>تواصل معنا</a>
+</li>
+
+<li class="nav-item">
+    <a class="nav-link" href="{{ lang_switch_target }}" lang="en" hreflang="en" title="English">
+        <i class="bi bi-translate me-1"></i>English
+    </a>
+</li>
+
+<li class="nav-item">
+    <a class="btn btn-primary btn-sm px-3" href="{% url 'portal_login' %}" aria-label="دخول العملاء"><i class="bi bi-box-arrow-in-right me-1"></i>دخول العملاء</a>
+</li>

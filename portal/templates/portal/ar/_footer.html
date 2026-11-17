@@ -1,0 +1,44 @@
+{% load static %}
+{% comment %}An included template does not inherit {% load %} from its parent, so
+   `static` has to be loaded here as well.
+
+   Arabic footer columns — included via {% block footer_columns %}.
+   The social icon row and the copyright line stay in the shared base template;
+   they are icons and a year, so they need no translation.{% endcomment %}
+
+<div class="row gy-4">
+
+    <div class="col-lg-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <img src="{% static 'images/icon-192.png' %}" alt="" width="30" height="30" style="border-radius:8px;" loading="lazy" decoding="async">
+            <span class="fw-bold">{{ settings.company_name|default:"LogiManager" }}</span>
+        </div>
+        <p class="text-secondary mb-0">
+            وكيلك الموثوق للتوريد من الصين، ومقرّنا في مدينة شوجو. نساعد الشركات في الإمارات
+            والشرق الأوسط على الشراء من الصين بثقة.
+        </p>
+    </div>
+
+    <div class="col-lg-4">
+        <h2 class="h6 fw-bold mb-3">تواصل معنا</h2>
+        <ul class="list-unstyled text-secondary">
+            {% if settings.company_phone %}<li class="mb-1"><i class="bi bi-telephone me-2"></i>{{ settings.company_phone }}</li>{% endif %}
+            {% if settings.company_address %}<li class="mb-1"><i class="bi bi-geo-alt me-2"></i>{{ settings.company_address }}</li>{% endif %}
+        </ul>
+    </div>
+
+    <div class="col-lg-4">
+        <h2 class="h6 fw-bold mb-3">روابط سريعة</h2>
+        <ul class="list-unstyled text-secondary">
+            <li class="mb-1"><a href="{% url 'ar_home' %}" class="text-secondary text-decoration-none hover-primary">الصفحة الرئيسية</a></li>
+            <li class="mb-1"><a href="{% url 'ar_services_page' %}" class="text-secondary text-decoration-none hover-primary">خدماتنا</a></li>
+            <li class="mb-1"><a href="{% url 'about_page' %}" class="text-secondary text-decoration-none hover-primary">من نحن</a></li>
+            <li class="mb-1"><a href="{% url 'contact_page' %}" class="text-secondary text-decoration-none hover-primary">تواصل معنا</a></li>
+            <li class="mb-1"><a href="{% url 'shop_index' %}" class="text-secondary text-decoration-none hover-primary">المنتجات</a></li>
+            <li class="mb-1"><a href="{% url 'blog_index' %}" class="text-secondary text-decoration-none hover-primary">أدلة الاستيراد <span lang="en" class="small">(EN)</span></a></li>
+            <li class="mb-1"><a href="{% url 'portal_login' %}" class="text-secondary text-decoration-none hover-primary">دخول العملاء</a></li>
+            <li class="mb-1"><a href="{% url 'front_page' %}" lang="en" hreflang="en" class="text-secondary text-decoration-none hover-primary">English site</a></li>
+        </ul>
+    </div>
+
+</div>

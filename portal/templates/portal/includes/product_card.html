@@ -1,0 +1,181 @@
+{% comment %}
+One product card, shared by all four catalogue pages.
+
+Previously each of My Products, Marketplace, Amazon and Noon carried its own
+near-identical copy of this markup, so a change to the card meant the same edit
+in four files — and they had already drifted (only Marketplace showed a source
+badge, only My Products showed the assignment note). This partial is the single
+definition; the per-page differences are driven by the flags below.
+
+Context:
+    data      one entry from products_data:
+                  .product          the Product
+                  .cbm              computed cubic metres, or None
+                  .first_image      first ProductImage, or None
+                  .in_cart          True when already in the customer's cart
+                  .assignment       CustomerProduct — My Products only
+                  .price_conversions optional {currency: price} map
+    settings  CompanySettings, for the currency label
+    show_source  True on Marketplace, where Amazon and Noon products are mixed
+                 and the badge is the only way to tell them apart. Omitted on
+                 the single-source pages, where it would be noise.
+
+The class names .product-card, .product-qty-input and .add-to-cart-btn are
+JavaScript hooks read by static/portal.js (it walks up via
+closest('.product-card') to find the quantity input). They must not be renamed.
+{% endcomment %}
+
+<article class="card product-card">
+
+    <div class="product-card__media">
+        {% comment %}The photo links to the detail page. The title below links too —
+           two hit areas for the same destination, because a thumbnail is what
+           people aim at and a title is what screen readers announce.
+        {% endcomment %}
+        <a href="{% url 'portal_product_detail' data.product.id %}"
+           class="product-card__medialink"
+           tabindex="-1"
+           aria-hidden="true">
+            {# Guarded on .src, not on the row existing — see shop_product_card.html. #}
+            {% if data.first_image.src %}
+            <img src="{{ data.first_image.src }}"
+                 class="product-card__img"
+                 alt="{{ data.product.name }}"
+                 loading="lazy">
+            {% else %}
+            <div class="product-card__img product-card__img--empty">
+                <i class="bi bi-image" aria-hidden="true"></i>
+            </div>
+            {% endif %}
+        </a>
+
+        {% comment %}Status flags only — MOQ and the physical specs moved into
+           the body below. They are measurements, not statuses, and as
+           translucent chips over a photograph they were frequently
+           unreadable. These sit on a solid dark ground for that reason.
+        {% endcomment %}
+        {% if show_source and data.product.source != 'general' or data.product.ready_to_ship %}
+        <div class="product-card__flags">
+            {% if show_source %}
+                {% if data.product.source == 'amazon' %}
+                <span class="product-card__flag product-card__flag--amazon">Amazon</span>
+                {% elif data.product.source == 'noon' %}
+                <span class="product-card__flag product-card__flag--noon">Noon</span>
+                {% endif %}
+            {% endif %}
+            {% if data.product.ready_to_ship %}
+            <span class="product-card__flag product-card__flag--ready"
+                  title="Ready to ship — labels required at checkout">
+                <i class="bi bi-truck" aria-hidden="true"></i>Ready
+            </span>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="product-card__body">
+
+        {% if data.product.category %}
+        <p class="product-card__eyebrow">
+            {{ data.product.subcategory.name|default:data.product.category.name }}
+        </p>
+        {% endif %}
+
+        <h3 class="product-card__title">
+            <a href="{% url 'portal_product_detail' data.product.id %}"
+               class="product-card__titlelink">{{ data.product.name }}</a>
+        </h3>
+
+        {% comment %}A product with variations has no single price, so the card
+           shows the cheapest as a "from" figure. Quoting the dearest would make
+           the catalogue look overpriced; quoting the parent's stored price would
+           be a number nothing is actually sold at.
+        {% endcomment %}
+        <p class="product-card__price">
+            {% if data.product.has_variants %}<span class="product-card__from">from </span>{% endif %}
+            {{ data.product.display_price }}<span class="product-card__currency">{{ settings.currency_symbol }}</span>
+        </p>
+
+        {% if data.price_conversions %}
+        <p class="product-card__fx">
+            {% for cur, price in data.price_conversions.items %}
+            {% if cur != settings.currency %}<span>{{ price }} {{ cur }}</span>{% endif %}
+            {% endfor %}
+        </p>
+        {% endif %}
+
+        {% comment %}MOQ leads the spec list because it is the number that
+           decides whether a customer can order at all.{% endcomment %}
+        <ul class="product-card__specs">
+            <li><i class="bi bi-box-seam" aria-hidden="true"></i>MOQ {{ data.product.moq }}</li>
+            {% if data.product.has_variants %}
+            <li><i class="bi bi-palette" aria-hidden="true"></i>{{ data.product.active_variants|length }} options</li>
+            {% endif %}
+            {% if data.product.weight %}
+            <li><i class="bi bi-speedometer2" aria-hidden="true"></i>{{ data.product.weight }} KG</li>
+            {% endif %}
+            {% if data.cbm %}
+            <li><i class="bi bi-bounding-box" aria-hidden="true"></i>{{ data.cbm }} CBM</li>
+            {% endif %}
+            {% if data.product.carton_qty %}
+            <li><i class="bi bi-stack" aria-hidden="true"></i>{{ data.product.carton_qty }} pcs/ctn</li>
+            {% endif %}
+        </ul>
+
+        {% if data.product.ready_to_ship %}
+        <p class="product-card__note">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>Ready to ship — provide labels at checkout.
+        </p>
+        {% endif %}
+
+        {% if data.assignment.note %}
+        <p class="product-card__note">
+            <i class="bi bi-chat-left-text" aria-hidden="true"></i>{{ data.assignment.note }}
+        </p>
+        {% endif %}
+
+        {% comment %}mt-auto pushes the action row to the bottom so buttons line
+           up across a row of cards whose text runs to different lengths.
+        {% endcomment %}
+        {% comment %}A variant product cannot be added from a card: there is no
+           single price and no way to pick a colour here. The card sends the
+           customer to the detail page to choose, which is also what the server
+           does if this is bypassed.
+        {% endcomment %}
+        {% if data.product.has_variants %}
+        <div class="product-card__actions">
+            <a href="{% url 'portal_product_detail' data.product.id %}"
+               class="btn product-card__btn">
+                <i class="bi bi-list-ul" aria-hidden="true"></i>Choose option
+            </a>
+        </div>
+        {% else %}
+        <div class="product-card__actions">
+            <input type="number"
+                   class="form-control product-qty-input"
+                   value="{{ data.product.moq }}"
+                   min="{{ data.product.moq }}"
+                   aria-label="Quantity for {{ data.product.name }}">
+            {% if data.in_cart %}
+            <button class="btn product-card__btn product-card__btn--in-cart" disabled>
+                <i class="bi bi-check-lg" aria-hidden="true"></i>In Cart
+            </button>
+            {% else %}
+            <button class="btn product-card__btn add-to-cart-btn"
+                    data-product-id="{{ data.product.id }}"
+                    data-moq="{{ data.product.moq }}">
+                <i class="bi bi-cart-plus" aria-hidden="true"></i>Add to Cart
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if data.product.sku %}
+        <p class="product-card__sku">SKU {{ data.product.sku }}</p>
+        {% endif %}
+
+        {# Staff only. Renders nothing for customers or anonymous visitors. #}
+        {% include "portal/includes/_supplier_link.html" with product=data.product %}
+
+    </div>
+</article>

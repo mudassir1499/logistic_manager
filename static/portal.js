@@ -282,6 +282,12 @@ document.addEventListener('DOMContentLoaded', function() {
             formData.append('product_id', productId);
             formData.append('quantity', moq);
 
+            // Which variation was picked, on the product detail page. Absent on
+            // the catalogue cards, where the server rejects a variant product and
+            // the customer is sent to the detail page to choose.
+            const variantInput = document.querySelector('input[name="pdpVariant"]:checked');
+            if (variantInput) formData.append('variant_id', variantInput.value);
+
             // Try to find a quantity input for this product card.
             const card = this.closest('.product-card') || this.closest('.col-sm-6, .col-lg-4, .col-xl-3');
             if (card) {
@@ -303,6 +309,15 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(data => {
                 if (data.success) {
                     showToast(data.message, 'success');
+                    // Meta / TikTok / GA4, from ONE call. The payload is built
+                    // server-side (see add_to_cart) so the value is the real
+                    // price of the variation that was added, not a figure
+                    // scraped out of the card - a product page shows a "from"
+                    // price, and billing the pixel for that teaches the ad
+                    // algorithm to chase the wrong basket size.
+                    if (data.tracking && typeof window.trackEvent === 'function') {
+                        window.trackEvent('add_to_cart', data.tracking);
+                    }
                     // Update any cart badge in the navbar if present.
                     document.querySelectorAll('.cart-badge-count').forEach(function(el) {
                         el.textContent = data.cart_count || '0';
@@ -322,3 +337,147 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     });
 });
+
+
+/* ============================================================================
+   SIGNED-IN PORTAL SHELL — off-canvas sidebar (portal/app_base.html)
+   ============================================================================
+   Below the lg breakpoint the sidebar is a drawer. Bootstrap's own Offcanvas
+   component was not used because the sidebar must stay permanently visible from
+   lg up, and Offcanvas would need its markup torn down and rebuilt at that
+   breakpoint. A class toggle does the same job in a dozen lines and lets CSS own
+   the breakpoint entirely.
+   ========================================================================== */
+document.addEventListener('DOMContentLoaded', function () {
+    var sidebar = document.getElementById('appSidebar');
+    var toggle = document.getElementById('appSidebarToggle');
+    var backdrop = document.querySelector('.app-sidebar-backdrop');
+    if (!sidebar || !toggle) return;
+
+    function setOpen(open) {
+        sidebar.classList.toggle('open', open);
+        if (backdrop) backdrop.classList.toggle('show', open);
+        toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        // Stop the page behind the drawer from scrolling under it.
+        document.body.style.overflow = open ? 'hidden' : '';
+    }
+
+    toggle.addEventListener('click', function () {
+        setOpen(!sidebar.classList.contains('open'));
+    });
+
+    // Backdrop and the drawer's own close button both dismiss it.
+    document.querySelectorAll('[data-app-sidebar-close]').forEach(function (el) {
+        el.addEventListener('click', function () { setOpen(false); });
+    });
+
+    // Escape closes the drawer, matching every other dismissible layer.
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('open')) setOpen(false);
+    });
+
+    // Resizing up to the persistent layout must clear the drawer state, or the
+    // body is left with overflow:hidden and the desktop page cannot scroll.
+    window.addEventListener('resize', function () {
+        if (window.innerWidth >= 992 && sidebar.classList.contains('open')) setOpen(false);
+    });
+});
+
+/* ---------------------------------------------------------------------------
+   SHARE BUTTONS
+   ---------------------------------------------------------------------------
+   Drives portal/includes/share_buttons.html. Facebook is a plain anchor and
+   needs no JavaScript; these two do.
+
+   The TikTok button exists because TikTok publishes no web share URL — see the
+   note in that template. navigator.share opens the OS share sheet, where TikTok
+   appears if installed; everywhere else the link is copied so it can be pasted
+   into the app. Whichever path runs, the label says what happened.
+   --------------------------------------------------------------------------- */
+(function () {
+    'use strict';
+
+    function copyText(text) {
+        // The async clipboard API is unavailable on http:// origins and in older
+        // browsers, so the textarea+execCommand path stays as a fallback.
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+        return new Promise(function (resolve, reject) {
+            var box = document.createElement('textarea');
+            box.value = text;
+            box.setAttribute('readonly', '');
+            box.style.position = 'fixed';
+            box.style.opacity = '0';
+            document.body.appendChild(box);
+            box.select();
+            try {
+                document.execCommand('copy') ? resolve() : reject();
+            } catch (err) {
+                reject(err);
+            } finally {
+                document.body.removeChild(box);
+            }
+        });
+    }
+
+    /** Briefly swap a button's label to confirm what just happened. */
+    function flash(labelEl, message) {
+        if (!labelEl) return;
+        var original = labelEl.dataset.original || labelEl.textContent;
+        labelEl.dataset.original = original;
+        labelEl.textContent = message;
+        setTimeout(function () { labelEl.textContent = original; }, 1800);
+    }
+
+    document.addEventListener('click', function (event) {
+        var row = event.target.closest('.share-row');
+        if (!row) return;
+
+        var url = row.dataset.shareUrl;
+        var title = row.dataset.shareTitle || document.title;
+        // Product name, tagline, contact number, then the link — composed on the
+        // server (CompanySettings.build_share_message) so the wording is editable
+        // in Settings and every path here says the same thing. Falls back to the
+        // bare URL if the attribute is missing.
+        var text = row.dataset.shareText || url;
+
+        var tiktokBtn = event.target.closest('[data-share-tiktok]');
+        if (tiktokBtn) {
+            event.preventDefault();
+            var ttLabel = tiktokBtn.querySelector('[data-share-tiktok-label]');
+            if (navigator.share) {
+                // `text` WITHOUT `url`. Passing both makes several targets -
+                // WhatsApp and Telegram among them - append the URL a second
+                // time, because the message already ends with it. Resolves when
+                // shared, rejects when the user dismisses the sheet, and a
+                // dismissal is not an error worth reporting.
+                navigator.share({ title: title, text: text }).catch(function () {});
+            } else {
+                copyText(text)
+                    .then(function () { flash(ttLabel, 'Copied — paste in TikTok'); })
+                    .catch(function () { flash(ttLabel, 'Copy failed'); });
+            }
+            return;
+        }
+
+        var copyBtn = event.target.closest('[data-share-copy]');
+        if (copyBtn) {
+            event.preventDefault();
+            var copyLabel = copyBtn.querySelector('[data-share-copy-label]');
+            copyText(text)
+                .then(function () { flash(copyLabel, 'Copied'); })
+                .catch(function () { flash(copyLabel, 'Copy failed'); });
+        }
+    });
+
+    // On a device with a share sheet the TikTok button opens it directly, so the
+    // label should not imply a copy. Set at runtime because it depends on the
+    // browser, not on the server.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (!navigator.share) return;
+        document.querySelectorAll('[data-share-tiktok]').forEach(function (btn) {
+            btn.setAttribute('title', 'Opens your share sheet — pick TikTok');
+        });
+    });
+})();

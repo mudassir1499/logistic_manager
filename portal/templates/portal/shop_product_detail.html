@@ -1,0 +1,463 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+{% load catalog_tags %}
+
+{% comment %}
+Public product page. Readable by anyone; ordering requires a customer login.
+
+This is the template that earns product rich results, so the JSON-LD below is
+the point of the page as much as the visible markup is. Two rules kept it
+honest:
+
+  - Every value in the structured data is also visible on the page. Marking up a
+    price or a rating a visitor cannot see is a manual-action risk, not a clever
+    trick.
+  - A product with variations emits AggregateOffer with a real low/high span
+    rather than a single Offer at the "from" price, because a single Offer would
+    promise a price most variations are not sold at.
+
+Context: see portal.views.shop_product_detail.
+{% endcomment %}
+
+{% block title %}{{ product.name }} — Wholesale from {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% block meta_description %}{{ product.name }} — wholesale from {{ product.moq }} pieces, {{ product.display_price }} {{ settings.currency_symbol }}{% if product.weight %}, {{ product.weight }} kg{% endif %}. Sourced direct from Chinese factories and shipped to UAE and the Middle East.{% endblock %}
+
+{% block canonical_url %}{{ settings.base_url }}{{ product.get_absolute_url }}{% endblock %}
+
+{% block og_type %}product{% endblock %}
+{% block og_url %}{{ settings.base_url }}{{ product.get_absolute_url }}{% endblock %}
+
+{% comment %}The product's own photo, made absolute — Facebook silently drops an
+   og:image it cannot resolve, and locally stored images render as '/media/…'.
+
+   THE FALLBACK MUST LIVE INSIDE THE BLOCK. This was written as
+   `{% if images %}{% block og_image %}…{% endblock %}{% endif %}`, which does
+   nothing: Django collects a child template's blocks at parse time, so the
+   override always replaced base.html's default and the surrounding `{% if %}`
+   was never consulted. It went unnoticed only because `images` always held at
+   least one row back when an undownloaded photo was kept as a CDN link. Now
+   that such rows render nothing and are filtered out, a product with no stored
+   photo emitted `<meta property="og:image" content="">` — and an empty og:image
+   is treated as a malformed tag rather than an absent one, which is worse than
+   having no product image at all.
+{% endcomment %}
+{% block og_image %}{% if images %}{{ images.0.src|absolutize:settings.base_url }}{% elif settings.og_image %}{{ settings.base_url }}{{ settings.og_image.url }}{% else %}{{ settings.base_url }}/static/images/og-default.png{% endif %}{% endblock %}
+{% block twitter_image %}{% if images %}{{ images.0.src|absolutize:settings.base_url }}{% elif settings.og_image %}{{ settings.base_url }}{{ settings.og_image.url }}{% else %}{{ settings.base_url }}/static/images/og-default.png{% endif %}{% endblock %}
+
+{% block og_title %}{{ product.name }}{% endblock %}
+{% comment %}Facebook builds its card from these tags and ignores anything the
+   share button passes as a parameter, so the tagline has to reach it here — this
+   is the ONLY route by which a Facebook share carries it. The copy and
+   share-sheet buttons carry it directly; see includes/share_buttons.html.
+{% endcomment %}
+{% block og_description %}Wholesale from {{ product.moq }} pieces at {{ product.display_price }} {{ settings.currency_symbol }}.{% if settings.share_pitch %} {{ settings.share_pitch }}.{% else %} Sourced direct from Chinese factories.{% endif %}{% if settings.share_contact_display %} WhatsApp {{ settings.share_contact_display }}.{% endif %}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Product",
+  "name": "{{ product.name|escapejs }}",
+  "url": "{{ settings.base_url }}{{ product.get_absolute_url }}",
+  {% if images %}"image": [{% for img in images %}"{{ img.src }}"{% if not forloop.last %},{% endif %}{% endfor %}],{% endif %}
+  {% if product.sku %}"sku": "{{ product.sku|escapejs }}",{% endif %}
+  "description": "{{ product.name|escapejs }} — wholesale from {{ product.moq }} pieces.",
+  "brand": { "@type": "Brand", "name": "{{ settings.company_name|default:'LogiManager'|escapejs }}" },
+  {% if attributes %}
+  "additionalProperty": [
+    {% for attr in attributes %}
+    { "@type": "PropertyValue", "name": "{{ attr.name|escapejs }}", "value": "{{ attr.value|escapejs }}" }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ],
+  {% endif %}
+  {% if variants %}
+  "offers": {
+    "@type": "AggregateOffer",
+    "priceCurrency": "{{ settings.currency_code }}",
+    "lowPrice": "{{ price_low }}",
+    "highPrice": "{{ price_high }}",
+    "offerCount": {{ variants|length }},
+    "availability": "https://schema.org/InStock",
+    "seller": { "@type": "Organization", "name": "{{ settings.company_name|default:'LogiManager'|escapejs }}" }
+  }
+  {% else %}
+  "offers": {
+    "@type": "Offer",
+    "priceCurrency": "{{ settings.currency_code }}",
+    "price": "{{ product.price }}",
+    "availability": "https://schema.org/InStock",
+    "url": "{{ settings.base_url }}{{ product.get_absolute_url }}",
+    "seller": { "@type": "Organization", "name": "{{ settings.company_name|default:'LogiManager'|escapejs }}" }
+  }
+  {% endif %}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/" },
+    { "@type": "ListItem", "position": 2, "name": "Catalogue", "item": "{{ settings.base_url }}{% url 'shop_index' %}" }{% if product.category %},
+    { "@type": "ListItem", "position": 3, "name": "{{ product.category.name|escapejs }}", "item": "{{ settings.base_url }}{% url 'shop_index' %}?category={{ product.category.slug }}" },
+    { "@type": "ListItem", "position": 4, "name": "{{ product.name|escapejs }}", "item": "{{ settings.base_url }}{{ product.get_absolute_url }}" }{% else %},
+    { "@type": "ListItem", "position": 3, "name": "{{ product.name|escapejs }}", "item": "{{ settings.base_url }}{{ product.get_absolute_url }}" }{% endif %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="pdp-public">
+  <div class="container">
+
+    <nav aria-label="Breadcrumb" class="shop-crumbs">
+      <a href="/">Home</a>
+      <span aria-hidden="true">/</span>
+      <a href="{% url 'shop_index' %}">Catalogue</a>
+      {% if product.category %}
+      <span aria-hidden="true">/</span>
+      <a href="{% url 'shop_index' %}?category={{ product.category.slug }}">{{ product.category.name }}</a>
+      {% endif %}
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ product.name|truncatechars:40 }}</span>
+    </nav>
+
+    <div class="pdp-layout">
+
+      <div class="pdp-gallery">
+        {% if images %}
+        <img src="{{ images.0.src }}" alt="{{ product.name }}"
+             class="pdp-gallery__main" id="pdpMainImage"
+             width="600" height="600" fetchpriority="high">
+        {% if images|length > 1 %}
+        <div class="pdp-thumbs">
+          {% for img in images %}
+          <button type="button" class="pdp-thumb {% if forloop.first %}is-active{% endif %}"
+                  data-src="{{ img.src }}" aria-label="View image {{ forloop.counter }}">
+            <img src="{{ img.src }}" alt="" loading="lazy">
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% else %}
+        <div class="pdp-gallery__main pdp-gallery__empty"><i class="bi bi-image" aria-hidden="true"></i></div>
+        {% endif %}
+      </div>
+
+      <div class="pdp-info">
+
+        <h1 class="pdp-public__title">{{ product.name }}</h1>
+
+        {# Staff only: opens the supplier listing. Absent from the response for everyone else. #}
+        {% include "portal/includes/_supplier_link.html" with product=product %}
+
+        {% comment %}Identity line. The SKU is the code a buyer quotes back in an
+           enquiry and the category is the route to similar products; both sat in
+           a spec table below the fold, while the one flag had a paragraph of its
+           own. Together they read as a single line of provenance under the name.
+        {% endcomment %}
+        <p class="pdp-meta">
+          {% if product.sku %}<span class="pdp-meta__sku">SKU {{ product.sku }}</span>{% endif %}
+          {% if product.category %}
+          <a href="{% url 'shop_index' %}?category={{ product.category.slug }}">{{ product.subcategory.name|default:product.category.name }}</a>
+          {% endif %}
+          {% if product.ready_to_ship %}
+          <span class="shop-card__flag shop-card__flag--ready">Ready to ship</span>
+          {% endif %}
+        </p>
+
+        {% comment %}The offer: one price, and the four numbers a wholesale buyer
+           checks before anything else.
+
+           The price was a 31px figure with the currency set at 20px beside it,
+           two near-equal weights sharing a baseline, and the unit it applied to
+           was never stated on a page where every price is per piece. The minimum
+           order, the carton quantity, the unit weight and the carton volume were
+           grey small print and a spec table placed AFTER the order button - so
+           the page asked for the decision before showing what it rests on.
+        {% endcomment %}
+        <div class="pdp-offer">
+          <p class="pdp-price" id="pdpPrice">
+            <span class="pdp-price__cur">{{ settings.currency_symbol }}</span><span
+              class="pdp-price__amt" id="pdpPriceAmount">{% if variants %}{{ price_low }}{% else %}{{ product.price }}{% endif %}</span><span
+              class="pdp-price__unit">per piece</span>
+          </p>
+          {% if variants and price_low != price_high %}
+          <p class="pdp-range">{{ variants|length }} options, {{ settings.currency_symbol }}&nbsp;{{ price_low }} – {{ settings.currency_symbol }}&nbsp;{{ price_high }}</p>
+          {% endif %}
+
+          {% comment %}`weight` is the weight of ONE PIECE - see Product.weight -
+             so it is labelled as such here. The old freight sentence read "this
+             carton is X CBM and Y kg", attaching a per-piece figure to a carton.
+          {% endcomment %}
+          <ul class="pdp-facts">
+            <li class="pdp-fact">
+              <span class="pdp-fact__v">{{ product.moq }}<span class="pdp-fact__u">pcs</span></span>
+              <span class="pdp-fact__k">Min. order</span>
+            </li>
+            {% if product.carton_qty %}
+            <li class="pdp-fact">
+              <span class="pdp-fact__v">{{ product.carton_qty }}<span class="pdp-fact__u">pcs</span></span>
+              <span class="pdp-fact__k">Per carton</span>
+            </li>
+            {% endif %}
+            {% if product.weight %}
+            <li class="pdp-fact">
+              <span class="pdp-fact__v">{{ product.weight|floatformat:"-3" }}<span class="pdp-fact__u">kg</span></span>
+              <span class="pdp-fact__k">Unit weight</span>
+            </li>
+            {% endif %}
+            {% if cbm %}
+            <li class="pdp-fact">
+              <span class="pdp-fact__v">{{ cbm }}<span class="pdp-fact__u">m³</span></span>
+              <span class="pdp-fact__k">Carton volume</span>
+            </li>
+            {% endif %}
+          </ul>
+        </div>
+
+        {% if variants %}
+        <h2 class="pdp-section-title">Options <span class="pdp-count">{{ variants|length }}</span></h2>
+        <div class="pdp-variants" role="radiogroup" aria-label="Choose an option">
+          {% for v in variants %}
+          <label class="pdp-variant">
+            <input type="radio" name="pdpVariant" value="{{ v.id }}"
+                   data-price="{{ v.price }}" data-img="{{ v.src }}"
+                   {% if v.id == default_variant_id %}checked{% endif %}>
+            {% if v.src %}<img src="{{ v.src }}" alt="" loading="lazy" class="pdp-variant__img">{% endif %}
+            <span class="pdp-variant__body">
+              <span class="pdp-variant__name">{{ v.name }}</span>
+            </span>
+            <span class="pdp-variant__price">{{ settings.currency_symbol }} {{ v.price }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% comment %}The auth boundary. A signed-in customer orders here; everyone
+           else is sent to sign in and returned to this page afterwards. The
+           server rejects anonymous add-to-cart regardless.
+        {% endcomment %}
+        <div class="pdp-actions">
+          {% if is_customer %}
+            <input type="number" class="form-control product-qty-input"
+                   value="{{ product.moq }}" min="{{ product.moq }}"
+                   aria-label="Quantity for {{ product.name }}">
+            {% if in_cart %}
+            <button class="shop-card__btn shop-card__btn--muted" disabled>
+              <i class="bi bi-check-lg" aria-hidden="true"></i> In cart
+            </button>
+            {% else %}
+            <button class="shop-card__btn add-to-cart-btn"
+                    data-product-id="{{ product.id }}" data-moq="{{ product.moq }}">
+              <i class="bi bi-cart-plus" aria-hidden="true"></i> Add to cart
+            </button>
+            {% endif %}
+          {% else %}
+            <a href="{% url 'account_login' %}?next={{ product.get_absolute_url|urlencode }}"
+               class="shop-card__btn">
+              <i class="bi bi-box-arrow-in-right" aria-hidden="true"></i> Sign in to order
+            </a>
+          {% endif %}
+        </div>
+
+        {% comment %}The secondary routes, as links rather than buttons.
+           Registering and asking a question were two more full-size buttons in
+           the panel, making three controls of equal weight where only one is the
+           thing to do next - and on a phone that panel is pinned to the bottom
+           of the screen, so every button in it costs permanent screen.
+        {% endcomment %}
+        <p class="pdp-actions-alt">
+          {% if not is_customer %}
+          <a href="{% url 'account_register' %}">Create an account</a>
+          <span aria-hidden="true">·</span>
+          {% endif %}
+          <a href="{% url 'contact_page' %}">Ask a question</a>
+        </p>
+
+        {% comment %}Freight, from the figures already on this page. A buyer in
+           Dubai or Karachi is not comparing a factory price, they are comparing
+           a landed cost - and the page held the weight and the CBM while saying
+           nothing about shipping at all. The calculator link carries nothing
+           yet; it just stops the question being a dead end.
+        {% endcomment %}
+        <p class="pdp-freight">
+          <i class="bi bi-truck" aria-hidden="true"></i>
+          <span>Shipped from China by air or sea to the UAE and the wider Gulf.
+          <a href="{% url 'shipping_calculator_page' %}">Estimate freight</a></span>
+        </p>
+
+        {% comment %}Specifications. The packing table that used to sit here
+           repeated what the facts strip now carries at the top of the page, and
+           the SKU and category moved up to the identity line. What is left is the
+           attribute list plus the carton's dimensions - the one packing figure
+           that cannot be reduced to a single number in the strip.
+
+           `cbm` is the guard for the carton row because the view computes it only
+           when all three dimensions are present, so it is exactly the condition
+           under which that row has something to say.
+        {% endcomment %}
+        {% if attributes or cbm %}
+        <h2 class="pdp-section-title">Specifications</h2>
+        <div class="pdp-specs">
+          {% for attr in attributes %}
+          <div class="pdp-spec">
+            <span class="pdp-spec__k">{{ attr.name }}</span>
+            <span class="pdp-spec__v">{{ attr.value }}</span>
+          </div>
+          {% endfor %}
+          {% if cbm %}
+          <div class="pdp-spec">
+            <span class="pdp-spec__k">Carton size</span>
+            <span class="pdp-spec__v">{{ product.carton_length|floatformat:"-1" }} × {{ product.carton_width|floatformat:"-1" }} × {{ product.carton_height|floatformat:"-1" }} cm</span>
+          </div>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% include "portal/includes/share_buttons.html" with share_url=share_url share_title=product.name %}
+
+        {% if not is_customer %}
+        <p class="pdp-note">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+          Prices and specifications are public. An account is only needed to place an order.
+        </p>
+        {% endif %}
+
+      </div>
+    </div>
+
+    {% if related %}
+    <section class="shop-related">
+      <h2 class="pdp-section-title">Related products</h2>
+      <div class="shop-grid">
+        {% for entry in related %}
+        {% include "portal/includes/shop_product_card.html" with data=entry %}
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+  </div>
+</section>
+
+<script>
+// Broken images, including the kind that "load".
+//
+// Product photos are a mix of files we host and links to the supplier's CDN, and
+// a CDN link rots when the supplier delists the listing or the host starts
+// blocking hotlinks.
+//
+// THE IMPORTANT CASE: alicdn does not 404 a dead image. It answers 200 with a
+// 1x1 pixel. The browser therefore fires `load`, not `error`, and object-fit
+// stretches that single pixel across the whole frame — which is why a missing
+// photo showed up as a large blank box rather than a broken-image icon, and why
+// an onerror handler alone did nothing.
+//
+// So both signals count: a real failure, or a "successful" image too small to be
+// a product photo. The main image falls through to the next candidate; when none
+// survive, the placeholder takes over. A bad thumbnail removes itself.
+(function () {
+    var main = document.getElementById('pdpMainImage');
+    if (!main) return;
+
+    // No product photo is 8px. A 1x1 or 2x2 is a CDN placeholder, nothing else.
+    var MIN_USABLE_PX = 8;
+
+    function isUsable(img) {
+        return img.naturalWidth >= MIN_USABLE_PX && img.naturalHeight >= MIN_USABLE_PX;
+    }
+
+    var sources = [].slice.call(document.querySelectorAll('.pdp-thumb'))
+        .map(function (t) { return t.dataset.src; });
+    if (!sources.length) sources = [main.getAttribute('src')];
+
+    function showPlaceholder() {
+        var box = document.createElement('div');
+        box.className = 'pdp-gallery__main pdp-gallery__empty';
+        box.innerHTML = '<i class="bi bi-image" aria-hidden="true"></i>';
+        main.replaceWith(box);
+    }
+
+    function advance() {
+        var next = sources[sources.indexOf(main.getAttribute('src')) + 1];
+        if (next) main.setAttribute('src', next);
+        else showPlaceholder();
+    }
+
+    main.addEventListener('error', advance);
+    main.addEventListener('load', function () {
+        if (!isUsable(main)) advance();
+    });
+    // A cached image can finish before the listener is attached.
+    if (main.complete && main.naturalWidth && !isUsable(main)) advance();
+
+    document.querySelectorAll('.pdp-thumb img').forEach(function (img) {
+        function drop() {
+            var button = img.closest('.pdp-thumb');
+            if (button) button.remove();
+        }
+        img.addEventListener('error', drop);
+        img.addEventListener('load', function () { if (!isUsable(img)) drop(); });
+        if (img.complete && img.naturalWidth && !isUsable(img)) drop();
+    });
+})();
+
+// Gallery + variant selection. Plain listeners so a future CSP needs no changes.
+(function () {
+    var main = document.getElementById('pdpMainImage');
+    if (main) {
+        document.querySelectorAll('.pdp-thumb').forEach(function (thumb) {
+            thumb.addEventListener('click', function () {
+                main.src = thumb.dataset.src;
+                document.querySelectorAll('.pdp-thumb').forEach(function (t) { t.classList.remove('is-active'); });
+                thumb.classList.add('is-active');
+            });
+        });
+    }
+
+    var radios = document.querySelectorAll('input[name="pdpVariant"]');
+    if (!radios.length) return;
+    // Only the number changes. This used to rebuild the whole price element
+    // with innerHTML, which destroyed the currency span - hence the saved
+    // outerHTML string put back in front of it - and would silently drop
+    // anything else inside the price, such as the "per piece" unit, on the
+    // first click. Writing textContent to the amount leaves the rest alone.
+    var amountEl = document.getElementById('pdpPriceAmount');
+    function apply(radio) {
+        if (amountEl) amountEl.textContent = radio.dataset.price;
+        if (main && radio.dataset.img) main.src = radio.dataset.img;
+    }
+    radios.forEach(function (r) {
+        r.addEventListener('change', function () { if (r.checked) apply(r); });
+    });
+    var checked = document.querySelector('input[name="pdpVariant"]:checked');
+    if (checked) apply(checked);
+})();
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}ViewContent. content_ids is the product's primary key, which is what
+   the product feed exports — catalogue and dynamic retargeting ads join on that
+   id, so a mismatch here means those campaigns simply never match a product.
+   value/currency let Meta and TikTok optimise for basket size rather than
+   treating a 12 RMB accessory and a 280 RMB machine as the same outcome.
+{% endcomment %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.trackEvent !== 'function') { return; }
+    window.trackEvent('view_item', {
+      content_ids: ['{{ product.id }}'],
+      content_name: '{{ product.name|escapejs }}',
+      content_type: 'product',
+      unit_price: {{ product.price|stringformat:"s" }},
+      value: {{ product.price|stringformat:"s" }}
+    });
+  });
+</script>
+{% endblock %}

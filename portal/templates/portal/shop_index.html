@@ -1,0 +1,174 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+{% load catalog_tags %}
+
+{% comment %}
+The public product catalogue — the site's main SEO surface for commercial terms.
+
+Anyone may read this page, including crawlers. Ordering requires a customer
+login; the cards handle that boundary, and add_to_cart enforces it server-side.
+
+Context: see portal.views.shop_index.
+{% endcomment %}
+
+{% block title %}
+{% if filter_selected_category %}{{ filter_selected_category.name }} — Wholesale Products{% else %}Wholesale Product Catalogue{% endif %} — {{ settings.company_name|default:"LogiManager" }}
+{% endblock %}
+
+{% block meta_description %}
+{% if filter_selected_category %}Browse wholesale {{ filter_selected_category.name|lower }} sourced from China, with factory pricing, MOQs and carton specs. Delivered to UAE and the Middle East.{% else %}Browse {{ result_count }} wholesale products sourced direct from Chinese factories — with real prices, minimum order quantities and carton specifications. Shipping to UAE and the Middle East.{% endif %}
+{% endblock %}
+
+{% comment %}Canonical always points at the UNFILTERED listing (or the plain
+   category URL). Sort, price and page variants are the same products in a
+   different arrangement, and letting each become its own indexed URL splits
+   the ranking signal across dozens of near-duplicates.
+{% endcomment %}
+{% block canonical_url %}{{ settings.base_url }}{% url 'shop_index' %}{% if filter_category %}?category={{ filter_category }}{% endif %}{% endblock %}
+
+{% comment %}A filtered, sorted or paginated view adds nothing to the index but
+   still passes link equity onward, so: noindex, follow.
+{% endcomment %}
+{% block meta_robots %}{% if filter_q or filter_sort or filter_min_price or filter_max_price or page_obj.number > 1 %}noindex, follow{% else %}index, follow, max-image-preview:large{% endif %}{% endblock %}
+
+{% block og_title %}Wholesale Product Catalogue — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block og_description %}Browse wholesale products sourced direct from Chinese factories, with real prices and MOQs.{% endblock %}
+
+{% block structured_data %}
+{% comment %}ItemList tells Google this page is a product listing and which
+   products are on it, which is what earns the listing-style result. Only the
+   first page is described — deeper pages are noindex anyway.
+{% endcomment %}
+{% if page_obj.number == 1 %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "{% if filter_selected_category %}{{ filter_selected_category.name|escapejs }}{% else %}Wholesale Product Catalogue{% endif %}",
+  "numberOfItems": {{ result_count }},
+  "itemListElement": [
+    {% for entry in products_data %}
+    {
+      "@type": "ListItem",
+      "position": {{ forloop.counter }},
+      "url": "{{ settings.base_url }}{{ entry.product.get_absolute_url }}",
+      "name": "{{ entry.product.name|escapejs }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ]
+}
+</script>
+{% endif %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    { "@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/" },
+    { "@type": "ListItem", "position": 2, "name": "Catalogue", "item": "{{ settings.base_url }}{% url 'shop_index' %}" }{% if filter_selected_category %},
+    { "@type": "ListItem", "position": 3, "name": "{{ filter_selected_category.name|escapejs }}", "item": "{{ settings.base_url }}{% url 'shop_index' %}?category={{ filter_category }}" }{% endif %}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="shop-hero">
+  <div class="container">
+    <nav aria-label="Breadcrumb" class="shop-crumbs">
+      <a href="/">Home</a>
+      <span aria-hidden="true">/</span>
+      {% if filter_selected_category %}
+      <a href="{% url 'shop_index' %}">Catalogue</a>
+      <span aria-hidden="true">/</span>
+      <span aria-current="page">{{ filter_selected_category.name }}</span>
+      {% else %}
+      <span aria-current="page">Catalogue</span>
+      {% endif %}
+    </nav>
+
+    <h1 class="shop-hero__title">
+      {% if filter_selected_category %}{{ filter_selected_category.name }}{% else %}Product Catalogue{% endif %}
+    </h1>
+    <p class="shop-hero__sub">
+      {{ result_count }} product{{ result_count|pluralize }} sourced direct from Chinese factories —
+      factory prices, real MOQs, full carton specs.
+    </p>
+
+    {% comment %}The page-level search box was removed when the site-wide search
+       bar moved into the shell (see base.html). Two identical boxes, one above
+       the other, both echoing the same term, read as a bug - and a customer who
+       typed in the wrong one got the same result, so it was pure noise. The
+       header bar carries the category and subcategory through the same way this
+       form did, via catalog_hidden_inputs on the sidebar filters.
+    {% endcomment %}
+  </div>
+</section>
+
+<section class="shop-body">
+  <div class="container">
+    <div class="catalog-layout">
+
+      <aside class="catalog-layout__aside">
+        {% include "portal/includes/catalog_sidebar.html" %}
+      </aside>
+
+      <div class="catalog-layout__main">
+
+        {% if products_data %}
+        <div class="shop-grid">
+          {% for entry in products_data %}
+          {% include "portal/includes/shop_product_card.html" with data=entry %}
+          {% endfor %}
+        </div>
+
+        {% comment %}rel prev/next is gone from Google's guidance, but the plain
+           links still matter: they are how a crawler walks past page one.
+        {% endcomment %}
+        {% if page_obj.has_other_pages %}
+        <nav class="shop-pager" aria-label="Catalogue pages">
+          {% if page_obj.has_previous %}
+          <a href="{% catalog_query page=page_obj.previous_page_number %}" rel="prev">← Previous</a>
+          {% endif %}
+          <span class="shop-pager__status">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+          {% if page_obj.has_next %}
+          <a href="{% catalog_query page=page_obj.next_page_number %}" rel="next">Next →</a>
+          {% endif %}
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="shop-empty">
+          <i class="bi bi-search" aria-hidden="true"></i>
+          {% if filters_active %}
+          <p>No products match those filters.</p>
+          <a href="{% url 'shop_index' %}" class="shop-card__btn">Clear filters</a>
+          {% else %}
+          <p>The catalogue is being updated. Please check back shortly.</p>
+          <a href="{% url 'contact_page' %}" class="shop-card__btn">Tell us what you need</a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}Search. Fired from the results page rather than on submit, so it
+   only counts searches that actually ran.
+{% endcomment %}
+{% if filter_q %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.trackEvent === 'function') {
+      window.trackEvent('search', { search_string: '{{ filter_q|escapejs }}' });
+    }
+  });
+</script>
+{% endif %}
+{% endblock %}

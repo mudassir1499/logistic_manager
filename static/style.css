@@ -2,54 +2,73 @@
    FILE: style.css
    PURPOSE: Main stylesheet for the Logistics Manager admin dashboard.
    ------------------------------------------------------------------------------
-   Modern light SaaS design system. Clean surfaces, warm terracotta/green/gold accents, and
-   soft shadows. Built to work with Bootstrap 5 utilities.
+   Brand design system, derived from the MUDASSIR LLC logo: a pure-black wordmark
+   on a cool off-white ground, with a gold four-point star. The UI is therefore
+   monochrome (black ink on cool grey surfaces) and uses gold only as an accent —
+   active bars, focus rings, icons and links — never as a large fill.
+   Built to work with Bootstrap 5 utilities.
    ============================================================================= */
 
 /* ----------------------------------------------------------------------------- */
 /* Design Tokens                                                                 */
 /* ----------------------------------------------------------------------------- */
 :root {
-  /* Backgrounds */
-  --bg-primary: #F8FAFC;
+  /* Backgrounds — the cool off-white ground sampled from the logo artwork. */
+  --bg-primary: #F3F4F7;   /* logo background colour */
   --bg-secondary: #FFFFFF;
   --bg-card: #FFFFFF;
-  --bg-card-hover: #F1F5F9;
-  --bg-input: #F8FAFC;
-  --bg-hover: #F1F5F9;
+  --bg-card-hover: #EBECEF;
+  --bg-input: #F3F4F7;
+  --bg-hover: #EBECEF;
 
-  /* Text */
-  --text-primary: #0F172A;
-  --text-secondary: #475569;
-  --text-muted: #64748B;
-  --text-on-primary: #FFFFFF;
+  /* Text — neutral greys sampled from the logo's antialiased edges. */
+  --text-primary: #0A0A0A;   /* logo black */
+  --text-secondary: #3F3F42;
+  --text-muted: #6A6A6C;
+  --text-on-primary: #FFFFFF;   /* on black fills */
+  --text-on-accent: #0A0A0A;    /* on gold fills — black passes 5.82:1, white does not */
 
   /* Borders */
-  --border-color: #E2E8F0;
-  --border-glow: rgba(200, 75, 49, 0.35);
+  --border-color: #DFE1E6;
+  --border-glow: rgba(176, 132, 33, 0.35);
 
-  /* Accents */
-  --accent-1: #C84B31;
-  --accent-2: #2D5A27;
-  --accent-3: #F5A623;
+  /* -------------------------------------------------------------------------
+     Brand accents — monochrome primary + gold from the logo's star mark.
+     Gold comes in three tiers because a single value cannot be legible
+     everywhere. Use --accent-gold for shapes (bars, rules, icons, focus rings)
+     and large display text only: at 3.40:1 on white it meets AA for large text
+     and non-text contrast, but NOT for body copy. Use --accent-gold-text for
+     any gold text at body size (5.26:1), and --accent-gold-light when gold sits
+     on a dark surface (9.14:1 on ink).
+     ------------------------------------------------------------------------- */
+  --accent-1: #0A0A0A;   /* logo black — primary action colour */
+  --accent-2: #262626;   /* hover/active */
+  --accent-3: #3F3F42;   /* gradient partner (charcoal) */
+  --accent-gold: #B08421;         /* the star mark — shapes & large text */
+  --accent-gold-dark: #8A661A;    /* pressed state */
+  --accent-gold-text: #8A661A;    /* body-size gold text (AA on white) */
+  --accent-gold-light: #D9A93C;   /* gold on dark surfaces */
+  --accent-gold-bg: rgba(176, 132, 33, 0.10);
   --noon-yellow: #FEEE00;
   --noon-dark: #2D2D2D;
 
-  /* Semantic */
-  --success: #16A34A;
-  --success-bg: rgba(22, 163, 74, 0.10);
-  --danger: #DC2626;
-  --danger-bg: rgba(220, 38, 38, 0.10);
-  --warning: #D97706;
-  --warning-bg: rgba(217, 119, 6, 0.10);
-  --info: #2D5A27;
-  --info-bg: rgba(45, 90, 39, 0.10);
+  /* Semantic — deepened so they read as status, not as competing brand colour.
+     Warning is pushed toward orange so it stays distinct from the gold accent. */
+  --success: #157F4A;
+  --success-bg: rgba(21, 127, 74, 0.10);
+  --danger: #B3261E;
+  --danger-bg: rgba(179, 38, 30, 0.10);
+  --warning: #C2410C;
+  --warning-bg: rgba(194, 65, 12, 0.10);
+  --info: #44546A;
+  --info-bg: rgba(68, 84, 106, 0.10);
 
   /* Gradients */
   --gradient-primary: linear-gradient(135deg, var(--accent-1), var(--accent-3));
-  --gradient-success: linear-gradient(135deg, #16A34A, #15803D);
-  --gradient-warning: linear-gradient(135deg, #D97706, #B45309);
-  --gradient-danger: linear-gradient(135deg, #DC2626, #B91C1C);
+  --gradient-gold: linear-gradient(135deg, var(--accent-gold), var(--accent-gold-dark));
+  --gradient-success: linear-gradient(135deg, #157F4A, #0F6039);
+  --gradient-warning: linear-gradient(135deg, #C2410C, #9A3412);
+  --gradient-danger: linear-gradient(135deg, #B3261E, #8C1D18);
 
   /* Typography */
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -72,12 +91,12 @@
   --radius-full: 9999px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow: 0 1px 3px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.06), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.06), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
-  --shadow-glow: 0 0 20px rgba(200, 75, 49, 0.12);
-  --shadow-inset: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  --shadow-sm: 0 1px 2px rgba(10, 10, 10, 0.05);
+  --shadow: 0 1px 3px rgba(10, 10, 10, 0.07), 0 1px 2px rgba(10, 10, 10, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(10, 10, 10, 0.07), 0 2px 4px -2px rgba(10, 10, 10, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(10, 10, 10, 0.07), 0 4px 6px -4px rgba(10, 10, 10, 0.05);
+  --shadow-glow: 0 0 20px rgba(176, 132, 33, 0.18);
+  --shadow-inset: inset 0 1px 2px rgba(10, 10, 10, 0.06);
 
   /* Motion */
   --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -138,7 +157,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   flex-shrink: 0;
 }
 
-.brand-icon { font-size: 1.5rem; flex-shrink: 0; }
+.brand-icon { width: 30px; height: 30px; flex-shrink: 0; display: block; }
 .brand-text { font-size: 1.15rem; font-weight: 800; white-space: nowrap; }
 
 .sidebar.collapsed .brand-text,
@@ -167,6 +186,8 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   align-items: center;
   gap: 12px;
   padding: 10px 12px;
+  /* Anchors the count badge when the sidebar collapses to icons only. */
+  position: relative;
   margin-bottom: 2px;
   border-radius: var(--radius);
   color: var(--text-secondary);
@@ -185,7 +206,29 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   color: var(--accent-1);
 }
 
-.sidebar-link.active { font-weight: 600; }
+/* In a monochrome palette the active link cannot be signalled by colour alone —
+   ink is already the resting text colour. A gold bar down the leading edge does
+   the work instead, and it is the one place the star mark's gold appears in the
+   chrome. ::before rather than border-left so the row does not shift by 3px
+   when it becomes active. */
+.sidebar-link.active {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sidebar-link.active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 60%;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent-gold);
+}
+
+.sidebar-link.active i { color: var(--accent-gold-text); }
 
 .main-content {
   margin-left: var(--sidebar-width);
@@ -200,18 +243,36 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 .topbar {
   position: sticky;
   top: 0;
-  height: var(--topbar-height);
+  /* min-height, not height: the action buttons on the right wrap onto a second
+     row when they no longer fit (see the media query below). With a fixed
+     height they overflowed instead, and body{overflow-x:hidden} clipped them
+     away with no scrollbar to reach them — which silently removed "Bulk Upload"
+     (the only entry point to the CSV/XLSX importer) and "Add Product" from the
+     products page on any window narrower than ~1200px. */
+  min-height: var(--topbar-height);
   background: rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 8px;
   padding: 0 24px;
   z-index: 1030;
 }
 
 .topbar-left, .topbar-right { display: flex; align-items: center; gap: 16px; }
+
+/* Let the title give up space before the actions do, and truncate rather than
+   push them off the row. The actions are what a page is FOR; the title only
+   repeats what the highlighted sidebar link already says. */
+.topbar-left { min-width: 0; flex-shrink: 1; }
+.topbar-left .page-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* min-width:0 is what actually lets this shrink — a flex item defaults to
+   min-width:auto, which refuses to go below its content width and so overflows
+   the row instead of wrapping. */
+.topbar-right { flex-wrap: wrap; justify-content: flex-end; min-width: 0; flex-shrink: 1; }
 
 .sidebar-toggle {
   width: 36px;
@@ -281,7 +342,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   flex-shrink: 0;
 }
 
-.admin-stat .stat-icon.indigo { background: rgba(200, 75, 49, 0.10); color: var(--accent-1); }
+.admin-stat .stat-icon.indigo { background: rgba(176, 132, 33, 0.10); color: var(--accent-1); }
 .admin-stat .stat-icon.emerald { background: var(--success-bg); color: var(--success); }
 .admin-stat .stat-icon.amber { background: var(--warning-bg); color: var(--warning); }
 .admin-stat .stat-icon.blue { background: var(--info-bg); color: var(--info); }
@@ -350,7 +411,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 .stat-card .stat-value { font-size: 1.75rem; font-weight: 800; color: var(--text-primary); line-height: 1.2; }
 .stat-card .stat-label { font-size: var(--font-size-sm); color: var(--text-muted); margin-top: 0.25rem; }
 
-.stat-card.accent-indigo .stat-icon { background: rgba(200, 75, 49, 0.10); color: var(--accent-1); }
+.stat-card.accent-indigo .stat-icon { background: rgba(176, 132, 33, 0.10); color: var(--accent-1); }
 .stat-card.accent-emerald .stat-icon { background: var(--success-bg); color: var(--success); }
 .stat-card.accent-amber .stat-icon { background: var(--warning-bg); color: var(--warning); }
 .stat-card.accent-blue .stat-icon { background: var(--info-bg); color: var(--info); }
@@ -386,7 +447,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   line-height: 1.2;
 }
 
-.metric-tile.indigo { background: rgba(200, 75, 49, 0.06); border-color: rgba(200, 75, 49, 0.18); }
+.metric-tile.indigo { background: rgba(176, 132, 33, 0.06); border-color: rgba(176, 132, 33, 0.18); }
 .metric-tile.indigo .metric-value { color: var(--accent-1); }
 .metric-tile.emerald { background: var(--success-bg); border-color: rgba(22, 163, 74, 0.18); }
 .metric-tile.emerald .metric-value { color: var(--success); }
@@ -482,7 +543,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 .btn-ghost:hover {
   border-color: var(--accent-1);
   color: var(--accent-1);
-  background: rgba(200, 75, 49, 0.04);
+  background: rgba(176, 132, 33, 0.04);
 }
 
 .btn-danger-ghost {
@@ -517,14 +578,14 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 .btn-primary:focus,
 .btn-primary:active,
 .btn-primary.active {
-  background: linear-gradient(135deg, #A33D28, var(--accent-1));
-  border-color: #A33D28;
+  background: linear-gradient(135deg, var(--accent-2), var(--accent-1));
+  border-color: var(--accent-2);
   color: #fff;
 }
 
 .btn-primary:focus,
 .btn-primary.focus {
-  box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.25);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.25);
 }
 
 .btn-outline-primary {
@@ -536,14 +597,14 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 .btn-outline-primary:focus,
 .btn-outline-primary:active,
 .btn-outline-primary.active {
-  background: rgba(200, 75, 49, 0.08);
+  background: rgba(176, 132, 33, 0.08);
   border-color: var(--accent-1);
   color: var(--accent-1);
 }
 
 .btn-outline-primary:focus,
 .btn-outline-primary.focus {
-  box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.15);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.15);
 }
 
 /* ----------------------------------------------------------------------------- */
@@ -557,7 +618,10 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 }
 
 .form-control, .form-select {
-  background: var(--bg-input);
+  /* background-COLOR, not the `background` shorthand: the shorthand resets
+     background-size/position/repeat and made the select's chevron tile across
+     the whole control as a row of giant arrows. */
+  background-color: var(--bg-input);
   border: 1px solid var(--border-color);
   border-radius: var(--radius);
   padding: 10px 14px;
@@ -567,14 +631,24 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 }
 
 .form-control:focus, .form-select:focus {
-  background: #fff;
+  background-color: #fff;
   border-color: var(--accent-1);
-  box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.12);
+  box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.12);
 }
 
 .form-control::placeholder { color: var(--text-muted); }
 
-.form-select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e"); }
+/* Explicit chevron geometry so the arrow is a single, small icon pinned to the
+   right edge (never tiled), with padding so text can't run underneath it. */
+.form-select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23475569' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 14px 10px;
+  padding-right: 34px;
+  appearance: none;
+  -webkit-appearance: none;
+}
 
 /* ----------------------------------------------------------------------------- */
 /* Badges & Chips                                                                */
@@ -619,7 +693,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   transition: var(--transition);
 }
 
-.filter-chip:hover, .filter-chip.active { border-color: var(--accent-1); color: var(--accent-1); background: rgba(200, 75, 49, 0.04); }
+.filter-chip:hover, .filter-chip.active { border-color: var(--accent-1); color: var(--accent-1); background: rgba(176, 132, 33, 0.04); }
 
 .filter-chip-count {
   background: var(--bg-hover);
@@ -672,19 +746,31 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 
 .product-card-badges { position: absolute; top: 10px; left: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
 
-.product-card-shipping { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+/* .product-card-shipping / .shipping-chip lived here. Both were dropped with
+   the air/sea chips they styled — the landed-cost figures were too cramped to
+   read on a six-per-row card grid. The calculation still runs and is shown in
+   full, with KSA rates and margins, in the product detail modal. */
 
-.shipping-chip {
-  display: inline-flex;
+/* Link out to the supplier's listing, so a buyer can message them about a
+   reorder without hunting down the product again. Staff screens only — which
+   factory supplies a product is never shown to customers. */
+.product-card-supplier {
+  display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 8px;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-full);
-  font-size: 11px;
-  font-weight: 600;
   background: var(--bg-hover);
   color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-decoration: none;
 }
+
+.product-card-supplier:hover { border-color: #B08421; color: #B08421; }
 
 .product-card-actions { display: flex; gap: 8px; margin-top: 12px; }
 
@@ -884,7 +970,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   font-size: 12px;
   font-weight: 600;
   color: var(--accent-1);
-  background: rgba(200, 75, 49, 0.08);
+  background: rgba(176, 132, 33, 0.08);
   padding: 2px 8px;
   border-radius: var(--radius-full);
 }
@@ -935,7 +1021,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
   transition: var(--transition);
 }
 
-.sidebar-search .search-bar input:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.12); }
+.sidebar-search .search-bar input:focus { outline: none; border-color: var(--accent-1); box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.12); }
 .sidebar-search .search-bar input::placeholder { color: var(--text-muted); }
 
 .sidebar-search-results {
@@ -990,7 +1076,7 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 /* Portfolio Drag & Drop                                                         */
 /* ----------------------------------------------------------------------------- */
 .portfolio-row { cursor: grab; transition: var(--transition); }
-.portfolio-row.dragging { opacity: 0.6; cursor: grabbing; background: rgba(200, 75, 49, 0.06); border: 1px dashed var(--accent-1); }
+.portfolio-row.dragging { opacity: 0.6; cursor: grabbing; background: rgba(176, 132, 33, 0.06); border: 1px dashed var(--accent-1); }
 .portfolio-row.drag-over { border-top: 2px solid var(--accent-1); }
 .portfolio-drag-handle { color: var(--text-muted); cursor: grab; padding: 4px; display: inline-flex; align-items: center; justify-content: center; }
 .portfolio-drag-handle:hover { color: var(--accent-1); }
@@ -1049,11 +1135,16 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-primary); margin-bo
 /* ----------------------------------------------------------------------------- */
 /* Focus & Accessibility                                                         */
 /* ----------------------------------------------------------------------------- */
-*:focus-visible { outline: 2px solid var(--accent-1); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(200, 75, 49, 0.12); }
+/* Focus rings are GOLD, not ink. The primary button is now solid black, so a
+   black outline on it would be invisible; gold reads clearly against both the
+   black fills and the off-white surfaces (3.40:1 on white clears the 3:1 that
+   WCAG requires of a non-text focus indicator). The outline-offset keeps a
+   light gap so the ring stays distinct from a dark button edge. */
+*:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(176, 132, 33, 0.20); }
 a:focus-visible { border-radius: 2px; }
-button:focus-visible, .btn:focus-visible, .btn-glow:focus-visible { outline: 2px solid var(--accent-1); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(200, 75, 49, 0.12); }
-input:focus-visible, select:focus-visible, textarea:focus-visible, .form-control:focus-visible { outline: 2px solid var(--accent-1); outline-offset: 0; border-color: var(--accent-1); box-shadow: 0 0 0 3px rgba(200, 75, 49, 0.12); }
-.sidebar-link:focus-visible { outline: 2px solid var(--accent-1); outline-offset: -2px; border-radius: var(--radius); background: var(--bg-hover); }
+button:focus-visible, .btn:focus-visible, .btn-glow:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 2px; box-shadow: 0 0 0 4px rgba(176, 132, 33, 0.20); }
+input:focus-visible, select:focus-visible, textarea:focus-visible, .form-control:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 0; border-color: var(--accent-gold); box-shadow: 0 0 0 3px rgba(176, 132, 33, 0.20); }
+.sidebar-link:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: -2px; border-radius: var(--radius); background: var(--bg-hover); }
 
 .skip-link {
   position: absolute;
@@ -1079,7 +1170,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .form-control
   .sidebar.mobile-open { transform: translateX(0); }
   .main-content { margin-left: 0 !important; }
   .content-area { padding: 16px; }
-  .topbar { padding: 0 16px; }
+  .topbar { padding: 8px 16px; }
   .admin-stats-bar { padding: 12px 16px 0; }
   .admin-stat, .admin-stat-skeleton { min-width: 100px; padding: 8px 12px; }
   .notification-dropdown { width: 280px; right: -40px; }
@@ -1309,3 +1400,579 @@ input:focus-visible, select:focus-visible, textarea:focus-visible, .form-control
   transition: var(--transition);
 }
 .search-clear:hover { color: var(--danger); background: var(--bg-hover); }
+
+/* =============================================================================
+   SaaS POLISH LAYER (indigo redesign)
+   Appended last so it refines the shared components without touching earlier
+   rules. Purely visual depth + a few responsive safeguards.
+   ============================================================================= */
+
+/* Crisp, consistent cards with a soft lift on the interactive ones. */
+.card {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Primary buttons get subtle indigo depth and a gentle hover lift. */
+.btn-primary {
+  box-shadow: 0 1px 2px rgba(176, 132, 33, 0.25);
+  transition: var(--transition);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(176, 132, 33, 0.28);
+}
+
+/* Stat cards lift slightly on hover for a livelier dashboard. */
+.stat-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+.stat-card:hover { transform: translateY(-2px); }
+
+/* Tables: quieter header, roomier rows — the modern SaaS data-table look. */
+.table > thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--font-size-xs);
+  color: var(--text-muted);
+  font-weight: 700;
+  border-bottom: 1px solid var(--border-color);
+}
+.table > tbody td { vertical-align: middle; }
+
+/* Responsive safeguards */
+img { max-width: 100%; height: auto; }
+.table-responsive { -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 575.98px) {
+  .content-area { padding: 12px; }
+  .page-title { font-size: 1.35rem; }
+  .stat-card .stat-value, .u-figure { font-size: 1.5rem; }
+  .card-body { padding: 1rem; }
+}
+
+/* Neutral gray stat-card variant (used by the support queue's "Closed" tile). */
+.stat-card.stat-gray .stat-icon { background: rgba(100, 116, 139, 0.12); color: var(--text-muted); }
+
+/* =============================================================================
+   ORDER FORM MODAL REDESIGN
+   Wide, scrollable dialog with sticky header/footer; shipment blocks read as
+   distinct indigo-accented cards; item rows sit on a quiet surface.
+   ============================================================================= */
+.order-modal .modal-content {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+}
+.order-modal .modal-header {
+  border-bottom: 1px solid var(--border-color);
+  padding: 16px 24px;
+}
+.order-modal .modal-title { font-weight: 800; }
+.order-modal .modal-body { padding: 24px; background: var(--bg-primary); }
+.order-modal .order-modal-footer {
+  border-top: 1px solid var(--border-color);
+  padding: 12px 24px;
+  background: var(--bg-secondary);
+  gap: 8px;
+}
+.order-modal .form-label { font-weight: 600; }
+
+/* Shipment blocks: white card on the grey body with an indigo accent edge. */
+.order-modal .shipment-block {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-left: 3px solid var(--accent-1);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+/* Item rows inside a shipment: quiet inset surface. */
+.order-modal .order-item-row {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+}
+
+/* -----------------------------------------------------------------------------
+   FIX: .animate-fade-in previously started at opacity:0 and waited for JS to add
+   .is-visible — but that observer only exists in portal.js, so back-office page
+   headers stayed permanently invisible. Animate purely in CSS instead: same
+   entrance effect, zero risk of hidden content.
+   ----------------------------------------------------------------------------- */
+.animate-fade-in {
+  opacity: 1;
+  transform: none;
+  animation: fadeSlideIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none; }
+}
+
+
+/* ==========================================================================
+   WEBSITE LEADS INBOX
+   ==========================================================================
+   Laid out as an inbox rather than a table. The message body is the useful
+   content, so it is shown in full — hiding it behind a click adds a step to the
+   only action that matters here, which is replying quickly.
+   ========================================================================== */
+
+.lead-inbox { display: flex; flex-direction: column; gap: 14px; }
+
+.lead-card {
+  padding: 18px 20px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: var(--bg-card, var(--bg-input));
+}
+
+/* Unread leads carry a coloured left edge so the queue is scannable at a glance
+   without reading a single word. */
+.lead-card-unread {
+  border-left: 3px solid var(--accent-gold);
+  background: rgba(245, 158, 11, 0.04);
+}
+
+.lead-card-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.lead-identity { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+
+.lead-name { font-weight: 700; font-size: 15px; }
+
+.lead-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent-gold);
+}
+
+.lead-subject {
+  font-size: 12px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(176, 132, 33, 0.12);
+  color: var(--accent-gold);
+}
+
+.lead-time { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+
+/* Contact details are tap-to-act links. On a phone this turns a lead into a
+   reply in one tap rather than a copy-paste into another app. */
+.lead-contacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+.lead-contacts a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  /* 44px min height is the comfortable touch target on a phone. */
+  min-height: 32px;
+}
+.lead-contacts a:hover { color: var(--accent-gold); text-decoration: underline; }
+.lead-contacts .lead-wa { color: #25d366; }
+
+.lead-message {
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: rgba(148, 163, 184, 0.07);
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.lead-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Sidebar count badges — mirror the header bell so an unanswered queue is
+   visible from any page, not only from the bell dropdown. */
+.sidebar-badge {
+  margin-left: auto;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  /* Gold fill with black text: 5.82:1. White on this gold is only 3.40:1 and
+     would fail at this size. */
+  background: var(--accent-gold);
+  color: var(--text-on-accent);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 18px;
+}
+/* When the sidebar is collapsed to icons the label is hidden, so the badge
+   becomes a small dot pinned to the icon instead of a floating number. */
+.sidebar.collapsed .sidebar-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  margin-left: 0;
+  min-width: 8px;
+  height: 8px;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+
+@media (max-width: 575.98px) {
+  .lead-card { padding: 14px 15px; }
+  .lead-card-head { gap: 6px; }
+  .lead-contacts { gap: 6px 12px; }
+  /* Full-width action button is easier to hit accurately on a phone. */
+  .lead-actions form,
+  .lead-actions .btn { width: 100%; }
+}
+
+
+/* ==========================================================================
+   DASHBOARD — "NEEDS ATTENTION" WORK QUEUE
+   ==========================================================================
+   Each row is a link straight to the filtered list that clears it. The count is
+   the largest element because it is the thing being scanned for; the label
+   explains it, and the arrow signals that the whole row is clickable.
+   ========================================================================== */
+
+.attention-panel { border-left: 4px solid var(--accent-gold); }
+
+.attention-total {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: rgba(176, 132, 33, 0.15);
+  color: var(--accent-gold);
+}
+
+.attention-grid {
+  display: grid;
+  /* auto-fit + minmax means the row count adapts to the viewport with no
+     breakpoints: three across on a desktop, one on a phone. */
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.attention-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  text-decoration: none;
+  transition: var(--transition);
+  /* 56px keeps the whole row a comfortable touch target on a phone. */
+  min-height: 56px;
+}
+.attention-item:hover {
+  transform: translateX(2px);
+  border-color: var(--accent-gold);
+  color: var(--text-primary);
+}
+
+.attention-icon { font-size: 20px; flex-shrink: 0; }
+.attention-count { font-size: 22px; font-weight: 800; line-height: 1; flex-shrink: 0; }
+.attention-label { font-size: 13px; color: var(--text-secondary); line-height: 1.35; }
+.attention-go { margin-left: auto; opacity: 0.4; flex-shrink: 0; }
+
+/* Tone colours carry urgency: red for money owed, amber for people waiting. */
+.attention-amber .attention-icon,
+.attention-amber .attention-count { color: var(--warning); }
+.attention-violet .attention-icon,
+.attention-violet .attention-count { color: var(--accent-gold-text); }
+.attention-info .attention-icon,
+.attention-info .attention-count { color: var(--info); }
+.attention-red .attention-icon,
+.attention-red .attention-count { color: var(--danger); }
+
+.attention-clear {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--success-bg);
+  color: var(--success);
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   BULK ACTION BAR (order list)
+   ==========================================================================
+   Hidden until a row is selected, so it costs nothing when unused.
+   ========================================================================== */
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--accent-gold);
+  border-radius: 10px;
+  background: rgba(176, 132, 33, 0.1);
+}
+.bulk-count { font-size: 13px; }
+.bulk-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* Selected rows are tinted so the selection stays obvious while scrolling a long
+   table — the checkbox alone scrolls out of view. */
+tr.row-selected { background: rgba(176, 132, 33, 0.09) !important; }
+
+/* ==========================================================================
+   DASHBOARD — MOBILE
+   ==========================================================================
+   The dashboard is the page most likely to be opened from a phone (checking
+   figures away from the desk), and it was laid out desktop-first.
+   ========================================================================== */
+
+@media (max-width: 767.98px) {
+  /* Charts get shorter: a 240px canvas on a 360px-wide screen wastes most of the
+     first viewport on one graph, pushing the numbers below the fold. */
+  .chart-box { height: 180px !important; }
+
+  /* Metric tiles two-up rather than five-across, with the value still the
+     dominant element. */
+  .metric-tile { padding: 12px 14px; }
+  .metric-value { font-size: 1.25rem; }
+  .metric-label { font-size: 11px; }
+  .metric-compare { font-size: 10px; }
+
+  .attention-item { padding: 12px 14px; gap: 10px; }
+  .attention-count { font-size: 20px; }
+  .attention-label { font-size: 12px; }
+
+  /* Any table NOT using the .table-stack card treatment scrolls inside its own
+     box rather than forcing the whole page sideways. Dense operational tables
+     (the order list, the shipment tabs) are genuinely better scrolled than
+     stacked — a ten-column row becomes an unreadable tower of labels.
+
+     Deliberately not a direct-child selector: the order table is wrapped in a
+     <form> for bulk selection, and `.glass-card > table` silently stopped
+     matching when that wrapper was added. */
+  .glass-card table:not(.table-stack) {
+    display: block;
+    overflow-x: auto;
+    /* Momentum scrolling on iOS, and a hint that there is more to the right. */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Bulk bar stacks and its buttons go full width — easier to hit accurately. */
+  .bulk-bar { flex-direction: column; align-items: stretch; }
+  .bulk-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .bulk-actions .btn { width: 100%; }
+}
+
+@media (max-width: 575.98px) {
+  .chart-box { height: 160px !important; }
+  .attention-grid { gap: 8px; }
+  /* Single column for the action buttons on the narrowest phones. */
+  .bulk-actions { grid-template-columns: 1fr; }
+}
+
+/* =============================================================================
+   LOADING OVERLAY
+   =============================================================================
+   One shared overlay for every server round-trip, driven from main.js.
+
+   Why an overlay and not a spinner per button: actions are triggered from a
+   dozen places (cards, modal footers, bulk bars, icon rows) and several of them
+   have no button to put a spinner in. More importantly, a bulk action can now
+   cover the whole filtered catalogue, which takes real seconds, and during that
+   time nothing on screen changed - so people clicked again and ran it twice.
+
+   It sits above Bootstrap modals (z-index 1055) on purpose: most actions are
+   launched from inside a modal and the feedback has to be visible there.
+   ========================================================================== */
+.app-loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(10, 10, 10, 0.45);
+    /* Fades in rather than appearing hard, so a slow action does not feel like
+       the page broke. */
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.app-loading-overlay.is-visible {
+    opacity: 1;
+    /* Swallows clicks while a request is in flight. This is the part that stops
+       a second submission of the same action. */
+    pointer-events: auto;
+}
+
+.app-loading-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: min(360px, calc(100vw - 32px));
+    padding: 18px 24px;
+    border: 1px solid var(--border-color, #DFE1E6);
+    border-radius: var(--radius-lg, 16px);
+    background: var(--bg-card, #FFFFFF);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.22);
+}
+
+.app-loading-spinner {
+    flex: 0 0 auto;
+    width: 22px;
+    height: 22px;
+    border: 2.5px solid var(--border-color, #DFE1E6);
+    border-top-color: var(--accent-gold, #B08421);
+    border-radius: 50%;
+    animation: app-loading-spin 0.7s linear infinite;
+}
+
+.app-loading-text {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary, #0A0A0A);
+    line-height: 1.35;
+}
+
+@keyframes app-loading-spin {
+    to { transform: rotate(360deg); }
+}
+
+/* A spinning element is a common migraine and vestibular trigger. The overlay
+   still appears and still blocks input; only the rotation stops. */
+@media (prefers-reduced-motion: reduce) {
+    .app-loading-overlay { transition: none; }
+    .app-loading-spinner {
+        animation: none;
+        border-top-color: var(--accent-gold, #B08421);
+        opacity: 0.75;
+    }
+}
+
+/* =============================================================================
+   SETTINGS TABS
+   =============================================================================
+   The six tabs on /settings/ (Company, Invoicing, Financial, Marketing, Email,
+   Operations) carried no styling at all — they fell through to stock Bootstrap
+   .nav-tabs, which produced three problems at once:
+
+     1. They WRAPPED onto a second row. The card's content column is 606px and
+        the six tabs measured 624px, so an overflow of eighteen pixels doubled
+        the height of the bar to 72px and left a ragged second line of three.
+     2. Stock padding (7px 14px) is what pushed it over that 18px, so the whole
+        thing was self-inflicted.
+     3. The active tab used Bootstrap's default treatment — a white bottom
+        border meant to sit on a white page — which against the card read as a
+        gap rather than a selection.
+
+   The rules below hold the bar on ONE line at any width by scrolling instead of
+   wrapping. That is the part that matters for the future: a seventh tab, or a
+   longer label after translation, can no longer silently double the height.
+   ========================================================================== */
+
+.settings-tabs {
+  /* Never wrap. Overflowing tabs scroll sideways instead of starting a new row. */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 2px;
+
+  border-bottom: 1px solid var(--border-color);
+  margin-bottom: 1.25rem;
+  padding-bottom: 0;
+
+  /* Momentum scrolling on touch, without a scrollbar eating vertical space. */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.settings-tabs::-webkit-scrollbar { display: none; }
+
+.settings-tabs .nav-item { flex: 0 0 auto; }
+
+.settings-tabs .nav-link {
+  /* Tighter than stock, which is what buys the single row back. */
+  padding: 0.5rem 0.7rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--text-muted);
+
+  background: transparent;
+  border: 0;
+  /* The selection indicator. Transparent until active so switching tabs does
+     not shift anything vertically. */
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  transition: color .15s ease, border-color .15s ease;
+}
+
+.settings-tabs .nav-link:hover {
+  color: var(--text-primary);
+  border-bottom-color: var(--border-color);
+  background: transparent;
+}
+
+.settings-tabs .nav-link.active {
+  color: var(--accent-gold-text);
+  background: transparent;
+  border-bottom-color: var(--accent-gold);
+}
+
+.settings-tabs .nav-link:focus-visible {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: -2px;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+}
+
+/* The icons are decoration; drop them on narrow screens so the labels — the
+   part that identifies the tab — survive in the space available. */
+@media (max-width: 576px) {
+  .settings-tabs .nav-link i { display: none; }
+  .settings-tabs .nav-link { padding: 0.5rem 0.6rem; }
+}
+
+/* =============================================================================
+   CHART SIZING
+   =============================================================================
+   The dashboard scrolled sideways by ~100px on any screen narrower than about
+   1400px. The tables were not the cause — measured at 1280 the widest was 919px
+   inside 1005px of content. It was the Chart.js canvases: one rendered 1080px
+   wide and pushed the document out to 1382px.
+
+   The charts already pass `responsive: true`, which sizes the canvas from its
+   PARENT. `.chart-box` set a height and never a width, and it sits inside a
+   Bootstrap column — a flex item, which defaults to `min-width: auto` and so
+   refuses to shrink below its content. Chart.js grows the canvas once, the
+   column locks to that width, and neither ever gives it back. This is the
+   standard flexbox/Chart.js deadlock and it needs both halves broken.
+   ========================================================================== */
+
+/* Half one: let the flex item shrink. Without this `max-width` below has
+   nothing smaller to resolve against. */
+.chart-box { min-width: 0; width: 100%; }
+.glass-card { min-width: 0; }
+.row > [class*="col-"] { min-width: 0; }
+
+/* Half two: cap the canvas. Chart.js writes width/height as inline attributes
+   AND inline style, so this has to outrank both. */
+.chart-box canvas { max-width: 100% !important; }

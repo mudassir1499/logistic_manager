@@ -1,7 +1,28 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
-{% block title %}Portfolio — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% comment %}Page-specific title/description — see the note in contact.html.{% endcomment %}
+{% block title %}Portfolio — China Sourcing Projects We Have Delivered | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Browse sourcing projects we have completed for importers in the UAE and Middle East — the product categories, factories and shipments we have handled from China.{% endblock %}
+{% block meta_keywords %}China sourcing portfolio, sourcing case studies, products sourced from China, importer projects UAE, China supplier projects{% endblock %}
+{% block og_title %}Portfolio — China Sourcing Projects We Have Delivered{% endblock %}
+{% block og_description %}Product categories and sourcing projects we have delivered for importers across the UAE and Middle East.{% endblock %}
+{% block twitter_title %}Portfolio — China Sourcing Projects We Have Delivered{% endblock %}
+{% block twitter_description %}Product categories and sourcing projects we have delivered for importers across the UAE and Middle East.{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Portfolio", "item": "{{ settings.base_url }}/portfolio/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

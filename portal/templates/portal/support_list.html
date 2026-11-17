@@ -1,20 +1,15 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}Support — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% block page_title %}Support{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">Get help with orders, payments, shipping and more</p>{% endblock %}
+{% block page_actions %}<a href="{% url 'portal_support_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New ticket</a>{% endblock %}
+
+{% block page %}
 <section class="py-4">
   <div class="container">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
-      <div>
-        <h4 class="fw-bold mb-1"><i class="bi bi-life-preserver me-2"></i>Support Tickets</h4>
-        <p class="text-secondary mb-0 small">Get help with orders, payments, shipping and more.</p>
-      </div>
-      <a href="{% url 'portal_support_create' %}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>New Ticket
-      </a>
-    </div>
 
     <div class="card">
       <div class="table-responsive">

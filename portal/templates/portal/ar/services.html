@@ -1,0 +1,176 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}Arabic services page — /ar/services/.
+   Same translation caveat as the Arabic homepage: this is Modern Standard Arabic
+   written for meaning rather than translated literally, and it should be reviewed
+   by a native speaker from the target market before you promote it.{% endcomment %}
+
+{% block html_lang %}ar{% endblock %}
+{% block html_dir %}rtl{% endblock %}
+{% block body_class %}has-hero{% endblock %}
+
+{% block extra_css %}
+<link rel="preload" href="{% static 'vendor/fonts/cairo-arabic.woff2' %}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="{% static 'vendor/fonts-ar.css' %}">
+<link rel="stylesheet" href="{% static 'portal-rtl.css' %}">
+{% endblock %}
+
+{% block title %}خدمات التوريد من الصين — تحقق من المصانع وفحص وشحن | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}خدمات توريد متكاملة من الصين لتجّار الإمارات والخليج: البحث عن المصانع، التحقق الميداني من المورّدين، التفاوض على الأسعار، فحص الجودة قبل الشحن، وتنسيق الشحن الجوي والبحري.{% endblock %}
+{% block meta_keywords %}خدمات توريد من الصين، التحقق من المصانع، فحص البضائع قبل الشحن، شحن من الصين الى الامارات، وكيل شراء صيني{% endblock %}
+{% block og_title %}خدمات التوريد من الصين{% endblock %}
+{% block og_description %}البحث عن المصانع، التحقق الميداني، فحص الجودة، وتنسيق الشحن — ينفّذها فريق موجود في الصين.{% endblock %}
+{% block twitter_title %}خدمات التوريد من الصين{% endblock %}
+{% block twitter_description %}البحث عن المصانع، التحقق الميداني، فحص الجودة، وتنسيق الشحن — ينفّذها فريق موجود في الصين.{% endblock %}
+
+{% block canonical_url %}{{ settings.base_url }}{% url 'ar_services_page' %}{% endblock %}
+
+{% block hreflang %}
+<link rel="alternate" hreflang="en" href="{{ settings.base_url }}{% url 'services_page' %}">
+<link rel="alternate" hreflang="ar" href="{{ settings.base_url }}{% url 'ar_services_page' %}">
+<link rel="alternate" hreflang="x-default" href="{{ settings.base_url }}{% url 'services_page' %}">
+{% endblock %}
+
+{% comment %}Arabic navigation and footer. The nav include also carries the
+   switch back to English, so the shared lang_switch block is left empty here
+   to avoid rendering the language link twice.{% endcomment %}
+{% block public_nav %}{% url 'services_page' as lang_switch_target %}{% include 'portal/ar/_nav.html' %}{% endblock %}
+{% block lang_switch %}{% endblock %}
+{% block footer_columns %}{% include 'portal/ar/_footer.html' %}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "خدمات التوريد من الصين",
+  "inLanguage": "ar",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "item": {"@type": "Service", "name": "البحث عن المنتجات", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 2, "item": {"@type": "Service", "name": "التحقق من المورّد", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 3, "item": {"@type": "Service", "name": "فحص الجودة", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 4, "item": {"@type": "Service", "name": "تنسيق الشحن", "provider": {"@id": "{{ settings.base_url }}/#business"}}}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "الرئيسية", "item": "{{ settings.base_url }}/ar/"},
+    {"@type": "ListItem", "position": 2, "name": "الخدمات", "item": "{{ settings.base_url }}/ar/services/"}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="service-hero">
+    <div class="container text-center">
+        <span class="section-label">ماذا نقدّم</span>
+        <h1 class="hero-title">خدماتنا</h1>
+        <p class="hero-subtitle">حلول توريد متكاملة من الصين — من إيجاد المورّد حتى تسليم البضاعة إلى بابك في الخليج.</p>
+        <div class="hero-stats mt-4 d-flex justify-content-center gap-3 flex-wrap">
+            <span class="badge bg-white-10">زيارات ميدانية للمصانع</span>
+            <span class="badge bg-white-10">فحص الجودة</span>
+            <span class="badge bg-white-10">تنسيق الشحن</span>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5">
+            <span class="section-label">الحلول</span>
+            <h2 class="section-title">الخدمات الأساسية</h2>
+            <p class="section-subtitle mx-auto">دعم شامل لعملية الشراء لكل من يستورد من الصين</p>
+        </div>
+        <div class="row g-4">
+
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="{% if site_images.service_sourcing %}{{ site_images.service_sourcing.image.url }}{% else %}{% static 'images/stock/product-sourcing.webp' %}{% endif %}"
+                         alt="البحث عن المنتجات" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
+                    <div class="service-body">
+                        <h2 class="h4 fw-bold mb-2">البحث عن المنتجات</h2>
+                        <p class="text-secondary mb-3">نحدّد المصانع المناسبة لمنتجك بالمواصفات التي تريدها، ونتحقق منها قبل ترشيحها لك.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> البحث عن المورّدين وترشيح الأنسب</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> تقييم القدرة الإنتاجية للمصنع</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> طلب العينات وتقييمها</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> خبرة في فئات منتجات متعددة</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="{% if site_images.service_verification %}{{ site_images.service_verification.image.url }}{% else %}{% static 'images/stock/shipping-coordination.webp' %}{% endif %}"
+                         alt="التحقق من المورّد" class="service-img" width="1200" height="797" loading="lazy" decoding="async">
+                    <div class="service-body">
+                        <h2 class="h4 fw-bold mb-2">التحقق من المورّد</h2>
+                        <p class="text-secondary mb-3">نزور المصنع بأنفسنا ونتحقق من سجلّه التجاري وقدرته الإنتاجية، حتى لا تتعامل مع مورّد غير موثوق.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> زيارة ميدانية للمصنع</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> التحقق من السجل التجاري والشهادات</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> معاينة خطوط الإنتاج</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> تقرير كامل عن المورّد قبل الدفع</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="{% if site_images.service_inspection %}{{ site_images.service_inspection.image.url }}{% else %}{% static 'images/stock/quality-inspection.webp' %}{% endif %}"
+                         alt="فحص الجودة" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
+                    <div class="service-body">
+                        <h2 class="h4 fw-bold mb-2">فحص الجودة</h2>
+                        <p class="text-secondary mb-3">معاينة ما قبل الشحن داخل المصنع للتأكد من مطابقة البضاعة قبل مغادرتها الصين.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> فحص المواصفات والأداء</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> فحص التغليف والملصقات</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> تقرير مصوّر بالصور والفيديو</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> موافقتك قبل الشحن</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="service-detail-card">
+                    <img src="{% if site_images.service_shipping %}{{ site_images.service_shipping.image.url }}{% else %}{% static 'images/stock/order-management.webp' %}{% endif %}"
+                         alt="إدارة الطلب والشحن" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
+                    <div class="service-body">
+                        <h2 class="h4 fw-bold mb-2">إدارة الطلب والشحن</h2>
+                        <p class="text-secondary mb-3">ننسّق الشحن الجوي والبحري من الصين إلى الإمارات والخليج، ونجهّز مستندات التصدير.</p>
+                        <ul class="service-features">
+                            <li><i class="bi bi-check-circle feature-icon"></i> شحن جوي وبحري حسب الأنسب لبضاعتك</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> تجميع بضائع عدة مورّدين في شحنة واحدة</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> تجهيز مستندات التصدير</li>
+                            <li><i class="bi bi-check-circle feature-icon"></i> دعم إجراءات التخليص الجمركي</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">أخبرنا بما تريد استيراده</h2>
+        <p class="text-white-50 mb-4">أرسل تفاصيل المنتج والكمية ووجهة الشحن، وسنعود إليك بعرض سعر مفصّل خلال 24 ساعة.</p>
+        <div class="d-flex gap-3 justify-content-center flex-wrap">
+            <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg" onclick="window.gtagEvent('quote_cta_click',{location:'ar_services'});">اطلب عرض سعر</a>
+            <a href="{% url 'ar_home' %}" class="btn btn-outline-light btn-lg">الصفحة الرئيسية</a>
+        </div>
+    </div>
+</section>
+
+{% endblock %}

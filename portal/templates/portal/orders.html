@@ -1,67 +1,87 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}My Orders — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% block page_title %}My Orders{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">{% if order_count %}{{ order_count }} order{{ order_count|pluralize }} · showing {{ page_obj.start_index }}–{{ page_obj.end_index }}{% else %}Track and view all your orders{% endif %}</p>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-1">My Orders</h4>
-                <p class="text-secondary mb-0 small">Track and view all your orders.</p>
-            </div>
-            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
-            </a>
-        </div>
+        {% if rows %}
 
-        <div class="card shadow-sm border-0">
+        {% comment %}Two renderings of the same rows. The desktop table carries nine
+           columns of money, which inside a horizontal scroller on a phone means the
+           grand total — the one number customers open this page for — sits off-screen.
+           Below lg the cards put it first instead.{% endcomment %}
+        <div class="card shadow-sm border-0 d-none d-lg-block">
             <div class="card-body p-0">
-                {% if orders %}
                 <div class="table-responsive">
-                    <table class="table table-hover align-middle mb-0">
+                    <table class="table table-hover align-middle mb-0 order-table">
                         <thead>
                             <tr>
-                                <th class="ps-4">Order #</th>
+                                <th class="ps-4">Order</th>
                                 <th>Date</th>
-                                <th>Items</th>
-                                <th>Total</th>
-                                <th>Shipping</th>
-                                <th>Grand Total</th>
+                                <th class="text-end">Goods</th>
+                                <th class="text-end">Shipping</th>
+                                <th class="text-end">Commission</th>
+                                <th class="text-end">Grand Total</th>
                                 <th>Status</th>
                                 <th>Payment</th>
-                                <th class="pe-4">Action</th>
+                                <th class="pe-4 text-end">Action</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {% for order in orders %}
+                            {% for row in rows %}
                             <tr>
-                                <td class="ps-4 fw-medium">#{{ order.id }}</td>
-                                <td class="text-secondary small">{{ order.date|date:"M d, Y" }}</td>
-                                <td>{{ order.items.count }}</td>
-                                <td class="fw-medium">{{ order.total }}</td>
-                                <td class="text-secondary">{{ order.shipping_cost }}</td>
-                                <td class="fw-bold">{{ order.total }}</td>
+                                <td class="ps-4">
+                                    <a href="{% url 'portal_order_detail' row.order.id %}" class="fw-semibold text-decoration-none">
+                                        {{ row.order.display_reference }}
+                                    </a>
+                                    <div class="text-secondary" style="font-size:12px;">
+                                        {{ row.order.item_count }} item{{ row.order.item_count|pluralize }}
+                                    </div>
+                                </td>
+                                <td class="text-secondary small">{{ row.order.date|date:"M d, Y" }}</td>
+                                <td class="text-end">{{ row.subtotal|floatformat:2 }}</td>
+                                <td class="text-end text-secondary">
+                                    {% if row.order.show_shipping_details %}
+                                    {{ row.shipping|floatformat:2 }}
+                                    {% else %}
+                                    <span title="Shipping is quoted separately for this order">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if row.commission %}
+                                    <span class="commission-amount">{{ row.commission|floatformat:2 }}</span>
+                                    {% if row.order.commission_percentage %}
+                                    <div class="text-secondary" style="font-size:12px;">{{ row.order.commission_percentage|floatformat:"-2" }}%</div>
+                                    {% endif %}
+                                    {% else %}
+                                    <span class="text-secondary">—</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end fw-bold">{{ row.grand_total|floatformat:2 }} <span class="text-secondary fw-normal" style="font-size:12px;">{{ settings.currency_symbol }}</span></td>
                                 <td>
-                                    {% if order.status == 'confirmed' %}
+                                    {% if row.order.status == 'confirmed' %}
                                     <span class="status-badge confirmed">Confirmed</span>
                                     {% else %}
-                                    <span class="status-badge pending">{{ order.status|title }}</span>
+                                    <span class="status-badge pending">{{ row.order.status|title }}</span>
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if order.payment_status == 'paid' %}
+                                    {% if row.order.payment_status == 'paid' %}
                                     <span class="status-badge paid">Paid</span>
-                                    {% elif order.payment_status == 'partial' %}
+                                    {% elif row.order.payment_status == 'partial' %}
                                     <span class="status-badge partial">Partial</span>
                                     {% else %}
                                     <span class="status-badge unpaid">Unpaid</span>
                                     {% endif %}
                                 </td>
-                                <td class="pe-4">
-                                    <a href="{% url 'portal_order_detail' order.id %}" class="btn btn-sm btn-primary">
+                                <td class="pe-4 text-end">
+                                    <a href="{% url 'portal_order_detail' row.order.id %}" class="btn btn-sm btn-primary">
                                         <i class="bi bi-eye"></i> View
                                     </a>
                                 </td>
@@ -70,14 +90,71 @@
                         </tbody>
                     </table>
                 </div>
-                {% else %}
-                <div class="text-center py-5">
-                    <i class="bi bi-inbox fs-1 text-muted"></i>
-                    <p class="text-secondary mt-2 mb-0">No orders found.</p>
-                </div>
-                {% endif %}
             </div>
         </div>
+
+        <div class="d-lg-none d-grid gap-3">
+            {% for row in rows %}
+            <a href="{% url 'portal_order_detail' row.order.id %}" class="order-card">
+                <div class="d-flex align-items-start justify-content-between gap-2 mb-2">
+                    <div>
+                        <div class="fw-semibold">{{ row.order.display_reference }}</div>
+                        <div class="text-secondary" style="font-size:12px;">
+                            {{ row.order.date|date:"M d, Y" }} · {{ row.order.item_count }} item{{ row.order.item_count|pluralize }}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="fw-bold">{{ row.grand_total|floatformat:2 }}</div>
+                        <div class="text-secondary" style="font-size:12px;">{{ settings.currency_symbol }}</div>
+                    </div>
+                </div>
+                <div class="order-card-breakdown">
+                    <span>Goods <strong>{{ row.subtotal|floatformat:2 }}</strong></span>
+                    {% if row.order.show_shipping_details %}
+                    <span>Shipping <strong>{{ row.shipping|floatformat:2 }}</strong></span>
+                    {% endif %}
+                    {% if row.commission %}
+                    <span>Commission
+                        <strong class="commission-amount">{{ row.commission|floatformat:2 }}</strong>{% if row.order.commission_percentage %} <span class="text-secondary">({{ row.order.commission_percentage|floatformat:"-2" }}%)</span>{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-center gap-2 mt-2 flex-wrap">
+                    {% if row.order.status == 'confirmed' %}
+                    <span class="status-badge confirmed">Confirmed</span>
+                    {% else %}
+                    <span class="status-badge pending">{{ row.order.status|title }}</span>
+                    {% endif %}
+                    {% if row.order.payment_status == 'paid' %}
+                    <span class="status-badge paid">Paid</span>
+                    {% elif row.order.payment_status == 'partial' %}
+                    <span class="status-badge partial">Partial</span>
+                    {% else %}
+                    <span class="status-badge unpaid">Unpaid</span>
+                    {% endif %}
+                    <i class="bi bi-chevron-right ms-auto text-secondary"></i>
+                </div>
+            </a>
+            {% endfor %}
+        </div>
+
+        {% else %}
+        <div class="card shadow-sm border-0">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-inbox fs-1 text-muted"></i>
+                <h6 class="fw-bold mt-3 mb-1">No orders yet</h6>
+                <p class="text-secondary small mb-3">Browse your catalogue or request a quote to get started.</p>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    <a href="{% url 'portal_products' %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-box-seam me-1"></i>Browse Products
+                    </a>
+                    <a href="{% url 'request_quote' %}" class="btn btn-outline-primary btn-sm">
+                        <i class="bi bi-clipboard-check me-1"></i>Request a Quote
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </section>
 

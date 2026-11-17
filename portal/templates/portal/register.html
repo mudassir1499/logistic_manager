@@ -3,6 +3,13 @@
 
 {% block title %}Register — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 
+{% comment %}Login/registration/password pages hold no content anyone would search
+   for, and indexing them dilutes the site's topical relevance. robots.txt already
+   blocks /portal/, but robots.txt only stops crawling — a URL linked from
+   elsewhere can still be indexed as a bare link. This tag is what actually keeps
+   them out of the index.{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
 {% block content %}
 
 <section class="auth-section">
@@ -23,37 +30,37 @@
                         <div class="row g-3">
                             <div class="col-md-6">
                                 <div class="auth-input-group">
-                                    <label>Full Name <span class="text-danger">*</span></label>
+                                    <label for="id_name">Full Name <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-person"></i></span>
-                                        <input type="text" name="name" class="form-control" placeholder="John Doe" required autofocus>
+                                        <input type="text" name="name" id="id_name" autocomplete="name" class="form-control" placeholder="John Doe" required autofocus>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <div class="auth-input-group">
-                                    <label>Phone <span class="text-danger">*</span></label>
+                                    <label for="id_phone">Phone <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-telephone"></i></span>
-                                        <input type="text" name="phone" class="form-control" placeholder="+971 5x xxx xxxx" required>
+                                        <input type="text" name="phone" id="id_phone" autocomplete="tel" class="form-control" placeholder="+971 5x xxx xxxx" required>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="auth-input-group">
-                                    <label>Email <span class="text-danger">*</span></label>
+                                    <label for="id_email">Email <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                                        <input type="email" name="email" class="form-control" placeholder="your@email.com" required>
+                                        <input type="email" name="email" id="id_email" autocomplete="email" class="form-control" placeholder="your@email.com" required>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-12">
                                 <div class="auth-input-group">
-                                    <label>Password <span class="text-danger">*</span></label>
+                                    <label for="passwordInput">Password <span class="text-danger">*</span></label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                                        <input type="password" name="password" class="form-control" placeholder="Min 8 characters, 1 uppercase, 1 lowercase, 1 digit" required minlength="8" id="passwordInput">
+                                        <input type="password" name="password" class="form-control" placeholder="Min 8 characters, 1 uppercase, 1 lowercase, 1 digit" required minlength="8" id="passwordInput" autocomplete="new-password">
                                         <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
                                             <i class="bi bi-eye"></i>
                                         </button>
@@ -72,10 +79,10 @@
                             </div>
                             <div class="col-12">
                                 <div class="auth-input-group">
-                                    <label>Address</label>
+                                    <label for="id_address">Address</label>
                                     <div class="input-group">
                                         <span class="input-group-text"><i class="bi bi-geo-alt"></i></span>
-                                        <textarea name="address" class="form-control" rows="2" placeholder="Your business address"></textarea>
+                                        <textarea name="address" id="id_address" autocomplete="street-address" class="form-control" rows="2" placeholder="Your business address"></textarea>
                                     </div>
                                 </div>
                             </div>
@@ -123,7 +130,10 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         });
         const data = await response.json();
         if (data.success) {
-            if (typeof fbq === 'function') fbq('track', 'Lead');
+            // CompleteRegistration, not Lead: both platforms have a dedicated
+            // event for it, and collapsing the two made a new account and an
+            // enquiry indistinguishable in reporting.
+            if (typeof window.trackEvent === 'function') window.trackEvent('sign_up', {});
             alertDiv.textContent = data.message || 'Registration successful!';
             alertDiv.classList.remove('d-none', 'alert-danger');
             alertDiv.classList.add('alert-success');
@@ -163,7 +173,7 @@ document.getElementById('registerForm').addEventListener('submit', async functio
         if (/[a-z]/.test(val)) score++;
         if (/[A-Z]/.test(val)) score++;
         if (/\d/.test(val)) score++;
-        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+        const colors = ['#B3261E', '#C2410C', '#44546A', '#157F4A'];
         const labels = ['Weak', 'Fair', 'Good', 'Strong'];
         bars.forEach((bar, index) => {
             if (index < score) {

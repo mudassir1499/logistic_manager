@@ -1,0 +1,226 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}=============================================================================
+   SIGNED-IN PORTAL SHELL
+   =============================================================================
+   Every page behind the customer login extends this instead of portal/base.html.
+
+   Why it exists: base.html serves the public marketing site, and the signed-in
+   portal was wearing that chrome. Ten destinations — Dashboard, Portfolio,
+   Orders, Cart, Requests, Products, Ledger, Support, Notifications, account —
+   were competing for room in one horizontal navbar, which on a phone collapsed
+   into a single undifferentiated hamburger list. A marketing navbar tops out at
+   about five items; an operational tool needs somewhere for the eleventh.
+
+   The shell keeps base.html's <head>, scripts, analytics and toast container by
+   inheriting them, and replaces only the navigation, main region and footer. So
+   the public site is untouched by anything in this file.
+
+   Child pages override {% block page %}, NOT {% block content %} — content is
+   used here to build the shell.
+   ============================================================================={% endcomment %}
+
+{% block body_class %}portal-app{% endblock %}
+
+{% comment %}base.html offsets the body for its fixed navbar. There is no fixed
+   navbar here, so the offset would just be a dead band above the sidebar.{% endcomment %}
+{% block body_offset %}{% endblock %}
+
+{% block site_nav %}{% endblock %}
+
+{% comment %}The marketing footer is eleven quick links, a company blurb and a social
+   row — appropriate when the goal is to keep a visitor on the site, pure noise
+   under a page whose job is to show an invoice. The shell ends with a single
+   line instead.{% endcomment %}
+{% block site_footer %}{% endblock %}
+
+{% block main_region %}
+<div class="app-shell">
+
+    {% comment %}--------------------------------------------------------------
+       SIDEBAR
+       ---------------------------------------------------------------
+       Persistent from lg up; an off-canvas drawer below that, toggled by the
+       topbar hamburger (portal.js). Items are grouped because eleven flat links
+       is a list to be read, whereas four labelled groups is a structure to be
+       scanned — the customer already knows whether they want money, goods or
+       help before they start looking.
+
+       aria-current="page" marks the active item for screen readers; the styling
+       hangs off the same .active class so the two can never disagree.
+       --------------------------------------------------------------{% endcomment %}
+    <aside class="app-sidebar" id="appSidebar" aria-label="Portal navigation">
+
+        <div class="app-sidebar-brand">
+            <a href="{% url 'portal_dashboard' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}"
+                     alt="" width="32" height="32" style="border-radius:8px;object-fit:contain;" decoding="async">
+                <span class="app-sidebar-brand-text">{{ settings.company_name|default:"LogiManager" }}</span>
+            </a>
+            {% comment %}Closes the drawer on mobile. Hidden from the persistent
+               desktop sidebar, where there is nothing to close.{% endcomment %}
+            <button class="app-sidebar-close d-lg-none" type="button" data-app-sidebar-close aria-label="Close navigation">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+
+        <nav class="app-sidebar-nav">
+            {% with url_name=request.resolver_match.url_name %}
+
+            <a class="app-nav-link {% if url_name == 'portal_dashboard' %}active{% endif %}"
+               href="{% url 'portal_dashboard' %}" {% if url_name == 'portal_dashboard' %}aria-current="page"{% endif %}>
+                <i class="bi bi-grid-1x2"></i><span>Dashboard</span>
+            </a>
+
+            <div class="app-nav-group-label">Orders</div>
+
+            <a class="app-nav-link {% if url_name == 'portal_orders' or url_name == 'portal_order_detail' %}active{% endif %}"
+               href="{% url 'portal_orders' %}" {% if url_name == 'portal_orders' %}aria-current="page"{% endif %}>
+                <i class="bi bi-receipt"></i><span>My Orders</span>
+            </a>
+            <a class="app-nav-link {% if url_name == 'portal_cart' or url_name == 'portal_checkout' %}active{% endif %}"
+               href="{% url 'portal_cart' %}" {% if url_name == 'portal_cart' %}aria-current="page"{% endif %}>
+                <i class="bi bi-cart3"></i><span>Cart</span>
+                <span class="app-nav-badge cart-badge-count {% if not customer_cart_count %}d-none{% endif %}">{{ customer_cart_count }}</span>
+            </a>
+            <a class="app-nav-link {% if url_name == 'my_requests' or url_name == 'request_quote' %}active{% endif %}"
+               href="{% url 'my_requests' %}" {% if url_name == 'my_requests' %}aria-current="page"{% endif %}>
+                <i class="bi bi-clipboard-check"></i><span>Quote Requests</span>
+            </a>
+
+            <div class="app-nav-group-label">Catalogue</div>
+
+            <a class="app-nav-link {% if url_name == 'portal_products' %}active{% endif %}"
+               href="{% url 'portal_products' %}" {% if url_name == 'portal_products' %}aria-current="page"{% endif %}>
+                <i class="bi bi-box-seam"></i><span>My Products</span>
+            </a>
+            {% comment %}One browse destination. Marketplace, Amazon and Noon were
+               three views of the same catalogue split by a `source` field that is
+               'general' on every product the sourcing extension imports — so two
+               of them were permanently empty and the third duplicated /shop/.
+               The public catalogue lists everything and is the single entry point.
+            {% endcomment %}
+            <a class="app-nav-link {% if url_name == 'shop_index' %}active{% endif %}"
+               href="{% url 'shop_index' %}" {% if url_name == 'shop_index' %}aria-current="page"{% endif %}>
+                <i class="bi bi-grid"></i><span>Browse Products</span>
+            </a>
+
+            <div class="app-nav-group-label">Finance</div>
+
+            <a class="app-nav-link {% if url_name == 'portal_ledger' %}active{% endif %}"
+               href="{% url 'portal_ledger' %}" {% if url_name == 'portal_ledger' %}aria-current="page"{% endif %}>
+                <i class="bi bi-journal-text"></i><span>Ledger</span>
+            </a>
+
+            <div class="app-nav-group-label">Help</div>
+
+            <a class="app-nav-link {% if url_name == 'portal_support_list' or url_name == 'portal_support_detail' or url_name == 'portal_support_create' %}active{% endif %}"
+               href="{% url 'portal_support_list' %}" {% if url_name == 'portal_support_list' %}aria-current="page"{% endif %}>
+                <i class="bi bi-life-preserver"></i><span>Support</span>
+                {% if customer_open_tickets %}<span class="app-nav-badge">{{ customer_open_tickets }}</span>{% endif %}
+            </a>
+            <a class="app-nav-link {% if url_name == 'portal_notifications' %}active{% endif %}"
+               href="{% url 'portal_notifications' %}" {% if url_name == 'portal_notifications' %}aria-current="page"{% endif %}>
+                <i class="bi bi-bell"></i><span>Notifications</span>
+                {% if customer_unread_notifications %}<span class="app-nav-badge danger">{{ customer_unread_notifications }}</span>{% endif %}
+            </a>
+
+            {% endwith %}
+        </nav>
+
+        {% comment %}A way back to the public site. Without it the portal is a
+           one-way door — the brand mark now goes to the dashboard, so this is the
+           only route back to the marketing pages.{% endcomment %}
+        <div class="app-sidebar-foot">
+            <a class="app-nav-link subtle" href="/">
+                <i class="bi bi-box-arrow-up-right"></i><span>Main website</span>
+            </a>
+        </div>
+    </aside>
+
+    {% comment %}Click-catcher behind the mobile drawer. aria-hidden because it is
+       decoration — the drawer's own close button is the accessible control.{% endcomment %}
+    <div class="app-sidebar-backdrop" data-app-sidebar-close aria-hidden="true"></div>
+
+    <div class="app-main">
+
+        {% comment %}--------------------------------------------------------------
+           TOPBAR
+           ---------------------------------------------------------------
+           Deliberately thin: the hamburger (mobile only), the page title, and the
+           account menu. Navigation lives in the sidebar, so nothing competes here.
+           The page title is a block, so each page names itself in one line rather
+           than repeating a heading + back-link cluster in its own markup.
+           --------------------------------------------------------------{% endcomment %}
+        <header class="app-topbar">
+            <button class="app-sidebar-toggle d-lg-none" type="button" id="appSidebarToggle"
+                    aria-label="Open navigation" aria-expanded="false" aria-controls="appSidebar">
+                <i class="bi bi-list"></i>
+            </button>
+
+            <div class="app-topbar-heading">
+                <h1 class="app-topbar-title">{% block page_title %}{% endblock %}</h1>
+                {% block page_subtitle %}{% endblock %}
+            </div>
+
+            <div class="app-topbar-actions">
+                {% block page_actions %}{% endblock %}
+
+                <a href="{% url 'portal_cart' %}" class="app-icon-btn d-none d-sm-inline-flex" aria-label="Cart" title="Cart">
+                    <i class="bi bi-cart3"></i>
+                    <span class="app-icon-badge cart-badge-count {% if not customer_cart_count %}d-none{% endif %}">{{ customer_cart_count }}</span>
+                </a>
+
+                <a href="{% url 'portal_notifications' %}" class="app-icon-btn d-none d-sm-inline-flex" aria-label="Notifications" title="Notifications">
+                    <i class="bi bi-bell"></i>
+                    {% if customer_unread_notifications %}
+                    <span class="app-icon-badge danger">{{ customer_unread_notifications }}</span>
+                    {% endif %}
+                </a>
+
+                <div class="dropdown">
+                    <button class="app-account-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <span class="avatar-sm">{{ portal_customer.name|first|upper|default:"?" }}</span>
+                        <span class="app-account-name d-none d-md-inline">{{ portal_customer.name|truncatechars:18|default:"Account" }}</span>
+                        <i class="bi bi-chevron-down d-none d-md-inline" style="font-size:11px;"></i>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-end shadow">
+                        <li><a class="dropdown-item" href="{% url 'portal_profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
+                        <li><a class="dropdown-item" href="{% url 'my_account' %}"><i class="bi bi-shield-lock me-2"></i>Security &amp; 2FA</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger" href="{% url 'portal_logout' %}"><i class="bi bi-box-arrow-right me-2"></i>Log Out</a></li>
+                    </ul>
+                </div>
+            </div>
+        </header>
+
+        <main id="main-content" class="app-content">
+
+            {% if portal_customer and current_profile and not current_profile.email_verified %}
+            <div class="alert alert-warning d-flex align-items-center justify-content-between flex-wrap gap-2 py-2 small">
+                <div><i class="bi bi-envelope-exclamation me-2"></i>Please verify your email address to secure your account.</div>
+                <a href="{% url 'account_resend_verification' %}" class="btn btn-sm btn-warning">Resend verification email</a>
+            </div>
+            {% endif %}
+
+            {% if messages %}
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle me-2"></i>{{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+            {% endfor %}
+            {% endif %}
+
+            {% block page %}{% endblock %}
+        </main>
+
+        <footer class="app-footer">
+            &copy; {% now "Y" %} {{ settings.company_name|default:"LogiManager" }}
+            <span class="app-footer-sep">·</span>
+            <a href="{% url 'portal_support_create' %}">Need help?</a>
+        </footer>
+    </div>
+</div>
+{% endblock %}

@@ -1,24 +1,26 @@
 
 
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}Checkout — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% comment %}Login/registration/password pages hold no content anyone would search
+   for, and indexing them dilutes the site's topical relevance. robots.txt already
+   blocks /portal/, but robots.txt only stops crawling — a URL linked from
+   elsewhere can still be indexed as a bare link. This tag is what actually keeps
+   them out of the index.{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block page_title %}Checkout{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">Review your order before confirming</p>{% endblock %}
+{% block page_actions %}<a href="{% url 'portal_cart' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to cart</a>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
         
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-1">Checkout</h4>
-                <p class="text-secondary mb-0 small">Review your order before confirming.</p>
-            </div>
-            <a href="{% url 'portal_cart' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back to Cart
-            </a>
-        </div>
 
         <div class="row g-4">
             
@@ -43,9 +45,9 @@
                                     <tr>
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
-                                                {% with img=item.product.images.first %}
+                                                {% with img=item.product.images.all|first %}
                                                 {% if img %}
-                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                <img src="{{ img.src }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
                                                 {% else %}
                                                 <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                                                     <i class="bi bi-image text-muted"></i>
@@ -53,11 +55,12 @@
                                                 {% endif %}
                                                 {% endwith %}
                                                 <span class="fw-medium">{{ item.product.name }}</span>
+{% if item.variant %}<br><small class="text-secondary">{{ item.variant.name }}</small>{% endif %}
                                             </div>
                                         </td>
-                                        <td>{{ item.product.price }} {{ settings.currency }}</td>
+                                        <td>{{ item.unit_price }} {{ settings.currency_symbol }}</td>
                                         <td>{{ item.quantity }}</td>
-                                        <td class="fw-medium">{{ item.subtotal }} {{ settings.currency }}</td>
+                                        <td class="fw-medium">{{ item.subtotal }} {{ settings.currency_symbol }}</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -78,43 +81,43 @@
                         {% for item in ready_to_ship_items %}
                         <div class="mb-4 p-3 rounded" style="background:var(--bg-input);border:1px solid var(--border-color);">
                             <div class="d-flex align-items-center gap-2 mb-3">
-                                {% with img=item.product.images.first %}
+                                {% with img=item.product.images.all|first %}
                                 {% if img %}
-                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                <img src="{{ img.src }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
                                 {% else %}
                                 <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                                     <i class="bi bi-image text-muted"></i>
                                 </div>
                                 {% endif %}
                                 {% endwith %}
-                                <strong>{{ item.product.name }}</strong>
+                                <strong>{{ item.product.name }}</strong>{% if item.variant %} <span class="text-secondary">({{ item.variant.name }})</span>{% endif %}
                                 <span class="badge bg-success">Ready to Ship</span>
                             </div>
                             <div class="row g-3">
                                 {% with prefix='item_'|add:item.id|stringformat:'s' %}
                                 <div class="col-md-6">
-                                    <label class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Shipping Label File</label>
-                                    <input type="file" name="{{ prefix }}_shipping_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
+                                    <label for="{{ prefix }}_shipping_label" class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Shipping Label File</label>
+                                    <input id="{{ prefix }}_shipping_label" type="file" name="{{ prefix }}_shipping_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Carton Label File</label>
-                                    <input type="file" name="{{ prefix }}_carton_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
+                                    <label for="{{ prefix }}_carton_label" class="form-label"><i class="bi bi-file-earmark-arrow-up me-1"></i>Carton Label File</label>
+                                    <input id="{{ prefix }}_carton_label" type="file" name="{{ prefix }}_carton_label" class="form-control" accept=".pdf,.png,.jpg,.jpeg">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Label Mark</label>
-                                    <input type="text" name="{{ prefix }}_label_mark" class="form-control" placeholder="e.g. SKU / FNSKU">
+                                    <label for="{{ prefix }}_label_mark" class="form-label">Label Mark</label>
+                                    <input id="{{ prefix }}_label_mark" type="text" name="{{ prefix }}_label_mark" class="form-control" placeholder="e.g. SKU / FNSKU">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Carton Mark</label>
-                                    <input type="text" name="{{ prefix }}_carton_mark" class="form-control" placeholder="e.g. Carton ID">
+                                    <label for="{{ prefix }}_carton_mark" class="form-label">Carton Mark</label>
+                                    <input id="{{ prefix }}_carton_mark" type="text" name="{{ prefix }}_carton_mark" class="form-control" placeholder="e.g. Carton ID">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Carton ASN</label>
-                                    <input type="text" name="{{ prefix }}_carton_asn" class="form-control" placeholder="ASN number">
+                                    <label for="{{ prefix }}_carton_asn" class="form-label">Carton ASN</label>
+                                    <input id="{{ prefix }}_carton_asn" type="text" name="{{ prefix }}_carton_asn" class="form-control" placeholder="ASN number">
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label">Carton Quantity</label>
-                                    <input type="number" name="{{ prefix }}_carton_quantity" class="form-control" value="1" min="1">
+                                    <label for="{{ prefix }}_carton_quantity" class="form-label">Carton Quantity</label>
+                                    <input id="{{ prefix }}_carton_quantity" type="number" name="{{ prefix }}_carton_quantity" class="form-control" value="1" min="1">
                                 </div>
                                 {% endwith %}
                             </div>
@@ -160,12 +163,12 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-secondary">Subtotal</span>
-                            <span class="fw-medium">{{ cart_total }} {{ settings.currency }}</span>
+                            <span class="fw-medium">{{ cart_total }} {{ settings.currency_symbol }}</span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
                             <span class="fw-bold">Total</span>
-                            <span class="fw-bold fs-5 text-primary">{{ cart_total }} {{ settings.currency }}</span>
+                            <span class="fw-bold fs-5 text-primary">{{ cart_total }} {{ settings.currency_symbol }}</span>
                         </div>
 
                         
@@ -200,4 +203,22 @@
     </div>
 </section>
 
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}InitiateCheckout. num_items and value are what make this event worth
+   firing — an InitiateCheckout with no value tells the platform someone reached
+   a page, which it already knew from PageView.
+{% endcomment %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    if (typeof window.trackEvent !== 'function') { return; }
+    window.trackEvent('begin_checkout', {
+      value: '{{ cart_total|stringformat:"s" }}',
+      num_items: {{ items|length }},
+      content_type: 'product',
+      content_ids: [{% for i in items %}'{{ i.product.id }}'{% if not forloop.last %},{% endif %}{% endfor %}]
+    });
+  });
+</script>
 {% endblock %}

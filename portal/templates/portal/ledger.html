@@ -1,21 +1,15 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}My Ledger — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% block page_title %}My Ledger{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">Transaction history and balances</p>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-1">My Ledger</h4>
-                <p class="text-secondary mb-0 small">View your transaction history and balances.</p>
-            </div>
-            <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back to Dashboard
-            </a>
-        </div>
 
         <div class="row g-3 mb-4">
             {% for currency, balance in balances.items %}
@@ -52,8 +46,23 @@
         </div>
 
         <div class="card shadow-sm border-0">
-            <div class="card-header py-3">
-                <h5 class="fw-bold mb-0"><i class="bi bi-list-ul me-2 text-primary"></i>Transaction History</h5>
+            <div class="card-header py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <h5 class="fw-bold mb-0"><i class="bi bi-list-ul me-2 text-primary"></i>Transaction History
+                    <span class="badge bg-light text-dark border ms-2 fw-normal">{{ selected_label }}</span>
+                </h5>
+                <div class="d-flex align-items-center gap-2">
+                    <form method="get" class="d-flex align-items-center gap-2">
+                        <select name="month" class="form-select form-select-sm" onchange="this.form.submit()" aria-label="Filter ledger by month">
+                            {% for m in available_months %}
+                            <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>{{ m.label }}</option>
+                            {% endfor %}
+                            <option value="all" {% if selected_month == 'all' %}selected{% endif %}>All history</option>
+                        </select>
+                    </form>
+                    <a href="?month={{ selected_month }}&export=xlsx" class="btn btn-sm btn-outline-primary text-nowrap">
+                        <i class="bi bi-download me-1"></i>Statement
+                    </a>
+                </div>
             </div>
             <div class="card-body p-0">
                 {% if entries_with_running %}

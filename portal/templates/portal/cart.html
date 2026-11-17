@@ -1,24 +1,25 @@
 
 
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}My Cart — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% comment %}Login/registration/password pages hold no content anyone would search
+   for, and indexing them dilutes the site's topical relevance. robots.txt already
+   blocks /portal/, but robots.txt only stops crawling — a URL linked from
+   elsewhere can still be indexed as a bare link. This tag is what actually keeps
+   them out of the index.{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block page_title %}My Cart{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">Review your items before checkout</p>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
         
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-1">My Cart</h4>
-                <p class="text-secondary mb-0 small">Review your items before checkout.</p>
-            </div>
-            <a href="{% url 'portal_products' %}" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-left me-1"></i>Back to Products
-            </a>
-        </div>
 
         {% if items %}
         <div class="row g-4">
@@ -45,9 +46,9 @@
                                     <tr data-item-id="{{ item.id }}">
                                         <td class="ps-4">
                                             <div class="d-flex align-items-center gap-2">
-                                                {% with img=item.product.images.first %}
+                                                {% with img=item.product.images.all|first %}
                                                 {% if img %}
-                                                <img src="{{ img.image.url }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
+                                                <img src="{{ img.src }}" alt="" class="rounded" style="width:40px;height:40px;object-fit:cover;">
                                                 {% else %}
                                                 <div class="bg-light rounded d-flex align-items-center justify-content-center" style="width:40px;height:40px;">
                                                     <i class="bi bi-image text-muted"></i>
@@ -56,17 +57,18 @@
                                                 {% endwith %}
                                                 <div>
                                                     <span class="fw-medium">{{ item.product.name }}</span>
+{% if item.variant %}<br><small class="text-secondary">{{ item.variant.name }}</small>{% endif %}
                                                     {% if item.product.ready_to_ship %}
                                                     <br><span class="badge bg-success" style="font-size:10px;"><i class="bi bi-truck me-1"></i>Ready to Ship — labels at checkout</span>
                                                     {% endif %}
                                                 </div>
                                             </div>
                                         </td>
-                                        <td>{{ item.product.price }} {{ settings.currency }}</td>
+                                        <td>{{ item.unit_price }} {{ settings.currency_symbol }}</td>
                                         <td>
-                                            <input type="number" class="form-control form-control-sm cart-qty-input" value="{{ item.quantity }}" min="1" data-item-id="{{ item.id }}" style="width:70px;">
+                                            <input type="number" class="form-control form-control-sm cart-qty-input" value="{{ item.quantity }}" min="1" data-item-id="{{ item.id }}" style="width:70px;" aria-label="Quantity for {{ item.product.name }}">
                                         </td>
-                                        <td class="fw-medium item-subtotal">{{ item.subtotal }} {{ settings.currency }}</td>
+                                        <td class="fw-medium item-subtotal">{{ item.subtotal }} {{ settings.currency_symbol }}</td>
                                         <td>
                                             <a href="{% url 'portal_remove_from_cart' item.id %}" class="btn btn-link text-danger p-0" onclick="return confirm('Remove this item from your cart?');">
                                                 <i class="bi bi-trash"></i>
@@ -90,12 +92,12 @@
                     <div class="card-body">
                         <div class="d-flex justify-content-between mb-2">
                             <span class="text-secondary">Subtotal</span>
-                            <span class="fw-medium" id="cartSubtotal">{{ cart_total }} {{ settings.currency }}</span>
+                            <span class="fw-medium" id="cartSubtotal">{{ cart_total }} {{ settings.currency_symbol }}</span>
                         </div>
                         <hr>
                         <div class="d-flex justify-content-between mb-3">
                             <span class="fw-bold">Total</span>
-                            <span class="fw-bold fs-5 text-primary" id="cartTotal">{{ cart_total }} {{ settings.currency }}</span>
+                            <span class="fw-bold fs-5 text-primary" id="cartTotal">{{ cart_total }} {{ settings.currency_symbol }}</span>
                         </div>
 
                         
@@ -183,13 +185,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         if (row) {
                             const subtotalCell = row.querySelector('.item-subtotal');
                             if (subtotalCell) {
-                                subtotalCell.textContent = data.subtotal + ' {{ settings.currency }}';
+                                subtotalCell.textContent = data.subtotal + ' {{ settings.currency_symbol }}';
                             }
                         }
                     }
                     // Update overall totals.
-                    document.getElementById('cartSubtotal').textContent = data.cart_total + ' {{ settings.currency }}';
-                    document.getElementById('cartTotal').textContent = data.cart_total + ' {{ settings.currency }}';
+                    document.getElementById('cartSubtotal').textContent = data.cart_total + ' {{ settings.currency_symbol }}';
+                    document.getElementById('cartTotal').textContent = data.cart_total + ' {{ settings.currency_symbol }}';
                     showToast(data.message, 'success');
                 } else {
                     showToast(data.message || 'Update failed.', 'error');

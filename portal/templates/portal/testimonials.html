@@ -1,13 +1,46 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
 {% block title %}Testimonials — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
-{% block meta_description %}See what our clients say about working with {{ settings.company_name|default:"LogiManager" }}. Trusted by 300+ businesses for China sourcing and product procurement.{% endblock %}
+{% comment %}The "Trusted by 300+ businesses" claim that used to sit here conflicted
+   with the homepage, which separately claimed "150+ Active Importers". Neither was
+   backed by anything. Replaced with a description of the page's actual content —
+   which is also a more accurate snippet for a search result.{% endcomment %}
+{% block meta_description %}Read what UAE and Middle East importers say about working with {{ settings.company_name|default:"LogiManager" }} on China sourcing, supplier verification and quality inspection.{% endblock %}
 {% block meta_keywords %}testimonials, reviews, client feedback, China sourcing testimonials, B2B sourcing reviews, procurement partner{% endblock %}
 {% block og_title %}What Our Clients Say — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 {% block og_description %}Real reviews from real clients. Discover why businesses across the Middle East trust us for China sourcing, supplier verification, and quality inspection.{% endblock %}
 {% block twitter_title %}What Our Clients Say — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 {% block twitter_description %}Real reviews from real clients. Discover why businesses across the Middle East trust us for China sourcing, supplier verification, and quality inspection.{% endblock %}
+
+{% block structured_data %}
+{% comment %}--------------------------------------------------------------------
+   Deliberately NOT marked up as Review / AggregateRating.
+   ---------------------------------------------------------------------------
+   Google's review-snippet policy excludes "self-serving" reviews — reviews about
+   a business that are collected and published by that same business. Marking
+   these up would not produce star ratings in search results, and combined with a
+   site-wide aggregateRating it is the pattern that triggers structured-data
+   manual actions.
+
+   To actually earn stars in Google results, collect reviews on a third-party
+   platform (Google Business Profile is the one that matters most here, then
+   Trustpilot) — Google reads those directly from the source, no markup needed.
+   The testimonials below still do their job for human visitors: they are the
+   social proof that converts a hesitant visitor into an enquiry.
+-----------------------------------------------------------------------{% endcomment %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Testimonials", "item": "{{ settings.base_url }}/testimonials/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 

@@ -1,0 +1,100 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}--------------------------------------------------------------------
+   THANK-YOU / CONVERSION PAGE
+   ---------------------------------------------------------------------------
+   Reached only by redirect after a successful enquiry. Its job is threefold:
+
+     1. Confirm receipt and set an expectation ("within 24 hours"), because the
+        moment right after submitting is when a visitor most wants reassurance.
+     2. Give the lead somewhere to go. A dead end here wastes an already-warm
+        visitor; the WhatsApp button in particular converts a form enquiry into a
+        live conversation, which is far more likely to close.
+     3. Provide a distinct URL that GA4 and Meta can count as a conversion.
+-----------------------------------------------------------------------{% endcomment %}
+
+{% block title %}Thank You — We'll Reply Within 24 Hours | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+
+{% comment %}noindex is deliberate and important. This page holds nothing anyone
+   would search for, and if it ranked, people would arrive here WITHOUT having
+   submitted the form — which would inflate the exact conversion metric the page
+   exists to measure. nofollow keeps crawlers from wandering off it too.{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block content %}
+
+<section class="section-padding" style="padding-top:140px;">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-7 text-center">
+
+                <div class="thankyou-check" aria-hidden="true">
+                    <i class="bi bi-check-lg"></i>
+                </div>
+
+                <h1 class="section-title mt-4 mb-3">Thank you — your enquiry is with us</h1>
+                <p class="section-subtitle mx-auto mb-4" style="max-width:560px;">
+                    A member of our sourcing team in Xuzhou will read it and reply
+                    <strong>within 24 hours</strong>, Monday to Saturday. If you sent it over a
+                    weekend, expect a response first thing Monday.
+                </p>
+
+                {% comment %}What happens next. Removing uncertainty at this point reduces
+                   the number of people who send the same enquiry to three competitors while
+                   they wait.{% endcomment %}
+                <div class="thankyou-steps text-start mx-auto mb-4">
+                    <h2 class="h6 fw-bold text-uppercase text-secondary mb-3">What happens next</h2>
+                    <ol class="mb-0">
+                        <li><strong>We read your requirement</strong> and check whether we already work with a suitable factory.</li>
+                        <li><strong>We come back with questions</strong> if anything is unclear — specification, quantity, destination, target price.</li>
+                        <li><strong>You get a written quote</strong> covering product cost, our fee and indicative freight, with no obligation.</li>
+                    </ol>
+                </div>
+
+                {% comment %}The fast path. A visitor who has just submitted a form is the
+                   warmest they will ever be — offering a live channel now is worth more than
+                   any other link we could show.{% endcomment %}
+                {% with wa_number=settings.whatsapp_number|default:settings.company_phone|default:"" %}
+                {% if wa_number %}
+                <div class="thankyou-fast mb-4">
+                    <p class="mb-3 fw-medium">In a hurry? Message us directly and skip the queue.</p>
+                    <a href="https://wa.me/{{ wa_number|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}"
+                       target="_blank" rel="noopener noreferrer" class="btn btn-success btn-lg">
+                        <i class="bi bi-whatsapp me-2"></i>Continue on WhatsApp
+                    </a>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                {% comment %}Keep them on the site while they wait. The guides are the strongest
+                   thing we have for building confidence before the reply lands.{% endcomment %}
+                <div class="border-top pt-4 mt-4">
+                    <p class="text-secondary mb-3">While you wait, these are the guides our clients read most:</p>
+                    <div class="d-flex gap-2 flex-wrap justify-content-center">
+                        <a href="{% url 'blog_detail' slug='how-to-verify-a-chinese-supplier' %}" class="btn btn-outline-primary btn-sm">Verifying a Chinese supplier</a>
+                        <a href="{% url 'blog_detail' slug='how-to-calculate-landed-cost-china-to-uae' %}" class="btn btn-outline-primary btn-sm">Calculating landed cost</a>
+                        <a href="{% url 'blog_detail' slug='uae-customs-duty-and-vat-on-imports-from-china' %}" class="btn btn-outline-primary btn-sm">UAE duty &amp; VAT</a>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{% url 'front_page' %}" class="text-secondary text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Back to homepage</a>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</section>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  {% comment %}Fire the conversion on page load rather than on form submit. A submit
+     handler can be cut short by the navigation that follows it, so events are
+     occasionally lost; this page only ever loads after a successful save, which
+     makes it the more reliable place to count from.{% endcomment %}
+  window.gtagEvent('generate_lead', { form_name: 'enquiry_confirmed', value: 1 });
+  if (typeof fbq === 'function') { fbq('track', 'Lead', { content_name: 'Enquiry Confirmed' }); }
+</script>
+{% endblock %}

@@ -1,7 +1,42 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
-{% block title %}Contact Us — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% comment %}Each public page needs its own title and description. When a page falls
+   back to base.html's generic ones, Google sees several pages describing themselves
+   identically, picks one, and treats the rest as near-duplicates — they stop ranking
+   for their own terms. The title leads with the search phrase, not the brand.{% endcomment %}
+{% block title %}Contact a China Sourcing Agent — Free Quote in 24 Hours | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Talk to a China sourcing agent based in Xuzhou. Send your product requirements and get a free sourcing quote within 24 hours. WhatsApp, phone and email support for UAE and Middle East importers.{% endblock %}
+{% block meta_keywords %}contact China sourcing agent, China sourcing quote, sourcing agent WhatsApp, import from China contact, Xuzhou sourcing office{% endblock %}
+{% block og_title %}Contact Us — Free China Sourcing Quote in 24 Hours{% endblock %}
+{% block og_description %}Send us your product requirements and get a free sourcing quote within 24 hours. Based in Xuzhou, China — serving the UAE and Middle East.{% endblock %}
+{% block twitter_title %}Contact Us — Free China Sourcing Quote in 24 Hours{% endblock %}
+{% block twitter_description %}Send us your product requirements and get a free sourcing quote within 24 hours. Based in Xuzhou, China — serving the UAE and Middle East.{% endblock %}
+
+{% block structured_data %}
+{% comment %}ContactPage + breadcrumb. The breadcrumb is what makes Google show
+   "mudassirllc.com › Contact" under the result instead of a raw URL.{% endcomment %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ContactPage",
+  "name": "Contact {{ settings.company_name|default:"LogiManager"|escapejs }}",
+  "url": "{{ settings.base_url }}/contact/",
+  "about": {"@id": "{{ settings.base_url }}/#business"}
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Contact", "item": "{{ settings.base_url }}/contact/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 
@@ -64,37 +99,113 @@
 
 <section class="section-padding feature-section">
     <div class="container">
-        <div class="row g-5 justify-content-center">
+        <div class="row g-4 g-lg-5 justify-content-center">
             <div class="col-lg-6">
                 <div class="contact-form-card">
                     <div class="text-center mb-4">
                         <span class="section-label">Get In Touch</span>
                         <h3 class="section-title">Send Us a Message</h3>
                     </div>
-                    <form method="post" action="{% url 'contact_page' %}" id="contactForm">
+                    {% comment %}data-lead-form fires the GA4 `generate_lead` conversion
+                       event from the handler in base.html.{% endcomment %}
+                    {% comment %}--------------------------------------------------------
+                       Every input here follows the same pattern, and each part earns
+                       its place:
+
+                         id + label for=   The label was previously unassociated, so
+                                           tapping it did nothing (bad on a phone, where
+                                           the label is a much bigger tap target than the
+                                           field) and screen readers could not say what
+                                           the field was for.
+                         autocomplete=     Without it, mobile browsers and password
+                                           managers will not offer to fill the field. This
+                                           is the difference between a 15-second form and
+                                           a 90-second one on a phone, and most of your
+                                           traffic is on a phone.
+                         value=            Repopulates after a failed submission. The form
+                                           used to come back empty and people gave up.
+                         aria-describedby  Ties the error text to the input so assistive
+                                           tech announces the reason, not just "invalid".
+                         novalidate        Suppresses the browser's own popup bubbles so
+                                           our inline messages are the single, consistent
+                                           way an error is reported.
+                       -----------------------------------------------------{% endcomment %}
+                    <form method="post" action="{% url 'contact_page' %}" id="contactForm" data-lead-form="contact_page" novalidate>
                         {% csrf_token %}
+                        {% comment %}---------------------------------------------
+                           SPAM DEFENCES - invisible to people, costly to bots.
+
+                           company_website is a honeypot: no human sees it, so
+                           anything in it came from something filling every
+                           input on the page.
+
+                           form_started_at is a SIGNED timestamp. The view
+                           measures how long the form was open; under three
+                           seconds is not someone reading and typing. Signed so
+                           the value cannot be rewritten to fake a slow fill.
+
+                           Neither asks the visitor to prove anything, which
+                           matters here: Google's reCAPTCHA is blocked in
+                           mainland China, where this business works from.
+                        ------------------------------------------{% endcomment %}
+                        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;opacity:0;">
+                            <label for="{{ antispam_field }}_contact">Company website</label>
+                            <input type="text" id="{{ antispam_field }}_contact"
+                                   name="{{ antispam_field }}" tabindex="-1" autocomplete="off">
+                        </div>
+                        <input type="hidden" name="form_started_at" value="{{ form_started_at }}">
+
                         <div class="mb-3">
-                            <label class="fw-medium mb-2">Name</label>
-                            <input type="text" name="name" class="form-control" required placeholder="Your full name">
+                            <label for="contactName" class="fw-medium mb-2">Name <span class="text-danger" aria-hidden="true">*</span></label>
+                            <input type="text" id="contactName" name="name"
+                                   class="form-control{% if field_errors.name %} is-invalid{% endif %}"
+                                   value="{{ form_data.name }}"
+                                   autocomplete="name" required
+                                   {% if field_errors.name %}aria-describedby="contactNameError" aria-invalid="true"{% endif %}
+                                   placeholder="Your full name">
+                            {% if field_errors.name %}<div id="contactNameError" class="invalid-feedback d-block">{{ field_errors.name }}</div>{% endif %}
                         </div>
                         <div class="mb-3">
-                            <label class="fw-medium mb-2">Email</label>
-                            <input type="email" name="email" class="form-control" required placeholder="your@email.com">
+                            <label for="contactEmail" class="fw-medium mb-2">Email <span class="text-danger" aria-hidden="true">*</span></label>
+                            <input type="email" id="contactEmail" name="email"
+                                   class="form-control{% if field_errors.email %} is-invalid{% endif %}"
+                                   value="{{ form_data.email }}"
+                                   autocomplete="email" inputmode="email" required
+                                   {% if field_errors.email %}aria-describedby="contactEmailError" aria-invalid="true"{% endif %}
+                                   placeholder="your@email.com">
+                            {% if field_errors.email %}<div id="contactEmailError" class="invalid-feedback d-block">{{ field_errors.email }}</div>{% endif %}
                         </div>
                         <div class="mb-3">
-                            <label class="fw-medium mb-2">Phone</label>
-                            <input type="tel" name="phone" class="form-control" placeholder="Your phone number">
+                            <label for="contactPhone" class="fw-medium mb-2">Phone / WhatsApp</label>
+                            {% comment %}inputmode="tel" brings up the numeric keypad on mobile
+                               instead of the full alphabetic keyboard.{% endcomment %}
+                            <input type="tel" id="contactPhone" name="phone" class="form-control"
+                                   value="{{ form_data.phone }}"
+                                   autocomplete="tel" inputmode="tel"
+                                   placeholder="+971 50 123 4567">
+                            <div class="form-text">Optional, but it is the fastest way for us to reach you.</div>
                         </div>
                         <div class="mb-3">
-                            <label class="fw-medium mb-2">Subject</label>
-                            <input type="text" name="subject" class="form-control" required placeholder="What product are you looking for?">
+                            <label for="contactSubject" class="fw-medium mb-2">Subject</label>
+                            <input type="text" id="contactSubject" name="subject" class="form-control"
+                                   value="{{ form_data.subject }}"
+                                   placeholder="What product are you looking for?">
                         </div>
                         <div class="mb-4">
-                            <label class="fw-medium mb-2">Message</label>
-                            <textarea name="message" rows="5" class="form-control" required placeholder="Tell us about the product you want to source, quantity, target price, and destination..."></textarea>
+                            <label for="contactMessage" class="fw-medium mb-2">Message <span class="text-danger" aria-hidden="true">*</span></label>
+                            <textarea id="contactMessage" name="message" rows="5"
+                                      class="form-control{% if field_errors.message %} is-invalid{% endif %}"
+                                      required
+                                      {% if field_errors.message %}aria-describedby="contactMessageError" aria-invalid="true"{% endif %}
+                                      placeholder="Tell us about the product you want to source, quantity, target price, and destination...">{{ form_data.message }}</textarea>
+                            {% if field_errors.message %}<div id="contactMessageError" class="invalid-feedback d-block">{{ field_errors.message }}</div>{% endif %}
+                        </div>
+                        <div class="mb-4">
+                            {% include 'portal/includes/captcha_field.html' with suffix='contact' error=field_errors.captcha %}
                         </div>
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary">Send Message</button>
+                            <button type="submit" class="btn btn-primary btn-lg px-4">Send Message</button>
+                            <p class="form-text mt-2 mb-0">We reply within 24 hours, Monday to Saturday.</p>
                         </div>
                     </form>
                 </div>

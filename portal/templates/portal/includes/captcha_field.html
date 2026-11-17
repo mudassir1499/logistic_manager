@@ -1,0 +1,25 @@
+{% comment %}----------------------------------------------------------------
+   Self-hosted CAPTCHA question for the public enquiry forms.
+
+   Usage:
+     {% include 'portal/includes/captcha_field.html' with suffix='contact' error=field_errors.captcha %}
+     {% include 'portal/includes/captcha_field.html' with suffix='ar' lang='ar' %}
+
+   `captcha` comes from portal.captcha.new_challenge() in the view. The token
+   carries no answer, only an HMAC of it - see portal/captcha.py.
+------------------------------------------------------------------{% endcomment %}
+{% if captcha %}
+<input type="hidden" name="captcha_token" value="{{ captcha.token }}">
+<div class="mb-3">
+    <label for="captchaAnswer_{{ suffix }}" class="form-label fw-medium">
+        {% if lang == 'ar' %}سؤال للتحقق: كم يساوي {{ captcha.a }} + {{ captcha.b }}؟{% else %}Quick check: what is {{ captcha.question }}?{% endif %}
+        <span class="text-danger" aria-hidden="true">*</span>
+    </label>
+    <input type="text" id="captchaAnswer_{{ suffix }}" name="captcha_answer"
+           class="form-control{% if error %} is-invalid{% endif %}"
+           inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" required
+           {% if error %}aria-describedby="captchaError_{{ suffix }}" aria-invalid="true"{% endif %}
+           placeholder="{% if lang == 'ar' %}اكتب الرقم{% else %}Type the number{% endif %}">
+    {% if error %}<div id="captchaError_{{ suffix }}" class="invalid-feedback d-block">{{ error }}</div>{% endif %}
+</div>
+{% endif %}

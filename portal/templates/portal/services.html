@@ -1,7 +1,64 @@
 {% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
 {% load static %}
 
-{% block title %}Our Services — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% comment %}Page-specific title/description — see the note in contact.html.{% endcomment %}
+{% block title %}China Sourcing Services — Supplier Verification, Inspection & Shipping | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}Full China sourcing services for UAE and Middle East importers: supplier discovery, on-site factory verification, price negotiation, pre-shipment quality inspection and air/sea freight coordination.{% endblock %}
+{% block meta_keywords %}China sourcing services, supplier verification China, factory audit China, pre-shipment inspection, price negotiation China, freight forwarding China to UAE{% endblock %}
+{% block og_title %}China Sourcing Services — Verification, Inspection & Shipping{% endblock %}
+{% block og_description %}Supplier discovery, on-site factory verification, quality inspection and freight coordination — handled by a team physically based in China.{% endblock %}
+{% block twitter_title %}China Sourcing Services — Verification, Inspection & Shipping{% endblock %}
+{% block twitter_description %}Supplier discovery, on-site factory verification, quality inspection and freight coordination — handled by a team physically based in China.{% endblock %}
+
+{% comment %}Reciprocal hreflang with the Arabic services page — see the note on the
+   homepage about why both sides must declare both URLs.{% endcomment %}
+{% block hreflang %}
+<link rel="alternate" hreflang="en" href="{{ settings.base_url }}{% url 'services_page' %}">
+<link rel="alternate" hreflang="ar" href="{{ settings.base_url }}{% url 'ar_services_page' %}">
+<link rel="alternate" hreflang="x-default" href="{{ settings.base_url }}{% url 'services_page' %}">
+{% endblock %}
+
+{% comment %}Point the language switcher at the Arabic SERVICES page rather than the
+   Arabic homepage. The base template's default sends everyone to /ar/, which is
+   right for pages with no Arabic counterpart but throws away the reader's place
+   when one exists.{% endcomment %}
+{% block lang_switch %}
+<li class="nav-item">
+    <a class="nav-link" href="{% url 'ar_services_page' %}" lang="ar" hreflang="ar" title="العربية">
+        <i class="bi bi-translate me-1"></i>العربية
+    </a>
+</li>
+{% endblock %}
+
+{% block structured_data %}
+{% comment %}Each service listed on this page marked up individually. This is what
+   lets Google associate the domain with the specific search terms ("factory audit
+   China", "pre-shipment inspection") rather than only the generic company name.{% endcomment %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "China Sourcing Services",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "item": {"@type": "Service", "name": "Product Sourcing", "description": "Supplier discovery and shortlisting, factory capability assessment, and sample procurement for a specific product requirement.", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 2, "item": {"@type": "Service", "name": "Supplier Verification", "description": "Physical factory visits, business licence verification, production capability audits and certification review before any payment is made.", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 3, "item": {"@type": "Service", "name": "Quality Inspection", "description": "Pre-shipment inspection at the factory covering specifications, functionality, packaging and labelling, with photo and video reports.", "provider": {"@id": "{{ settings.base_url }}/#business"}}},
+    {"@type": "ListItem", "position": 4, "item": {"@type": "Service", "name": "Shipping Coordination", "description": "Air and sea freight coordination from China to the UAE and Middle East, including export documentation and customs clearance support.", "provider": {"@id": "{{ settings.base_url }}/#business"}}}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Services", "item": "{{ settings.base_url }}/services/"}
+  ]
+}
+</script>
+{% endblock %}
 
 {% block content %}
 
@@ -28,7 +85,7 @@
         <div class="row g-4">
             <div class="col-md-6">
                 <div class="service-detail-card">
-                    <img src="https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80" alt="Product Sourcing" class="service-img">
+                    <img src="{% if site_images.service_sourcing %}{{ site_images.service_sourcing.image.url }}{% else %}{% static 'images/stock/product-sourcing.webp' %}{% endif %}" alt="Product Sourcing" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
                     <div class="service-body">
                         <h4 class="fw-bold mb-2">Product Sourcing</h4>
                         <p class="text-secondary mb-3">We identify, vet, and connect you with the right Chinese manufacturers for your exact product needs — saving you time and eliminating risk.</p>
@@ -43,7 +100,7 @@
             </div>
             <div class="col-md-6">
                 <div class="service-detail-card">
-                    <img src="https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80" alt="Supplier Verification" class="service-img">
+                    <img src="{% if site_images.service_verification %}{{ site_images.service_verification.image.url }}{% else %}{% static 'images/stock/shipping-coordination.webp' %}{% endif %}" alt="Supplier Verification" class="service-img" width="1200" height="797" loading="lazy" decoding="async">
                     <div class="service-body">
                         <h4 class="fw-bold mb-2">Supplier Verification</h4>
                         <p class="text-secondary mb-3">We physically visit factories, audit credentials, and verify production capabilities so you never deal with unreliable suppliers.</p>
@@ -58,7 +115,7 @@
             </div>
             <div class="col-md-6">
                 <div class="service-detail-card">
-                    <img src="https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&w=800&q=80" alt="Quality Inspection" class="service-img">
+                    <img src="{% if site_images.service_inspection %}{{ site_images.service_inspection.image.url }}{% else %}{% static 'images/stock/quality-inspection.webp' %}{% endif %}" alt="Quality Inspection" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
                     <div class="service-body">
                         <h4 class="fw-bold mb-2">Quality Inspection</h4>
                         <p class="text-secondary mb-3">Pre-shipment inspections at the factory ensure your products meet specifications before they leave China.</p>
@@ -73,7 +130,7 @@
             </div>
             <div class="col-md-6">
                 <div class="service-detail-card">
-                    <img src="https://images.unsplash.com/photo-1605745341112-85968b19335b?auto=format&fit=crop&w=800&q=80" alt="Order Management & Shipping" class="service-img">
+                    <img src="{% if site_images.service_shipping %}{{ site_images.service_shipping.image.url }}{% else %}{% static 'images/stock/order-management.webp' %}{% endif %}" alt="Order Management & Shipping" class="service-img" width="1200" height="800" loading="lazy" decoding="async">
                     <div class="service-body">
                         <h4 class="fw-bold mb-2">Order Management & Shipping</h4>
                         <p class="text-secondary mb-3">We negotiate prices, manage purchase orders, and coordinate air or sea freight from China to your destination.</p>

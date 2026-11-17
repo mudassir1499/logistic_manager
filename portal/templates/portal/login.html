@@ -3,6 +3,13 @@
 
 {% block title %}Customer Login — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 
+{% comment %}Login/registration/password pages hold no content anyone would search
+   for, and indexing them dilutes the site's topical relevance. robots.txt already
+   blocks /portal/, but robots.txt only stops crawling — a URL linked from
+   elsewhere can still be indexed as a bare link. This tag is what actually keeps
+   them out of the index.{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
 {% block content %}
 
 <section class="auth-section">
@@ -10,7 +17,7 @@
         <div class="auth-card-split">
             <div class="auth-left">
                 <div class="auth-brand">
-                    <span class="brand-icon">📦</span>
+                    <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}" alt="" width="26" height="26" class="brand-icon" style="border-radius:7px;object-fit:contain;" decoding="async">
                     {{ settings.company_name|default:"LogiManager" }}
                 </div>
                 <h2 class="auth-title">Welcome Back</h2>
@@ -43,17 +50,17 @@
                 <form id="loginForm" method="post">
                     {% csrf_token %}
                     <div class="auth-input-group">
-                        <label>Email Address</label>
+                        <label for="id_email">Email Address</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-envelope"></i></span>
-                            <input type="email" name="email" class="form-control" placeholder="your@email.com" required autofocus>
+                            <input type="email" name="email" id="id_email" autocomplete="username" class="form-control" placeholder="your@email.com" required autofocus>
                         </div>
                     </div>
                     <div class="auth-input-group">
-                        <label>Password</label>
+                        <label for="id_password">Password</label>
                         <div class="input-group">
                             <span class="input-group-text"><i class="bi bi-lock"></i></span>
-                            <input type="password" name="password" class="form-control" placeholder="Enter your password" required>
+                            <input type="password" name="password" id="id_password" autocomplete="current-password" class="form-control" placeholder="Enter your password" required>
                             <button class="btn btn-outline-secondary toggle-password" type="button" tabindex="-1">
                                 <i class="bi bi-eye"></i>
                             </button>
@@ -106,7 +113,11 @@ document.getElementById('loginForm').addEventListener('submit', async function(e
         });
         const data = await response.json();
         if (data.success) {
-            if (typeof fbq === 'function') fbq('track', 'Lead');
+            // Deliberately NOT a conversion event. Signing in is something an
+            // existing customer does; counting it as a Lead taught Meta to
+            // optimise for people already won. Left as a plain custom event so
+            // the volume is still visible without polluting optimisation.
+            if (typeof fbq === 'function') fbq('trackCustom', 'CustomerSignIn');
             window.location.href = data.redirect;
         } else {
             errorDiv.textContent = data.message || 'Login failed.';

@@ -39,6 +39,9 @@ from products.models import Product
 # Import secrets for generating secure random tokens
 import secrets
 
+# Import re for stripping HTML when estimating a blog post's reading time
+import re
+
 
 class PasswordResetRequest(models.Model):
     """
@@ -559,6 +562,19 @@ class CartItem(models.Model):
         help_text="The product in the cart"
     )
 
+    # The chosen variation, for products that sell several. NULL for plain
+    # products. Two variants of the same product are two separate cart lines —
+    # they have different prices and are, for every practical purpose, different
+    # things to buy.
+    variant = models.ForeignKey(
+        'products.ProductVariant',
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name='cart_entries',
+        help_text="The chosen variation, when the product has any",
+    )
+
     # PositiveIntegerField: how many units the customer wants to order.
     # Default is 1. The checkout view validates against the product's MOQ.
     quantity = models.PositiveIntegerField(default=1, help_text="Number of units to order")
@@ -610,20 +626,34 @@ class CartItem(models.Model):
         return f"CartItem: {self.product.name} x {self.quantity} ({owner})"
 
     @property
+    def unit_price(self):
+        """
+        What one unit of this line costs.
+
+        The chosen variation's price when there is one, otherwise the product's.
+        Variations of a listing routinely differ by 2-3x — a water gun at 38.65 and
+        the same listing's battery kit at 85 — so charging the parent's price for
+        every variation would be wrong in both directions.
+        """
+        if self.variant_id and self.variant.price is not None:
+            return self.variant.price
+        return self.product.price
+
+    @property
     def subtotal(self):
         """
         A computed property that calculates the line subtotal for this cart item.
 
         Returns:
-            Decimal: product.price × quantity, rounded to 2 decimal places.
+            Decimal: unit_price × quantity, rounded to 2 decimal places.
 
         Business Logic:
             The subtotal is the per-line cost before shipping, taxes, or commissions.
-            It is computed dynamically from the product's current price, so if the admin
+            It is computed dynamically from the current price, so if the admin
             changes the price between cart-add and checkout, the customer sees the updated price.
         """
         # Decimal multiplication to avoid floating-point errors in money calculations.
-        return (self.product.price * self.quantity).quantize(Decimal('0.01'))
+        return (self.unit_price * self.quantity).quantize(Decimal('0.01'))
 
 
 class ContactMessage(models.Model):
@@ -650,6 +680,21 @@ class ContactMessage(models.Model):
     subject = models.CharField(max_length=255, blank=True, help_text="Subject or lead source")
     message = models.TextField(help_text="Message content")
     is_read = models.BooleanField(default=False, help_text="Whether an admin has reviewed this message")
+
+    # --- Spam handling ----------------------------------------------------
+    # Flagged, never discarded. A false positive on a real enquiry costs far
+    # more than a spam message sitting in a tab nobody opens, so suspicious
+    # submissions are saved like any other and simply kept out of the default
+    # list and out of the notification email.
+    is_spam = models.BooleanField(
+        default=False, db_index=True,
+        help_text="Flagged by the spam filter. Hidden from the main inbox, never deleted automatically.")
+    spam_score = models.PositiveSmallIntegerField(
+        default=0,
+        help_text="How strongly this scored as spam. The threshold is in portal/antispam.py.")
+    spam_reason = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text="Why it was flagged, so a wrong call can be seen and corrected rather than guessed at.")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -666,3 +711,222 @@ class ContactMessage(models.Model):
         """Mark the message as reviewed by an admin."""
         self.is_read = True
         self.save(update_fields=['is_read'])
+
+
+# =============================================================================
+# BLOG
+# =============================================================================
+# Why the site has a blog at all:
+#
+#   The marketing pages only rank for terms that describe the company ("China
+#   sourcing agent"). They cannot rank for the questions a UAE importer actually
+#   types before they are ready to buy — "customs duty on imports from China to
+#   UAE", "how to verify a Chinese supplier", "air vs sea freight to Dubai".
+#   Those searches happen far more often than anyone searching for a sourcing
+#   agent by name, and the person making them is exactly the target customer.
+#
+#   Each article is a separate indexable page targeting one of those questions,
+#   and each ends with a call to action pointing back at /contact/. For a business
+#   like this it is the single largest available source of new organic leads.
+# =============================================================================
+
+
+class BlogCategory(models.Model):
+    """
+    A topic grouping for blog posts (e.g. "Shipping & Logistics", "Supplier Sourcing").
+
+    Categories exist for two reasons: they give visitors a way to browse related
+    articles (which increases pages per session), and they create internal linking
+    structure, which is how search engines work out that a cluster of pages all
+    cover one subject in depth.
+
+    Attributes:
+        name (str): Display name, e.g. "Customs & Compliance".
+        slug (str): URL fragment, e.g. "customs-compliance".
+        description (str): Short intro shown on the category listing.
+        display_order (int): Manual sort order in navigation and filters.
+    """
+
+    name = models.CharField(max_length=120, unique=True, help_text="Category name shown to visitors")
+    slug = models.SlugField(max_length=140, unique=True, help_text="URL fragment, e.g. shipping-logistics")
+    description = models.CharField(
+        max_length=300,
+        blank=True,
+        default='',
+        help_text="One-line description shown at the top of the category listing"
+    )
+    display_order = models.PositiveIntegerField(default=0, help_text="Lower numbers appear first")
+
+    class Meta:
+        ordering = ['display_order', 'name']
+        verbose_name = 'Blog Category'
+        verbose_name_plural = 'Blog Categories'
+
+    def __str__(self):
+        return self.name
+
+
+class BlogPost(models.Model):
+    """
+    A single article on the public blog.
+
+    Attributes:
+        title (str): Headline shown on the page and used as the default <title>.
+        slug (str): URL fragment. Permanent — changing it breaks inbound links
+                    and discards whatever ranking the old URL had earned.
+        category (BlogCategory): Topic grouping. Optional.
+        excerpt (str): Summary shown in listings, and the default meta
+                    description when `meta_description` is blank.
+        body (str): The article itself, stored as HTML.
+        hero_image (Image): Optional header image, also used for social sharing.
+        hero_image_alt (str): Alt text for the header image.
+        meta_title / meta_description (str): SEO overrides. Blank falls back to
+                    title/excerpt, so an author never has to fill them in.
+        is_published (bool): Drafts stay invisible to the public.
+        published_at (datetime): Publication timestamp; also the sort key.
+        updated_at (datetime): Last edit. Reported to search engines as the
+                    article's dateModified and as the sitemap <lastmod>.
+        reading_minutes (int): Estimated read time; computed on save if left 0.
+
+    Why `body` holds raw HTML:
+        Articles are authored once and rendered with `|safe` in the template. That
+        is only acceptable because authoring is restricted to admin/staff — the
+        same people who could edit the templates anyway. If blog authoring is ever
+        opened to customers or any untrusted user, this field must be run through a
+        sanitiser (e.g. bleach) before rendering, or it becomes stored XSS.
+    """
+
+    title = models.CharField(max_length=220, help_text="Article headline")
+
+    # max_length is capped at 191, not a rounder number, for MySQL.
+    #
+    # A unique CharField becomes a UNIQUE index. Under utf8mb4 MySQL reserves 4
+    # bytes per character, so a VARCHAR(240) unique index needs 960 bytes. InnoDB
+    # allows a 3072-byte index prefix only with the DYNAMIC row format and (on
+    # older servers) innodb_large_prefix enabled; where those defaults are not in
+    # place the limit is 767 bytes and `migrate` dies with
+    # "Specified key was too long; max key length is 767 bytes" (error 1071).
+    #
+    # 191 x 4 = 764 bytes, which fits under even the oldest limit. This is the
+    # well-known "191" cap for unique utf8mb4 columns. No slug here approaches it
+    # (the longest is under 60 characters), so the ceiling costs nothing and makes
+    # the migration safe on any MySQL/MariaDB configuration this may be deployed to.
+    slug = models.SlugField(
+        max_length=191,
+        unique=True,
+        help_text="URL fragment. Do NOT change after publishing — it breaks inbound links and loses rankings."
+    )
+    category = models.ForeignKey(
+        BlogCategory,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='posts',
+        help_text="Topic grouping"
+    )
+    excerpt = models.TextField(
+        max_length=400,
+        help_text="1-2 sentence summary. Shown in listings and used as the meta description if none is set."
+    )
+    body = models.TextField(help_text="Article content as HTML")
+
+    hero_image = models.ImageField(
+        upload_to='blog/',
+        blank=True,
+        null=True,
+        help_text="Header image. Also used as the social share image. Recommended 1200x630."
+    )
+    hero_image_alt = models.CharField(
+        max_length=250,
+        blank=True,
+        default='',
+        help_text="Describes the image for screen readers and image search."
+    )
+
+    meta_title = models.CharField(
+        max_length=200,
+        blank=True,
+        default='',
+        help_text="Overrides the browser/search-result title. Leave blank to use the article title."
+    )
+    meta_description = models.CharField(
+        max_length=320,
+        blank=True,
+        default='',
+        help_text="Overrides the search-result snippet. Leave blank to use the excerpt. Aim for 150-160 characters."
+    )
+    keywords = models.CharField(
+        max_length=400,
+        blank=True,
+        default='',
+        help_text="Comma-separated topic keywords."
+    )
+
+    author_name = models.CharField(
+        max_length=120,
+        blank=True,
+        default='',
+        help_text="Byline. Leave blank to use the company name."
+    )
+
+    is_published = models.BooleanField(default=True, help_text="Untick to hide this post from the public site")
+    is_featured = models.BooleanField(default=False, help_text="Featured posts are highlighted at the top of the blog index")
+    published_at = models.DateTimeField(default=timezone.now, help_text="Publication date. Also controls ordering.")
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    reading_minutes = models.PositiveIntegerField(
+        default=0,
+        help_text="Estimated reading time in minutes. Calculated automatically on save if left at 0."
+    )
+
+    class Meta:
+        ordering = ['-published_at']
+        verbose_name = 'Blog Post'
+        verbose_name_plural = 'Blog Posts'
+        indexes = [
+            # The public listing filters on is_published and sorts by published_at
+            # on every page load; this index serves both halves of that query.
+            models.Index(fields=['is_published', '-published_at']),
+        ]
+
+    def __str__(self):
+        return self.title
+
+    def get_absolute_url(self):
+        """
+        Canonical URL of this article.
+
+        Used by the template, the sitemap, and Django admin's "View on site" link,
+        so the URL shape stays defined in exactly one place (portal/urls.py).
+        """
+        return reverse('blog_detail', kwargs={'slug': self.slug})
+
+    def save(self, *args, **kwargs):
+        """
+        Persist the post, filling in the reading estimate when it is not set.
+
+        Reading time appears next to the headline because it improves click-through
+        from listings — a visitor decides whether to commit before they start. 200
+        words per minute is the usual estimate for non-technical prose.
+        """
+        if not self.reading_minutes:
+            # Strip HTML tags first so markup does not inflate the word count.
+            plain = re.sub(r'<[^>]+>', ' ', self.body or '')
+            self.reading_minutes = max(1, round(len(plain.split()) / 200))
+        super().save(*args, **kwargs)
+
+    @property
+    def seo_title(self):
+        """The <title> to render: the explicit override, else the headline."""
+        return self.meta_title or self.title
+
+    @property
+    def seo_description(self):
+        """The meta description to render: the explicit override, else the excerpt."""
+        return self.meta_description or self.excerpt
+
+    @property
+    def display_author(self):
+        """Byline to show: the explicit author, else the company name."""
+        return self.author_name or 'Mudassir LLC'

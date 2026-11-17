@@ -1,0 +1,175 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}--------------------------------------------------------------------
+   BLOG ARTICLE
+   ---------------------------------------------------------------------------
+   This is the page that has to earn the search visit. Everything in the head is
+   driven by the post record so an author never edits a template to publish.
+
+   Note the deliberate `|safe` on post.body: article HTML is authored by admin and
+   staff only. If blog authoring is ever opened to untrusted users, that filter
+   becomes a stored-XSS hole and the body must be sanitised first (see the model
+   docstring in portal/models.py).
+-----------------------------------------------------------------------{% endcomment %}
+
+{% block title %}{{ post.seo_title }} | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}{{ post.seo_description }}{% endblock %}
+{% block meta_keywords %}{{ post.keywords }}{% endblock %}
+
+{% block og_title %}{{ post.seo_title }}{% endblock %}
+{% block og_description %}{{ post.seo_description }}{% endblock %}
+{% block twitter_title %}{{ post.seo_title }}{% endblock %}
+{% block twitter_description %}{{ post.seo_description }}{% endblock %}
+
+{% block structured_data %}
+{% comment %}Article markup. `datePublished` / `dateModified` are what let Google
+   show a date beside the result and judge freshness — for a topic like freight
+   rates or customs rules, a visible recent date is a large share of why someone
+   clicks one result over another.
+
+   No `aggregateRating` or review markup here, deliberately: see the note in
+   base.html about self-serving ratings.{% endcomment %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "{{ post.title|escapejs }}",
+  "description": "{{ post.seo_description|escapejs }}",
+  "articleSection": "{{ post.category.name|default:""|escapejs }}",
+  "datePublished": "{{ post.published_at|date:'c' }}",
+  "dateModified": "{{ post.updated_at|date:'c' }}",
+  "inLanguage": "en",
+  "author": {
+    "@type": "Organization",
+    "name": "{{ post.display_author|escapejs }}",
+    "url": "{{ settings.base_url }}/about/"
+  },
+  "publisher": {"@id": "{{ settings.base_url }}/#business"},
+  "isPartOf": {"@id": "{{ settings.base_url }}/blog/#blog"},
+  "mainEntityOfPage": {
+    "@type": "WebPage",
+    "@id": "{{ settings.base_url }}{{ post.get_absolute_url }}"
+  },
+  "image": "{% if post.hero_image %}{{ settings.base_url }}{{ post.hero_image.url }}{% else %}{{ settings.base_url }}/static/images/og-default.png{% endif %}"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ settings.base_url }}/blog/"},
+    {"@type": "ListItem", "position": 3, "name": "{{ post.title|escapejs }}", "item": "{{ settings.base_url }}{{ post.get_absolute_url }}"}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<article class="blog-article">
+    <header class="blog-article-header">
+        <div class="container">
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    {% comment %}Visible breadcrumb trail. It matches the BreadcrumbList
+                       markup above — Google expects the two to agree — and gives the
+                       reader a way back up into the site.{% endcomment %}
+                    <nav aria-label="Breadcrumb" class="blog-breadcrumb">
+                        <a href="{% url 'front_page' %}">Home</a>
+                        <span aria-hidden="true">/</span>
+                        <a href="{% url 'blog_index' %}">Blog</a>
+                        {% if post.category %}
+                        <span aria-hidden="true">/</span>
+                        <a href="{% url 'blog_index' %}?category={{ post.category.slug }}">{{ post.category.name }}</a>
+                        {% endif %}
+                    </nav>
+
+                    <h1 class="blog-article-title">{{ post.title }}</h1>
+
+                    <p class="blog-article-standfirst">{{ post.excerpt }}</p>
+
+                    <div class="blog-article-meta">
+                        <span><i class="bi bi-person"></i> {{ post.display_author }}</span>
+                        <span class="blog-meta-sep">·</span>
+                        <time datetime="{{ post.published_at|date:'Y-m-d' }}"><i class="bi bi-calendar3"></i> {{ post.published_at|date:'j F Y' }}</time>
+                        <span class="blog-meta-sep">·</span>
+                        <span><i class="bi bi-clock"></i> {{ post.reading_minutes }} min read</span>
+                        {% if post.updated_at|date:'Y-m-d' != post.published_at|date:'Y-m-d' %}
+                        <span class="blog-meta-sep">·</span>
+                        <span class="text-secondary">Updated {{ post.updated_at|date:'j M Y' }}</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    {% if post.hero_image %}
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-9">
+                <img src="{{ post.hero_image.url }}" alt="{{ post.hero_image_alt|default:post.title }}"
+                     class="blog-article-hero" width="1200" height="630" decoding="async">
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="blog-article-body">
+                    {{ post.body|safe }}
+                </div>
+
+                {% comment %}In-article conversion point. A reader who has got this far is
+                   researching a purchase — this is the moment the article has to turn
+                   into an enquiry, which is the entire commercial purpose of the blog.{% endcomment %}
+                <aside class="blog-cta">
+                    <h2 class="h4 fw-bold mb-2">Want this handled for you?</h2>
+                    <p class="mb-3">We are on the ground in Xuzhou, China. We find the factory, verify it in person, inspect the goods before they ship, and coordinate freight to the UAE. Tell us what you need and we'll reply within 24 hours.</p>
+                    <div class="d-flex gap-2 flex-wrap">
+                        <a href="{% url 'contact_page' %}" class="btn btn-primary" onclick="window.gtagEvent('quote_cta_click',{location:'blog_article',article:'{{ post.slug }}'});">Get a Free Quote</a>
+                        {% with wa_number=settings.whatsapp_number|default:settings.company_phone|default:"" %}
+                        {% if wa_number %}
+                        <a href="https://wa.me/{{ wa_number|cut:'+'|cut:'-'|cut:' '|cut:'('|cut:')' }}" target="_blank" rel="noopener noreferrer" class="btn btn-success">
+                            <i class="bi bi-whatsapp me-1"></i>Ask on WhatsApp
+                        </a>
+                        {% endif %}
+                        {% endwith %}
+                    </div>
+                </aside>
+            </div>
+        </div>
+    </div>
+</article>
+
+{% if related_posts %}
+<section class="section-padding bg-light">
+    <div class="container">
+        <h2 class="section-title h4 mb-4">Keep reading</h2>
+        <div class="row g-4">
+            {% for rel in related_posts %}
+            <div class="col-md-4">
+                <article class="blog-card h-100">
+                    <div class="blog-card-body">
+                        {% if rel.category %}<span class="blog-card-cat">{{ rel.category.name }}</span>{% endif %}
+                        <h3 class="blog-card-title"><a href="{{ rel.get_absolute_url }}">{{ rel.title }}</a></h3>
+                        <p class="blog-card-excerpt">{{ rel.excerpt|truncatewords:22 }}</p>
+                        <div class="blog-card-meta"><i class="bi bi-clock"></i> {{ rel.reading_minutes }} min read</div>
+                    </div>
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="text-center mt-4">
+            <a href="{% url 'blog_index' %}" class="btn btn-outline-primary">All guides</a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}

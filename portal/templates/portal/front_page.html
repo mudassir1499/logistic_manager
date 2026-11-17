@@ -1,18 +1,37 @@
 {% extends 'portal/base.html' %}
 {% load static %}
 
+{% comment %}Homepage has a dark hero, so the navbar sits transparent over it until scroll.{% endcomment %}
+{% block body_class %}has-hero theme-light{% endblock %}
+
 {% block title %}Reliable China Sourcing Agent for UAE & Middle East — {{ settings.company_name|default:"LogiManager" }}{% endblock %}
 {% block meta_description %}Source products from China without the risk. We verify suppliers, inspect quality, negotiate prices, and ship to UAE & Middle East. Get a free quote in 24 hours.{% endblock %}
 {% block meta_keywords %}China sourcing agent UAE, buy from China, supplier verification China, China procurement Middle East, product sourcing Xuzhou, import from China to Dubai{% endblock %}
+
+{% comment %}Reciprocal hreflang. Both pages in a language pair must declare BOTH
+   URLs — if only one side does, Google discards the annotation entirely, which is
+   the single most common way this gets implemented wrongly.{% endcomment %}
+{% block hreflang %}
+<link rel="alternate" hreflang="en" href="{{ settings.base_url }}{% url 'front_page' %}">
+<link rel="alternate" hreflang="ar" href="{{ settings.base_url }}{% url 'ar_home' %}">
+<link rel="alternate" hreflang="x-default" href="{{ settings.base_url }}{% url 'front_page' %}">
+{% endblock %}
 
 {% block content %}
 
 <section class="hero-v2">
     <div class="container">
-        <div class="row g-5 align-items-center">
+        <div class="row g-4 g-lg-5 align-items-center">
             <div class="col-lg-7">
                 <span class="hero-badge">Based in China — Serving UAE & Middle East</span>
-                <h1 class="hero-title">Source from China Without the Risk</h1>
+                {% comment %}Two lines, the second in gold. The split is not
+                   decorative: "Source from China" is what we do and "Without the
+                   Risk" is the promise that separates us from a freight
+                   forwarder, so the colour falls on the half a visitor is
+                   actually weighing. The accent span is a block, so the break is
+                   the same at every width instead of landing wherever the
+                   measure happens to run out.{% endcomment %}
+                <h1 class="hero-title">Source from China<span class="hero-title__accent">Without the Risk</span></h1>
                 <p class="hero-subtitle">
                     We find reliable factories, verify suppliers on-site, negotiate better prices, and manage shipping — so you can focus on growing your business in the UAE & Middle East.
                 </p>
@@ -23,11 +42,13 @@
                     <li><i class="bi bi-check-circle-fill"></i> Free quote within 24 hours</li>
                 </ul>
                 <div class="d-flex gap-3 flex-wrap hero-cta-row">
-                    <a href="{% url 'services_page' %}" class="btn btn-primary btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroExploreServices');}">Explore Services</a>
-                    <a href="{% url 'contact_page' %}" class="btn btn-outline-light btn-lg" onclick="if(typeof fbq==='function'){fbq('track','Contact');}">Get a Quote</a>
-                    <a href="https://whatsapp.com/channel/0029Vb7luVX0G0XkqhMjD82f" target="_blank" rel="noopener" class="btn btn-success btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroWhatsAppCommunity');}">
+                    <a href="{% url 'services_page' %}" class="btn btn-primary btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroExploreServices');}window.gtagEvent('select_content',{content_type:'services',location:'hero'});">Explore Services</a>
+                    <a href="{% url 'contact_page' %}" class="btn btn-outline-light btn-lg" onclick="if(typeof fbq==='function'){fbq('track','Contact');}window.gtagEvent('quote_cta_click',{location:'hero'});">Get a Quote</a>
+                    {% if settings.whatsapp_channel_url %}
+                    <a href="{{ settings.whatsapp_channel_url }}" target="_blank" rel="noopener" class="btn btn-success btn-lg" onclick="if(typeof fbq==='function'){fbq('trackCustom','HeroWhatsAppCommunity');}">
                         <i class="bi bi-whatsapp me-2"></i>Join WhatsApp Community
                     </a>
+                    {% endif %}
                 </div>
                 <div class="whatsapp-banner mt-3">
                     <i class="bi bi-whatsapp"></i>
@@ -37,125 +58,249 @@
             <div class="col-lg-5">
                 <div class="hero-lead-card">
                     <div class="lead-card-header">
-                        <h3 class="mb-1">Get Your Free Quote</h3>
-                        <p class="mb-0">Tell us what you need and we'll reply within 24 hours.</p>
+                        <h3 class="mb-1">Request a Product</h3>
+                        <p class="mb-0">Tell us what to source and we'll quote within 24 hours.</p>
                     </div>
-                    <form method="post" action="{% url 'contact_page' %}" id="heroLeadForm">
+                    {% comment %}data-lead-form is picked up by the GA4 handler in
+                       base.html, which fires the `generate_lead` conversion event on
+                       submit. Keeps the tracking wiring out of this template.{% endcomment %}
+                    <form method="post" action="{% url 'contact_page' %}" id="heroLeadForm" data-lead-form="homepage_hero">
                         {% csrf_token %}
-                        <input type="hidden" name="subject" value="Meta Ads Lead — Homepage Form">
+                        {% comment %}---------------------------------------------
+                           SPAM DEFENCES - invisible to people, costly to bots.
+
+                           company_website is a honeypot: no human sees it, so
+                           anything in it came from something filling every
+                           input on the page.
+
+                           form_started_at is a SIGNED timestamp. The view
+                           measures how long the form was open; under three
+                           seconds is not someone reading and typing. Signed so
+                           the value cannot be rewritten to fake a slow fill.
+
+                           Neither asks the visitor to prove anything, which
+                           matters here: Google's reCAPTCHA is blocked in
+                           mainland China, where this business works from.
+                        ------------------------------------------{% endcomment %}
+                        <div aria-hidden="true" style="position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;opacity:0;">
+                            <label for="{{ antispam_field }}_hero">Company website</label>
+                            <input type="text" id="{{ antispam_field }}_hero"
+                                   name="{{ antispam_field }}" tabindex="-1" autocomplete="off">
+                        </div>
+                        <input type="hidden" name="form_started_at" value="{{ form_started_at }}">
+
+                        <input type="hidden" name="subject" value="Product sourcing request — Homepage">
+                        {% comment %}autocomplete + inputmode let a phone fill this form from
+                           the browser's saved details in a couple of taps. Without them the
+                           visitor types four fields by hand on a small keyboard, which is
+                           where most mobile form abandonment happens.{% endcomment %}
                         <div class="mb-3">
                             <label for="leadName" class="form-label">Full Name</label>
-                            <input type="text" class="form-control" id="leadName" name="name" placeholder="Your name" required>
+                            <input type="text" class="form-control" id="leadName" name="name" autocomplete="name" placeholder="Your name" required>
                         </div>
                         <div class="mb-3">
                             <label for="leadEmail" class="form-label">Email</label>
-                            <input type="email" class="form-control" id="leadEmail" name="email" placeholder="you@company.com" required>
+                            <input type="email" class="form-control" id="leadEmail" name="email" autocomplete="email" inputmode="email" placeholder="you@company.com" required>
                         </div>
                         <div class="mb-3">
                             <label for="leadPhone" class="form-label">WhatsApp / Phone</label>
-                            <input type="tel" class="form-control" id="leadPhone" name="phone" placeholder="+971 50 123 4567" required>
+                            <input type="tel" class="form-control" id="leadPhone" name="phone" autocomplete="tel" inputmode="tel" placeholder="+971 50 123 4567" required>
                         </div>
                         <div class="mb-3">
-                            <label for="leadMessage" class="form-label">What product are you looking for?</label>
-                            <textarea class="form-control" id="leadMessage" name="message" rows="3" placeholder="Product name, quantity, destination..." required></textarea>
+                            <label for="leadMessage" class="form-label">What do you need sourced?</label>
+                            <textarea class="form-control" id="leadMessage" name="message" rows="2" placeholder="e.g. 65W GaN fast charger, USB-C, retail boxed" required></textarea>
                         </div>
-                        <button type="submit" class="btn btn-accent btn-lg w-100">Get My Free Quote</button>
-                        <p class="small text-center mt-2 mb-0" style="color:rgba(255,255,255,0.7)"><i class="bi bi-shield-lock me-1"></i>No spam. Unsubscribe anytime.</p>
+                        {% comment %}The three answers that make a sourcing enquiry
+                           actionable. Without them the first reply is always the same
+                           three questions, which costs a day each way.
+                           contact_page appends them to the message body.
+                        {% endcomment %}
+                        <div class="mb-3">
+                            <label class="form-label" for="leadLink">Product link <span class="text-secondary">(optional)</span></label>
+                            <input type="url" class="form-control" id="leadLink" name="product_link"
+                                   inputmode="url" placeholder="1688, Alibaba or any reference link">
+                        </div>
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label" for="leadQty">Quantity</label>
+                                <input type="text" class="form-control" id="leadQty" name="quantity"
+                                       inputmode="numeric" placeholder="e.g. 500 pcs">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label" for="leadDest">Ship to</label>
+                                <input type="text" class="form-control" id="leadDest" name="destination"
+                                       autocomplete="country-name" placeholder="e.g. Dubai, UAE">
+                            </div>
+                        </div>
+                        {% include 'portal/includes/captcha_field.html' with suffix='hero' %}
+                        <button type="submit" class="btn btn-accent btn-lg w-100">Request This Product</button>
+                        {% comment %}No inline colour. This carried style="color:rgba(255,255,255,.7)"
+                           from when the card was dark, and an inline style beats every
+                           stylesheet rule - so when the card went white the line stayed
+                           white on white and simply vanished. The card's own CSS colours
+                           it.{% endcomment %}
+                        <p class="small text-center mt-2 mb-0 lead-card-note"><i class="bi bi-shield-lock me-1"></i>No spam. Unsubscribe anytime.</p>
                     </form>
                 </div>
             </div>
         </div>
+        {% comment %}--------------------------------------------------------------
+           CREDIBILITY FIGURES
+           -----------------------------------------------------------------
+           These were hardcoded: "500+ Products Sourced", "98% Quality Pass Rate",
+           "200+ Verified Suppliers", "24/7 Client Support". None came from any
+           data — they were template placeholders that shipped as if they were
+           facts. Your buyer is someone who has been burned importing from China
+           before and is scanning for reasons to distrust you; unsourced round
+           numbers read as filler and drag down the specific claims beside them.
+
+           Each figure now comes from Settings → Homepage Figures and renders ONLY
+           when it has been filled in. Everything is blank by default, so nothing
+           unverified ships. The whole row disappears if none are set.
+           ---------------------------------------------------------{% endcomment %}
+        {% if settings.stat_years_in_china or settings.stat_products_sourced or settings.stat_verified_suppliers or settings.stat_active_clients %}
         <div class="hero-stats mt-5">
             <div class="row justify-content-center g-4">
+                {% if settings.stat_years_in_china %}
                 <div class="col-6 col-md-3">
                     <div class="hero-stat-card">
-                        <div class="stat-value">500+</div>
+                        <div class="stat-value">{{ settings.stat_years_in_china }}</div>
+                        <div class="stat-label">Years Based in China</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if settings.stat_verified_suppliers %}
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">{{ settings.stat_verified_suppliers }}</div>
+                        <div class="stat-label">Factories Visited</div>
+                    </div>
+                </div>
+                {% endif %}
+                {% if settings.stat_products_sourced %}
+                <div class="col-6 col-md-3">
+                    <div class="hero-stat-card">
+                        <div class="stat-value">{{ settings.stat_products_sourced }}</div>
                         <div class="stat-label">Products Sourced</div>
                     </div>
                 </div>
+                {% endif %}
+                {% if settings.stat_active_clients %}
                 <div class="col-6 col-md-3">
                     <div class="hero-stat-card">
-                        <div class="stat-value">98%</div>
-                        <div class="stat-label">Quality Pass Rate</div>
+                        <div class="stat-value">{{ settings.stat_active_clients }}</div>
+                        <div class="stat-label">Active Clients</div>
                     </div>
                 </div>
-                <div class="col-6 col-md-3">
-                    <div class="hero-stat-card">
-                        <div class="stat-value">200+</div>
-                        <div class="stat-label">Verified Suppliers</div>
-                    </div>
-                </div>
-                <div class="col-6 col-md-3">
-                    <div class="hero-stat-card">
-                        <div class="stat-value">24/7</div>
-                        <div class="stat-label">Client Support</div>
-                    </div>
-                </div>
+                {% endif %}
             </div>
         </div>
+        {% endif %}
     </div>
 </section>
 
+{% comment %}----------------------------------------------------------------
+   THE CAPABILITY PANEL
+   ---------------------------------------------------------------------------
+   Four labels on a thin white strip became a navy panel lifted onto the seam
+   between the hero photograph and the page. Each item gained a line of
+   explanation, because "Verified Suppliers" on its own is a claim every
+   sourcing site makes - "we walk into the factory" is the part that is ours.
+
+   The columns are col-6 col-lg-3: four across on a desktop, two on a tablet or
+   phone. The dividers come from .trust-col in the stylesheet, which drops the
+   left border on the first of each row at both counts.
+--------------------------------------------------------------------{% endcomment %}
 <section class="trust-bar">
     <div class="container">
-        <div class="row g-4 align-items-center justify-content-center text-center">
-            <div class="col-6 col-md-3">
-                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-check-circle-fill"></i>
-                    <span>Verified Suppliers</span>
+        <div class="trust-panel">
+            <div class="row g-0">
+                <div class="col-6 col-lg-3 trust-col">
+                    <div class="trust-item">
+                        <i class="bi bi-patch-check" aria-hidden="true"></i>
+                        <span class="trust-item__body">
+                            <span class="trust-item__title">Verified Suppliers</span>
+                            <span class="trust-item__desc">Factories visited and checked on the ground in China.</span>
+                        </span>
+                    </div>
                 </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-truck"></i>
-                    <span>Shipping Coordination</span>
+                <div class="col-6 col-lg-3 trust-col">
+                    <div class="trust-item">
+                        <i class="bi bi-truck" aria-hidden="true"></i>
+                        <span class="trust-item__body">
+                            <span class="trust-item__title">Shipping Coordination</span>
+                            <span class="trust-item__desc">Air and sea freight to the UAE and the wider Gulf.</span>
+                        </span>
+                    </div>
                 </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-broadcast"></i>
-                    <span>Order Tracking</span>
+                <div class="col-6 col-lg-3 trust-col">
+                    <div class="trust-item">
+                        <i class="bi bi-broadcast" aria-hidden="true"></i>
+                        <span class="trust-item__body">
+                            <span class="trust-item__title">Order Tracking</span>
+                            <span class="trust-item__desc">Every order visible from factory floor to delivery.</span>
+                        </span>
+                    </div>
                 </div>
-            </div>
-            <div class="col-6 col-md-3">
-                <div class="trust-item d-flex align-items-center justify-content-center gap-2">
-                    <i class="bi bi-tags"></i>
-                    <span>Competitive Pricing</span>
+                <div class="col-6 col-lg-3 trust-col">
+                    <div class="trust-item">
+                        <i class="bi bi-tags" aria-hidden="true"></i>
+                        <span class="trust-item__body">
+                            <span class="trust-item__title">Competitive Pricing</span>
+                            <span class="trust-item__desc">Factory prices negotiated directly, in Mandarin.</span>
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </section>
 
+{% comment %}--------------------------------------------------------------------
+   HOW WE WORK — replaces the old "proof strip"
+   ---------------------------------------------------------------------------
+   This strip previously showed "4.8/5 Client Rating", "150+ Active Importers",
+   "7+ Years in China" and "100% Payment Protection" with star icons. The 4.8/5
+   in particular was also being emitted as schema.org aggregateRating, which is a
+   Google structured-data policy violation when the rating is self-declared and
+   not visible as real reviews — the penalty is loss of ALL rich results for the
+   domain, so it was removed there too.
+
+   What replaces it is stronger, not weaker: statements about how the business
+   actually operates. Each one is verifiable, each one is a genuine differentiator
+   against a remote agent, and none of them can be challenged as an invented
+   metric. "We are in the building" beats "98% quality pass rate" precisely
+   because a sceptical buyer can imagine checking it.
+-----------------------------------------------------------------------{% endcomment %}
 <section class="proof-strip">
     <div class="container">
         <div class="row g-4 text-center justify-content-center">
             <div class="col-6 col-md-3">
                 <div class="proof-item">
-                    <div class="star-rating mb-1"><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i></div>
-                    <div class="proof-value">4.8/5</div>
-                    <div class="proof-label">Client Rating</div>
+                    <i class="bi bi-geo-alt-fill proof-icon"></i>
+                    <div class="proof-value">In China</div>
+                    <div class="proof-label">Our office is in Xuzhou, not a call centre</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="proof-item">
-                    <i class="bi bi-people-fill proof-icon"></i>
-                    <div class="proof-value">150+</div>
-                    <div class="proof-label">Active Importers</div>
+                    <i class="bi bi-building-check proof-icon"></i>
+                    <div class="proof-value">In Person</div>
+                    <div class="proof-label">We visit the factory before you pay</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="proof-item">
-                    <i class="bi bi-globe proof-icon"></i>
-                    <div class="proof-value">7+</div>
-                    <div class="proof-label">Years in China</div>
+                    <i class="bi bi-camera-fill proof-icon"></i>
+                    <div class="proof-value">Photo Proof</div>
+                    <div class="proof-label">Inspection report before goods ship</div>
                 </div>
             </div>
             <div class="col-6 col-md-3">
                 <div class="proof-item">
-                    <i class="bi bi-shield-check proof-icon"></i>
-                    <div class="proof-value">100%</div>
-                    <div class="proof-label">Payment Protection</div>
+                    <i class="bi bi-clock-fill proof-icon"></i>
+                    <div class="proof-value">{% if settings.stat_response_time %}{{ settings.stat_response_time }}{% else %}Fast{% endif %}</div>
+                    <div class="proof-label">Typical time to a written quote</div>
                 </div>
             </div>
         </div>
@@ -169,21 +314,34 @@
             <h2 class="section-title">Amazon & Noon Products</h2>
             <p class="section-subtitle mx-auto">Browse ready-to-ship products from China for Amazon FBA and Noon. Registered customers can view prices, place orders, and upload shipping labels.</p>
         </div>
-        <div class="row g-4 justify-content-center">
-            <div class="col-md-8 col-lg-6">
-                <a href="{% url 'portal_marketplace' %}" class="text-decoration-none">
-                    <div class="service-card h-100 text-center">
-                        <div class="service-icon">
-                            <i class="bi bi-shop"></i>
-                        </div>
-                        <h5 class="fw-bold mb-2">Marketplace</h5>
-                        <p class="text-secondary small mb-0">Browse Amazon and Noon products in one place. Filter by source, add to cart, and checkout.</p>
-                    </div>
-                </a>
-            </div>
+        {% comment %}Real stock, not a card that promises it.
+
+           This section used to be a single tile linking to /shop/, so the
+           storefront's homepage showed no products at all. The card partial is
+           the same one /shop/ renders, so a product looks identical in both
+           places and there is one template to fix when it changes.
+
+           The whole grid is skipped when the catalogue is empty rather than
+           rendering an empty row — the buttons below still give a way in.
+        {% endcomment %}
+        {% if featured_products %}
+        <div class="shop-grid">
+            {% for entry in featured_products %}
+            {% include "portal/includes/shop_product_card.html" with data=entry %}
+            {% endfor %}
         </div>
-        <div class="text-center mt-4">
-            <a href="{% url 'portal_login' %}" class="btn btn-primary"><i class="bi bi-box-arrow-in-right me-2"></i>Login to Browse Products</a>
+        {% endif %}
+
+        <div class="text-center mt-4 d-flex gap-2 justify-content-center flex-wrap">
+            <a href="{% url 'shop_index' %}" class="btn btn-primary">
+                <i class="bi bi-grid me-2"></i>Browse all products
+            </a>
+            {% comment %}These carry the marketplace filter the catalogue
+               sidebar sets, and are the same URLs the retired
+               /products/amazon/ and /products/noon/ pages now redirect to.
+            {% endcomment %}
+            <a href="{% url 'shop_index' %}?source=amazon" class="btn btn-outline-secondary">Amazon</a>
+            <a href="{% url 'shop_index' %}?source=noon" class="btn btn-outline-secondary">Noon</a>
         </div>
     </div>
 </section>
@@ -241,9 +399,36 @@
 
 <section class="feature-section section-padding">
     <div class="container">
-        <div class="row g-5 align-items-center">
+        <div class="row g-4 g-lg-5 align-items-center">
             <div class="col-lg-6">
-                <img src="https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80" alt="China sourcing operations" class="about-image img-fluid w-100">
+                {% comment %}--------------------------------------------------------
+                   Owner-uploaded photo if one exists, otherwise the bundled stock
+                   image. Upload yours at Django admin → Settings Manager → Site
+                   Images → "Homepage" slot.
+
+                   This is the single highest-value image on the site: the section
+                   beside it claims you are physically in China visiting factories,
+                   and a generic stock warehouse actively undermines that. A real
+                   phone photo of your team on a factory floor is worth more here
+                   than any professional stock shot.
+
+                   width/height are set so the browser reserves the space before
+                   the file arrives — without them the text beside it jumps as the
+                   image loads, which is measured as Cumulative Layout Shift and is
+                   one of the Core Web Vitals Google ranks on.
+                   -------------------------------------------------------{% endcomment %}
+                {% if site_images.home_feature %}
+                <img src="{{ site_images.home_feature.image.url }}"
+                     alt="{{ site_images.home_feature.alt_text|default:'Our team visiting a factory in China' }}"
+                     class="about-image img-fluid w-100" width="1200" height="800" loading="lazy" decoding="async">
+                {% if site_images.home_feature.caption %}
+                <p class="small text-secondary mt-2 mb-0">{{ site_images.home_feature.caption }}</p>
+                {% endif %}
+                {% else %}
+                <img src="{% static 'images/stock/china-operations.webp' %}"
+                     alt="Cargo and sourcing operations in China"
+                     class="about-image img-fluid w-100" width="1200" height="800" loading="lazy" decoding="async">
+                {% endif %}
             </div>
             <div class="col-lg-6">
                 <span class="section-label">Why Choose Us</span>
@@ -311,7 +496,12 @@
             {% for item in portfolio_items %}
             <div class="col-md-6 col-lg-4">
                 <div class="img-card">
-                    <img src="{{ item.image|default:'https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?auto=format&fit=crop&w=800&q=80' }}" alt="{{ item.title }}">
+                    {% comment %}An if/else rather than a `|default:` filter, because
+                       `{% static %}` is a tag and cannot be nested inside a filter
+                       argument.{% endcomment %}
+                    <img src="{% if item.image %}{{ item.image }}{% else %}{% static 'images/stock/china-operations.webp' %}{% endif %}"
+                         alt="{{ item.title }}"
+                         width="1200" height="800" loading="lazy" decoding="async">
                     <div class="img-overlay">
                         <h5 class="fw-bold mb-1">{{ item.title }}</h5>
                         <p class="text-white-50 small mb-0">{{ item.description }}</p>

@@ -1,26 +1,16 @@
-{% extends 'portal/base.html' %}
+{% extends 'portal/app_base.html' %}
 {% load static %}
 
 {% block title %}My Requests — {{ customer.name }}{% endblock %}
 
-{% block content %}
+{% block page_title %}Quote Requests{% endblock %}
+{% block page_subtitle %}<p class="app-topbar-sub">Track your quotation requests and their status</p>{% endblock %}
+{% block page_actions %}<a href="{% url 'request_quote' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>New request</a>{% endblock %}
+
+{% block page %}
 
 <section class="py-4">
     <div class="container">
-        <div class="d-flex align-items-center justify-content-between mb-4">
-            <div>
-                <h4 class="fw-bold mb-1">My Product Requests</h4>
-                <p class="text-secondary mb-0 small">Track your quotation requests and their status.</p>
-            </div>
-            <div class="d-flex gap-2">
-                <a href="{% url 'request_quote' %}" class="btn btn-primary btn-sm">
-                    <i class="bi bi-plus-lg me-1"></i>New Request
-                </a>
-                <a href="{% url 'portal_dashboard' %}" class="btn btn-outline-secondary btn-sm">
-                    <i class="bi bi-arrow-left me-1"></i>Back
-                </a>
-            </div>
-        </div>
 
         <div class="card shadow-sm border-0">
             <div class="card-body p-0">
@@ -45,7 +35,7 @@
                                 <td>
                                     <div class="fw-medium">{{ req.name }}</div>
                                     {% if req.product_link %}
-                                    <a href="{{ req.product_link }}" target="_blank" class="small text-decoration-none">
+                                    <a href="{{ req.product_link }}" target="_blank" rel="noopener noreferrer" class="small text-decoration-none">
                                         <i class="bi bi-link-45deg"></i> View Link
                                     </a>
                                     {% endif %}
@@ -54,11 +44,11 @@
                                     {% if req.images.exists %}
                                     <div class="d-flex gap-1">
                                         {% for img in req.images.all|slice:":3" %}
-                                        <a href="{{ img.image.url }}" target="_blank">
+                                        <a href="{{ img.image.url }}" target="_blank" rel="noopener">
                                             <img src="{{ img.image.url }}" class="rounded" style="width:40px;height:40px;object-fit:cover;" alt="">
                                         </a>
                                         {% endfor %}
-                                        {% if req.images.count > 3 %}
+                                        {% if req.images.all|length > 3 %}
                                         <span class="badge bg-light text-dark d-flex align-items-center">+{{ req.images.count|add:"-3" }}</span>
                                         {% endif %}
                                     </div>

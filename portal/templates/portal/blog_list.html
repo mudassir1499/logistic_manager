@@ -1,0 +1,190 @@
+{% extends 'portal/base.html' %}
+{% block body_class %}has-hero{% endblock %}
+{% load static %}
+
+{% comment %}--------------------------------------------------------------------
+   BLOG INDEX
+   ---------------------------------------------------------------------------
+   The hub of the content cluster. It links out to every article, so it is both
+   the page a visitor browses and the page that tells Google how the articles
+   relate to each other.
+
+   The title and description change when a category filter is active, so the
+   filtered view does not present itself as a duplicate of the unfiltered one.
+-----------------------------------------------------------------------{% endcomment %}
+
+{% block title %}{% if active_category %}{{ active_category.name }} — China Sourcing Blog{% else %}China Sourcing & Import Blog for UAE Businesses{% endif %} | {{ settings.company_name|default:"LogiManager" }}{% endblock %}
+{% block meta_description %}{% if active_category %}{{ active_category.description|default:active_category.name }} Practical guides for UAE importers buying from China.{% else %}Practical guides for UAE and Middle East importers: how to verify Chinese suppliers, customs duty and VAT, air vs sea freight to Dubai, MOQ negotiation, Amazon FBA and Noon sourcing.{% endif %}{% endblock %}
+{% block meta_keywords %}China sourcing blog, import from China to UAE, Dubai import guide, UAE customs duty China, shipping China to Dubai, Amazon FBA UAE sourcing{% endblock %}
+{% block og_title %}{% if active_category %}{{ active_category.name }}{% else %}China Sourcing & Import Guides for UAE Businesses{% endif %}{% endblock %}
+{% block og_description %}Practical, no-fluff guides for UAE importers buying from China — suppliers, inspections, freight, customs and costs.{% endblock %}
+{% block twitter_title %}{% if active_category %}{{ active_category.name }}{% else %}China Sourcing & Import Guides for UAE Businesses{% endif %}{% endblock %}
+{% block twitter_description %}Practical, no-fluff guides for UAE importers buying from China — suppliers, inspections, freight, customs and costs.{% endblock %}
+
+{% comment %}A filtered or paginated listing has no unique content of its own worth
+   ranking, so it points its canonical at the clean /blog/ URL. That consolidates
+   the ranking signals onto one address instead of splitting them across
+   ?category=… and ?page=… variants of the same list.{% endcomment %}
+{% block canonical_url %}{{ settings.base_url }}{% url 'blog_index' %}{% endblock %}
+
+{% block structured_data %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Blog",
+  "@id": "{{ settings.base_url }}/blog/#blog",
+  "name": "China Sourcing & Import Guides for UAE Businesses",
+  "description": "Practical guides for UAE and Middle East businesses importing from China.",
+  "url": "{{ settings.base_url }}/blog/",
+  "publisher": {"@id": "{{ settings.base_url }}/#business"},
+  "inLanguage": "en"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "{{ settings.base_url }}/"},
+    {"@type": "ListItem", "position": 2, "name": "Blog", "item": "{{ settings.base_url }}/blog/"}
+  ]
+}
+</script>
+{% endblock %}
+
+{% block content %}
+
+<section class="blog-hero">
+    <div class="container">
+        <div class="text-center py-5">
+            <span class="section-label">Knowledge Base</span>
+            <h1 class="hero-title">{% if active_category %}{{ active_category.name }}{% else %}China Sourcing Guides for UAE Importers{% endif %}</h1>
+            <p class="hero-subtitle mx-auto" style="max-width:720px;">
+                {% if active_category and active_category.description %}
+                    {{ active_category.description }}
+                {% else %}
+                    Straight answers on suppliers, inspections, freight, customs and cost — written by a team that works inside China every day.
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</section>
+
+<section class="section-padding">
+    <div class="container">
+
+        {% comment %}Category filter. Rendered as links, not a JS dropdown, so each
+           filtered view is a real crawlable URL that search engines can follow.{% endcomment %}
+        {% if categories %}
+        <nav class="blog-filters mb-5 d-flex flex-wrap gap-2 justify-content-center" aria-label="Filter articles by topic">
+            <a href="{% url 'blog_index' %}" class="blog-chip{% if not active_category %} active{% endif %}">
+                All articles <span class="blog-chip-count">{{ total_posts }}</span>
+            </a>
+            {% for cat in categories %}
+            <a href="?category={{ cat.slug }}" class="blog-chip{% if active_category and active_category.pk == cat.pk %} active{% endif %}">
+                {{ cat.name }}
+            </a>
+            {% endfor %}
+        </nav>
+        {% endif %}
+
+        {% if featured_posts %}
+        <div class="mb-5">
+            <h2 class="section-title h4 mb-4"><i class="bi bi-star-fill text-warning me-2"></i>Start here</h2>
+            <div class="row g-4">
+                {% for post in featured_posts %}
+                <div class="col-md-4">
+                    <article class="blog-card blog-card-featured h-100">
+                        <div class="blog-card-body">
+                            {% if post.category %}<span class="blog-card-cat">{{ post.category.name }}</span>{% endif %}
+                            <h3 class="blog-card-title"><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h3>
+                            <p class="blog-card-excerpt">{{ post.excerpt }}</p>
+                            <div class="blog-card-meta">
+                                <i class="bi bi-clock"></i> {{ post.reading_minutes }} min read
+                            </div>
+                        </div>
+                    </article>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if posts %}
+        <div class="row g-4">
+            {% for post in posts %}
+            <div class="col-md-6 col-lg-4">
+                <article class="blog-card h-100">
+                    {% if post.hero_image %}
+                    <a href="{{ post.get_absolute_url }}" class="blog-card-img-link">
+                        {% comment %}width/height reserve the space before the image loads, which
+                           stops the grid jumping — that jump is measured as Cumulative Layout
+                           Shift and is one of the Core Web Vitals Google ranks on.{% endcomment %}
+                        <img src="{{ post.hero_image.url }}" alt="{{ post.hero_image_alt|default:post.title }}"
+                             class="blog-card-img" width="800" height="420" loading="lazy" decoding="async">
+                    </a>
+                    {% endif %}
+                    <div class="blog-card-body">
+                        {% if post.category %}<span class="blog-card-cat">{{ post.category.name }}</span>{% endif %}
+                        <h2 class="blog-card-title"><a href="{{ post.get_absolute_url }}">{{ post.title }}</a></h2>
+                        <p class="blog-card-excerpt">{{ post.excerpt }}</p>
+                        <div class="blog-card-meta">
+                            <time datetime="{{ post.published_at|date:'Y-m-d' }}">{{ post.published_at|date:'j M Y' }}</time>
+                            <span class="blog-meta-sep">·</span>
+                            <i class="bi bi-clock"></i> {{ post.reading_minutes }} min read
+                        </div>
+                        <a href="{{ post.get_absolute_url }}" class="blog-card-link">Read guide <i class="bi bi-arrow-right"></i></a>
+                    </div>
+                </article>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% comment %}Pagination that preserves the active category. The shared
+           includes/pagination.html emits a bare ?page=N, which would silently drop
+           the ?category= filter on every page change.{% endcomment %}
+        {% if page_obj.paginator.num_pages > 1 %}
+        <nav aria-label="Blog pages" class="d-flex justify-content-center mt-5">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?{% if active_category %}category={{ active_category.slug }}&amp;{% endif %}page={{ page_obj.previous_page_number }}" aria-label="Previous page"><i class="bi bi-chevron-left"></i></a></li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-left"></i></span></li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    {% if num == page_obj.number %}
+                    <li class="page-item active" aria-current="page"><span class="page-link">{{ num }}</span></li>
+                    {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
+                    <li class="page-item"><a class="page-link" href="?{% if active_category %}category={{ active_category.slug }}&amp;{% endif %}page={{ num }}" aria-label="Go to page {{ num }}">{{ num }}</a></li>
+                    {% endif %}
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?{% if active_category %}category={{ active_category.slug }}&amp;{% endif %}page={{ page_obj.next_page_number }}" aria-label="Next page"><i class="bi bi-chevron-right"></i></a></li>
+                {% else %}
+                <li class="page-item disabled"><span class="page-link"><i class="bi bi-chevron-right"></i></span></li>
+                {% endif %}
+            </ul>
+        </nav>
+        {% endif %}
+
+        {% else %}
+        <div class="text-center py-5">
+            <i class="bi bi-journal-text" style="font-size:3rem;opacity:.3;"></i>
+            <p class="text-secondary mt-3 mb-0">No articles in this topic yet.</p>
+            <a href="{% url 'blog_index' %}" class="btn btn-outline-primary mt-3">View all articles</a>
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<section class="cta-section">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Have a product in mind?</h2>
+        <p class="text-white-50 mb-4">Reading is useful. A real quote is better. Tell us what you want to source and we'll come back within 24 hours.</p>
+        <a href="{% url 'contact_page' %}" class="btn btn-primary btn-lg" onclick="window.gtagEvent('quote_cta_click',{location:'blog_index'});">Get a Free Quote</a>
+    </div>
+</section>
+
+{% endblock %}

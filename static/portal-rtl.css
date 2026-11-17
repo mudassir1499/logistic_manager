@@ -1,0 +1,110 @@
+/* ==========================================================================
+   RIGHT-TO-LEFT OVERRIDES
+   ==========================================================================
+   Loaded only on the Arabic pages, after portal.css.
+
+   `dir="rtl"` on <html> already mirrors text direction, text alignment, and the
+   order of inline and flex content — the browser does most of the work. What it
+   does NOT mirror is anything written with a physical direction: `left`, `right`,
+   `margin-left`, `padding-right`, `text-align: left`, and so on. Those stay put
+   and end up on the wrong side.
+
+   This file fixes exactly those cases. It is deliberately short: rather than
+   restating the whole stylesheet, it targets the specific physical properties
+   portal.css uses. If you add new components, prefer logical properties
+   (`margin-inline-start` instead of `margin-left`) and they will mirror
+   automatically with no entry needed here.
+   ========================================================================== */
+
+body[dir='rtl'],
+html[dir='rtl'] body {
+  /* Cairo covers Arabic and Latin, so mixed-script lines (e.g. "شحن FOB") stay
+     visually consistent instead of switching typeface mid-sentence. */
+  font-family: 'Cairo', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  text-align: right;
+}
+
+/* --- Bootstrap spacing utilities -----------------------------------------
+   me-1/me-2/ms-2 etc. are hardcoded to margin-right / margin-left. Every icon
+   in the navigation and buttons uses them, so without this every icon sits on
+   the wrong side of its label. */
+[dir='rtl'] .me-1 { margin-right: 0 !important; margin-left: 0.25rem !important; }
+[dir='rtl'] .me-2 { margin-right: 0 !important; margin-left: 0.5rem !important; }
+[dir='rtl'] .me-3 { margin-right: 0 !important; margin-left: 1rem !important; }
+[dir='rtl'] .ms-1 { margin-left: 0 !important; margin-right: 0.25rem !important; }
+[dir='rtl'] .ms-2 { margin-left: 0 !important; margin-right: 0.5rem !important; }
+[dir='rtl'] .ms-3 { margin-left: 0 !important; margin-right: 1rem !important; }
+[dir='rtl'] .ms-auto { margin-left: 0 !important; margin-right: auto !important; }
+[dir='rtl'] .me-auto { margin-right: 0 !important; margin-left: auto !important; }
+[dir='rtl'] .text-md-start { text-align: right !important; }
+[dir='rtl'] .text-md-end { text-align: left !important; }
+
+/* --- Lists ---------------------------------------------------------------- */
+[dir='rtl'] ul,
+[dir='rtl'] ol { padding-right: 22px; padding-left: 0; }
+
+/* --- Floating quick-actions column ----------------------------------------
+   Deliberately NOT mirrored.
+
+   The instinct is to move the stack to the bottom right in RTL, and that is what
+   this rule originally did. It was wrong: the Tawk.to chat bubble is positioned
+   bottom-right by a third-party script that knows nothing about text direction,
+   so mirroring put our buttons directly underneath it.
+
+   Not colliding matters more than mirroring here. A persistent action column is
+   read as page furniture rather than as content, so leaving it on the left in
+   both directions costs nothing, while an overlap makes one of the two buttons
+   unusable. The stack therefore stays put and the right side remains reserved
+   for the chat widget in both directions. */
+
+/* --- Article and content blocks ------------------------------------------- */
+[dir='rtl'] .blog-article-body { text-align: right; }
+[dir='rtl'] .blog-article-body blockquote {
+  border-left: none;
+  border-right: 4px solid var(--color-primary);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+[dir='rtl'] .blog-article-body th,
+[dir='rtl'] .blog-article-body td { text-align: right; }
+[dir='rtl'] .blog-breadcrumb { flex-direction: row-reverse; justify-content: flex-end; }
+
+/* --- Forms ---------------------------------------------------------------- */
+[dir='rtl'] .form-control,
+[dir='rtl'] .form-select { text-align: right; }
+/* The select chevron is positioned on the right by Bootstrap; move it across and
+   flip the padding that keeps text clear of it. */
+[dir='rtl'] .form-select {
+  background-position: left 0.75rem center;
+  padding-right: 1rem;
+  padding-left: 2.5rem;
+}
+
+/* --- Dropdowns ------------------------------------------------------------ */
+[dir='rtl'] .dropdown-menu { text-align: right; }
+[dir='rtl'] .dropdown-menu-end { --bs-position: start; }
+
+/* --- Feature and service lists -------------------------------------------- */
+[dir='rtl'] .feature-list-item { flex-direction: row-reverse; }
+[dir='rtl'] .service-features { padding-right: 0; }
+[dir='rtl'] .hero-checklist { padding-right: 0; }
+
+/* --- Numerals -------------------------------------------------------------
+   Keep Western Arabic numerals (0-9) rather than Eastern Arabic-Indic (٠-٩).
+   Gulf business writing overwhelmingly uses the Western forms for prices,
+   dimensions and dates, and mixing the two in a table of freight costs is
+   genuinely hard to read. */
+[dir='rtl'] {
+  font-variant-numeric: lining-nums;
+  -moz-font-feature-settings: 'lnum';
+  font-feature-settings: 'lnum';
+}
+
+/* --- Signed-in portal shell ------------------------------------------------
+   The shell is written with logical properties, so the sidebar, its active
+   marker and the badges all mirror on their own. The one exception is the
+   mobile drawer: translateX is a physical transform and does not flip, so an
+   RTL drawer would slide in from the left, off the edge it does not live on. */
+@media (max-width: 991.98px) {
+  [dir='rtl'] .app-sidebar { transform: translateX(100%); }
+  [dir='rtl'] .app-sidebar.open { transform: translateX(0); }
+}

@@ -1,0 +1,369 @@
+{% extends 'portal/app_base.html' %}
+{% load static %}
+
+{% comment %}
+Full detail view for one product.
+
+Context (see portal.views.customer_product_detail):
+    product      the Product
+    images       list of ProductImage — .src resolves local file or supplier CDN
+    attributes   list of ProductAttribute, already in display order
+    cbm          carton volume in m³, or None
+    in_cart      True when this product is already in the customer's cart
+    can_add_to_cart  False for drafts
+    assignment   CustomerProduct when this product was assigned to them, else None
+
+DELIBERATELY ABSENT: product.source_url. That is the supplier's listing, and
+showing a customer where the goods are bought is showing them how to skip us.
+It stays on the staff screens only.
+{% endcomment %}
+
+{% block title %}{{ product.name }} — Product Details{% endblock %}
+
+{% block page_title %}{{ product.name }}{% endblock %}
+{% block page_subtitle %}
+{% if product.category %}
+<p class="app-topbar-sub">{{ product.subcategory.name|default:product.category.name }}</p>
+{% endif %}
+{% endblock %}
+
+{% block page_actions %}
+<a href="{% url 'portal_products' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left" aria-hidden="true"></i> Back to products
+</a>
+{% endblock %}
+
+{% block page %}
+
+<style>
+/* Scoped to this page with a pdp- prefix so nothing here can leak into the
+   catalogue cards, which share the portal stylesheet. */
+.pdp-layout { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 32px; align-items: start; }
+@media (max-width: 900px) { .pdp-layout { grid-template-columns: 1fr; gap: 24px; } }
+
+.pdp-gallery__main { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; border-radius: 14px; border: 1px solid var(--border-color, rgba(0,0,0,.1)); background: var(--bg-input, #f4f4f5); display: block; }
+.pdp-gallery__empty { display: flex; align-items: center; justify-content: center; font-size: 42px; color: var(--text-secondary, #71717a); }
+.pdp-thumbs { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.pdp-thumb { width: 68px; height: 68px; border-radius: 10px; overflow: hidden; border: 2px solid transparent; background: none; padding: 0; cursor: pointer; }
+.pdp-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pdp-thumb.is-active { border-color: var(--accent-3, #b08421); }
+
+.pdp-price { font-size: 30px; font-weight: 700; margin: 0 0 2px; }
+.pdp-price__cur { font-size: 15px; font-weight: 600; margin-left: 6px; color: var(--text-secondary, #71717a); }
+.pdp-moq { color: var(--text-secondary, #71717a); margin: 0 0 20px; font-size: 14px; }
+
+.pdp-flags { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+.pdp-flag { font-size: 11px; font-weight: 700; letter-spacing: .02em; border-radius: 999px; padding: 4px 11px; background: rgba(0,0,0,.06); }
+.pdp-flag--ready { background: rgba(74,222,128,.18); color: #157f4a; }
+.pdp-flag--amazon { background: rgba(255,153,0,.18); color: #8a5a00; }
+.pdp-flag--noon { background: rgba(254,224,11,.22); color: #7a6a00; }
+
+/* .pdp-specs / .pdp-spec deliberately live ONLY in static/portal.css, which
+   app_base -> portal/base.html already loads. They used to be defined in both
+   places, byte-identical, which meant a fix to the spec sheet applied to
+   whichever copy you happened to find - the public shop page reads the
+   stylesheet copy, this page read the one below it. */
+
+.pdp-section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--text-secondary, #71717a); margin: 26px 0 10px; }
+
+/* Capped and scrollable: a listing with seventeen options must not push the
+   Add-to-cart button below the fold. */
+.pdp-variants { max-height: 300px; overflow-y: auto; border: 1px solid var(--border-color, rgba(0,0,0,.1)); border-radius: 12px; }
+.pdp-variant { display: flex; align-items: center; gap: 11px; padding: 9px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color, rgba(0,0,0,.07)); margin: 0; }
+.pdp-variant:last-child { border-bottom: 0; }
+.pdp-variant:hover { background: rgba(0,0,0,.03); }
+.pdp-variant:has(input:checked) { background: rgba(176,132,33,.10); }
+.pdp-variant__img { width: 40px; height: 40px; object-fit: cover; border-radius: 7px; flex: 0 0 auto; }
+.pdp-variant__body { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.pdp-variant__name { font-size: 13px; font-weight: 600; }
+.pdp-variant__stock { font-size: 11px; color: var(--text-secondary, #71717a); }
+.pdp-variant__price { font-weight: 700; font-size: 14px; white-space: nowrap; }
+
+.pdp-actions { display: flex; gap: 10px; align-items: center; margin-top: 22px; flex-wrap: wrap; }
+.pdp-actions .product-qty-input { max-width: 120px; }
+.pdp-note { font-size: 13px; color: var(--text-secondary, #71717a); margin-top: 14px; display: flex; gap: 7px; align-items: flex-start; }
+</style>
+
+<section class="py-4">
+  <div class="container">
+    <div class="pdp-layout">
+
+      {# ---------------------------------------------------------------- #}
+      {# Gallery                                                          #}
+      {# ---------------------------------------------------------------- #}
+      <div class="pdp-gallery">
+        {% if images %}
+        <img src="{{ images.0.src }}"
+             alt="{{ product.name }}"
+             class="pdp-gallery__main"
+             id="pdpMainImage">
+
+        {% if images|length > 1 %}
+        <div class="pdp-thumbs">
+          {% for img in images %}
+          <button type="button"
+                  class="pdp-thumb {% if forloop.first %}is-active{% endif %}"
+                  data-src="{{ img.src }}"
+                  aria-label="View image {{ forloop.counter }}">
+            <img src="{{ img.src }}" alt="" loading="lazy">
+          </button>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% else %}
+        <div class="pdp-gallery__main pdp-gallery__empty">
+          <i class="bi bi-image" aria-hidden="true"></i>
+        </div>
+        {% endif %}
+      </div>
+
+      {# ---------------------------------------------------------------- #}
+      {# Details                                                          #}
+      {# ---------------------------------------------------------------- #}
+      <div class="pdp-info">
+
+        {% if product.source != 'general' or product.ready_to_ship %}
+        <div class="pdp-flags">
+          {% if product.source == 'amazon' %}<span class="pdp-flag pdp-flag--amazon">Amazon</span>{% endif %}
+          {% if product.source == 'noon' %}<span class="pdp-flag pdp-flag--noon">Noon</span>{% endif %}
+          {% if product.ready_to_ship %}
+          <span class="pdp-flag pdp-flag--ready"><i class="bi bi-truck" aria-hidden="true"></i> Ready to ship</span>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        {% if variants %}
+        <p class="pdp-price" id="pdpPrice">{{ price_low }}<span class="pdp-price__cur">{{ settings.currency_symbol }}</span></p>
+        <p class="pdp-moq">
+          {% if price_low != price_high %}From {{ price_low }} to {{ price_high }} {{ settings.currency_symbol }} · {% endif %}
+          Minimum order {{ product.moq }} pcs
+        </p>
+
+        {% comment %}One radio per variation. Radios rather than a <select> because
+           each option carries a price and often a photo, and a native select can
+           show neither. The whole group is keyboard-navigable for free.
+        {% endcomment %}
+        <h2 class="pdp-section-title">Options — {{ variants|length }}</h2>
+        <div class="pdp-variants" role="radiogroup" aria-label="Choose an option">
+          {% for v in variants %}
+          <label class="pdp-variant">
+            <input type="radio" name="pdpVariant" value="{{ v.id }}"
+                   data-price="{{ v.price }}"
+                   data-img="{{ v.src }}"
+                   {% if forloop.first %}checked{% endif %}>
+            {% if v.src %}<img src="{{ v.src }}" alt="" loading="lazy" class="pdp-variant__img">{% endif %}
+            <span class="pdp-variant__body">
+              <span class="pdp-variant__name">{{ v.name }}</span>
+              {% if v.stock %}<span class="pdp-variant__stock">stock {{ v.stock }}</span>{% endif %}
+            </span>
+            <span class="pdp-variant__price">{{ v.price }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="pdp-price">{{ product.price }}<span class="pdp-price__cur">{{ settings.currency_symbol }}</span></p>
+        <p class="pdp-moq">Minimum order {{ product.moq }} pcs</p>
+        {% endif %}
+
+        {% comment %}The shipping figures first: they are the ones that decide
+           whether an order is viable, and they exist on every product.
+        {% endcomment %}
+        {# Staff only: opens the supplier listing. Absent from the response for everyone else. #}
+        {% include "portal/includes/_supplier_link.html" with product=product %}
+
+        <div class="pdp-specs">
+          {% if product.sku %}
+          <div class="pdp-spec"><span class="pdp-spec__k">SKU</span><span class="pdp-spec__v">{{ product.sku }}</span></div>
+          {% endif %}
+          {% if product.weight %}
+          <div class="pdp-spec"><span class="pdp-spec__k">Weight</span><span class="pdp-spec__v">{{ product.weight }} KG</span></div>
+          {% endif %}
+          {% if product.carton_qty %}
+          <div class="pdp-spec"><span class="pdp-spec__k">Pieces / carton</span><span class="pdp-spec__v">{{ product.carton_qty }}</span></div>
+          {% endif %}
+          {% if cbm %}
+          <div class="pdp-spec"><span class="pdp-spec__k">Carton volume</span><span class="pdp-spec__v">{{ cbm }} CBM</span></div>
+          {% endif %}
+          {% if product.carton_length and product.carton_width and product.carton_height %}
+          <div class="pdp-spec">
+            <span class="pdp-spec__k">Carton size</span>
+            <span class="pdp-spec__v">{{ product.carton_length }} × {{ product.carton_width }} × {{ product.carton_height }} CM</span>
+          </div>
+          {% endif %}
+          {% if product.category %}
+          <div class="pdp-spec">
+            <span class="pdp-spec__k">Category</span>
+            <span class="pdp-spec__v">{{ product.subcategory.name|default:product.category.name }}</span>
+          </div>
+          {% endif %}
+        </div>
+
+        {% comment %}The free-form attributes staff enter per product — model,
+           model number, material, voltage, whatever this product needs. Rendered
+           in the order they were arranged in the editor, and the whole block
+           disappears when there are none rather than showing an empty heading.
+        {% endcomment %}
+        {% if attributes %}
+        <h2 class="pdp-section-title">Specifications</h2>
+        <div class="pdp-specs">
+          {% for attr in attributes %}
+          <div class="pdp-spec">
+            <span class="pdp-spec__k">{{ attr.name }}</span>
+            <span class="pdp-spec__v">{{ attr.value }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if assignment.note %}
+        <h2 class="pdp-section-title">Note from your account manager</h2>
+        <p>{{ assignment.note }}</p>
+        {% endif %}
+
+        {% comment %}The class names below are JS hooks in static/portal.js, which
+           walks up via closest('.product-card') to find the quantity input — so
+           this action row must carry that class even though it is not a card.
+        {% endcomment %}
+        {% if can_add_to_cart %}
+        <div class="pdp-actions product-card">
+          <input type="number"
+                 class="form-control product-qty-input"
+                 value="{{ product.moq }}"
+                 min="{{ product.moq }}"
+                 aria-label="Quantity for {{ product.name }}">
+          {% if in_cart %}
+          <button class="btn btn-secondary" disabled>
+            <i class="bi bi-check-lg" aria-hidden="true"></i> In cart
+          </button>
+          {% else %}
+          <button class="btn btn-primary add-to-cart-btn"
+                  id="pdpAddToCart"
+                  data-product-id="{{ product.id }}"
+                  data-moq="{{ product.moq }}">
+            <i class="bi bi-cart-plus" aria-hidden="true"></i> Add to cart
+          </button>
+          {% endif %}
+          <a href="{% url 'request_quote' %}" class="btn btn-outline-secondary">Request a quote</a>
+        </div>
+        {% endif %}
+
+        {% include "portal/includes/share_buttons.html" with share_url=share_url share_title=product.name %}
+
+        {% if product.ready_to_ship %}
+        <p class="pdp-note">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+          Ready to ship — you will be asked for shipping and carton labels at checkout.
+        </p>
+        {% endif %}
+
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+// Broken images, including the kind that "load".
+//
+// Product photos are a mix of files we host and links to the supplier's CDN, and
+// a CDN link rots when the supplier delists the listing or the host starts
+// blocking hotlinks.
+//
+// THE IMPORTANT CASE: alicdn does not 404 a dead image. It answers 200 with a
+// 1x1 pixel. The browser therefore fires `load`, not `error`, and object-fit
+// stretches that single pixel across the whole frame — which is why a missing
+// photo showed up as a large blank box rather than a broken-image icon, and why
+// an onerror handler alone did nothing.
+//
+// So both signals count: a real failure, or a "successful" image too small to be
+// a product photo. The main image falls through to the next candidate; when none
+// survive, the placeholder takes over. A bad thumbnail removes itself.
+(function () {
+    var main = document.getElementById('pdpMainImage');
+    if (!main) return;
+
+    // No product photo is 8px. A 1x1 or 2x2 is a CDN placeholder, nothing else.
+    var MIN_USABLE_PX = 8;
+
+    function isUsable(img) {
+        return img.naturalWidth >= MIN_USABLE_PX && img.naturalHeight >= MIN_USABLE_PX;
+    }
+
+    var sources = [].slice.call(document.querySelectorAll('.pdp-thumb'))
+        .map(function (t) { return t.dataset.src; });
+    if (!sources.length) sources = [main.getAttribute('src')];
+
+    function showPlaceholder() {
+        var box = document.createElement('div');
+        box.className = 'pdp-gallery__main pdp-gallery__empty';
+        box.innerHTML = '<i class="bi bi-image" aria-hidden="true"></i>';
+        main.replaceWith(box);
+    }
+
+    function advance() {
+        var next = sources[sources.indexOf(main.getAttribute('src')) + 1];
+        if (next) main.setAttribute('src', next);
+        else showPlaceholder();
+    }
+
+    main.addEventListener('error', advance);
+    main.addEventListener('load', function () {
+        if (!isUsable(main)) advance();
+    });
+    // A cached image can finish before the listener is attached.
+    if (main.complete && main.naturalWidth && !isUsable(main)) advance();
+
+    document.querySelectorAll('.pdp-thumb img').forEach(function (img) {
+        function drop() {
+            var button = img.closest('.pdp-thumb');
+            if (button) button.remove();
+        }
+        img.addEventListener('error', drop);
+        img.addEventListener('load', function () { if (!isUsable(img)) drop(); });
+        if (img.complete && img.naturalWidth && !isUsable(img)) drop();
+    });
+})();
+
+// Thumbnail switching. Plain listeners rather than inline handlers so the page
+// works unchanged if a Content-Security-Policy is added later.
+(function () {
+    var main = document.getElementById('pdpMainImage');
+    if (!main) return;
+    document.querySelectorAll('.pdp-thumb').forEach(function (thumb) {
+        thumb.addEventListener('click', function () {
+            main.src = thumb.dataset.src;
+            document.querySelectorAll('.pdp-thumb').forEach(function (t) {
+                t.classList.remove('is-active');
+            });
+            thumb.classList.add('is-active');
+        });
+    });
+})();
+
+// Picking a variation updates the headline price and, when that variation has
+// its own photo, the main image. The price shown must be the price charged —
+// leaving the "from" figure up while a dearer option is selected would be a
+// quiet lie about what the Add-to-cart button is going to do.
+(function () {
+    var radios = document.querySelectorAll('input[name="pdpVariant"]');
+    if (!radios.length) return;
+    var priceEl = document.getElementById('pdpPrice');
+    var main = document.getElementById('pdpMainImage');
+    var currency = priceEl ? priceEl.querySelector('.pdp-price__cur') : null;
+    var currencyText = currency ? currency.outerHTML : '';
+
+    function apply(radio) {
+        if (priceEl) priceEl.innerHTML = radio.dataset.price + currencyText;
+        if (main && radio.dataset.img) main.src = radio.dataset.img;
+    }
+
+    radios.forEach(function (radio) {
+        radio.addEventListener('change', function () { if (radio.checked) apply(radio); });
+    });
+
+    var checked = document.querySelector('input[name="pdpVariant"]:checked');
+    if (checked) apply(checked);
+})();
+</script>
+
+{% endblock %}
