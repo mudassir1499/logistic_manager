@@ -1,0 +1,163 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Quotations{% endblock %}
+{% block page_title %}Quotations{% endblock %}
+{% block nav_quotes %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="page-title"><i class="bi bi-file-earmark-text me-2"></i>Quotations</h1>
+    <p class="text-secondary mb-0">Every price offered, and what became of it</p>
+  </div>
+  <a href="{% url 'quotation_create' %}" class="btn btn-primary">
+    <i class="bi bi-plus-lg me-1"></i>New quotation
+  </a>
+</div>
+
+{% comment %}The figures this screen exists for.
+
+   Conversion is over DECIDED quotations, not all of them. Counting quotes that
+   are still open as losses would make the rate fall every time one is sent,
+   which is the opposite of what it should do.
+{% endcomment %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="text-secondary small">Open</div>
+      <div class="h3 mb-0">{{ open_count }}</div>
+      <div class="text-secondary" style="font-size:12px;">draft or awaiting an answer</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="text-secondary small">Accepted</div>
+      <div class="h3 mb-0">{{ accepted_count }}</div>
+      <div class="text-secondary" style="font-size:12px;">of {{ decided_count }} decided</div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="text-secondary small">Conversion</div>
+      <div class="h3 mb-0">
+        {% if conversion_rate is not None %}{{ conversion_rate }}%{% else %}&mdash;{% endif %}
+      </div>
+      <div class="text-secondary" style="font-size:12px;">
+        {% if conversion_rate is None %}nothing decided yet{% else %}accepted ÷ decided{% endif %}
+      </div>
+    </div></div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="card h-100"><div class="card-body">
+      <div class="text-secondary small">Total</div>
+      <div class="h3 mb-0">{{ total_count }}</div>
+      <div class="text-secondary" style="font-size:12px;">all time</div>
+    </div></div>
+  </div>
+</div>
+
+<div class="card mb-3"><div class="card-body">
+  <form method="get" class="row g-2 align-items-end">
+    <div class="col-12 col-md-4">
+      <label class="form-label small mb-1">Search</label>
+      <input type="search" name="q" value="{{ search }}" class="form-control form-control-sm"
+             placeholder="Number, customer or item">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1">Status</label>
+      <select name="status" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if status == value %}selected{% endif %}>
+          {{ label }}{% if counts|length %} ({{ counts|default_if_none:0 }}){% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label small mb-1">Customer</label>
+      <select name="customer" class="form-select form-select-sm">
+        <option value="">All</option>
+        {% for c in customers %}
+        <option value="{{ c.id }}" {% if customer_id == c.id|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2">
+      <button class="btn btn-sm btn-outline-secondary w-100">Filter</button>
+    </div>
+  </form>
+</div></div>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead>
+        <tr>
+          <th>Number</th>
+          <th>Customer</th>
+          <th class="text-center">Items</th>
+          <th class="text-end">Value</th>
+          <th class="text-center">Status</th>
+          <th>Valid until</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for q in quotations %}
+        <tr>
+          <td>
+            <a href="{% url 'quotation_detail' q.id %}" class="fw-semibold">{{ q.number }}</a>
+            {% if q.order_id %}
+            <div class="text-secondary" style="font-size:11.5px;">→ order #{{ q.order_id }}</div>
+            {% endif %}
+          </td>
+          <td>{{ q.customer.name }}</td>
+          <td class="text-center">{{ q.item_count }}</td>
+          <td class="text-end">{{ q.currency }} {{ q.subtotal|floatformat:2 }}</td>
+          <td class="text-center">
+            {% if q.status == 'accepted' %}<span class="badge bg-success">Accepted</span>
+            {% elif q.status == 'declined' %}<span class="badge bg-danger">Declined</span>
+            {% elif q.status == 'sent' %}<span class="badge bg-primary">Sent</span>
+            {% elif q.status == 'expired' %}<span class="badge bg-secondary">Expired</span>
+            {% else %}<span class="badge bg-secondary">Draft</span>{% endif %}
+          </td>
+          <td>
+            {% if q.valid_until %}
+              {{ q.valid_until|date:"d M Y" }}
+              {% comment %}Overdue is computed, never stored - see Quotation.is_overdue.{% endcomment %}
+              {% if q.is_overdue %}<span class="badge bg-warning text-dark ms-1">overdue</span>{% endif %}
+            {% else %}<span class="text-secondary">&mdash;</span>{% endif %}
+          </td>
+          <td class="text-secondary">{{ q.created_at|date:"d M Y" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center text-secondary py-5">
+            No quotations yet.
+            <a href="{% url 'quotation_create' %}">Create the first one</a>.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if page_obj.has_other_pages %}
+<nav class="mt-3 d-flex justify-content-center gap-2">
+  {% if page_obj.has_previous %}
+  <a class="btn btn-sm btn-outline-secondary"
+     href="?page={{ page_obj.previous_page_number }}&status={{ status }}&q={{ search }}&customer={{ customer_id }}">Previous</a>
+  {% endif %}
+  <span class="btn btn-sm btn-outline-secondary disabled">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+  </span>
+  {% if page_obj.has_next %}
+  <a class="btn btn-sm btn-outline-secondary"
+     href="?page={{ page_obj.next_page_number }}&status={{ status }}&q={{ search }}&customer={{ customer_id }}">Next</a>
+  {% endif %}
+</nav>
+{% endif %}
+{% endblock %}

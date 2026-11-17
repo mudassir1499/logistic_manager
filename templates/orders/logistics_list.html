@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+
+{% comment %}
+Freight-only jobs.
+
+One screen: the list, and a modal that both creates and edits. There is no
+separate detail page because a job has five fields — a detail page would be the
+same form with an extra click in front of it.
+
+Context: see orders.views.logistics_order_list.
+{% endcomment %}
+
+{% block title %}Logistics Orders — Logistic Manager{% endblock %}
+{% block nav_orders %}active{% endblock %}
+{% block page_title %}Logistics Orders{% endblock %}
+
+{% block content %}
+<div class="glass-card mb-4">
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <form method="get" class="d-flex gap-2 flex-grow-1" role="search">
+      <input type="search" name="q" value="{{ query }}" class="form-control"
+             placeholder="Search tracking number, description or customer..."
+             aria-label="Search logistics orders" style="max-width:340px;">
+      <select name="status" class="form-select" style="max-width:210px;"
+              aria-label="Filter by status" onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if active_status == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-outline-secondary" type="submit">Search</button>
+    </form>
+    <button class="btn btn-primary" type="button" onclick="openJob()">
+      <i class="bi bi-plus-lg me-1" aria-hidden="true"></i>New logistics order
+    </button>
+  </div>
+
+  {% if jobs %}
+  <div class="table-responsive">
+    <table class="table align-middle">
+      <thead>
+        <tr>
+          <th style="width:70px;">Photo</th>
+          <th>Tracking</th>
+          <th>Goods</th>
+          <th>Customer</th>
+          <th>Weight</th>
+          <th>Shipping ({{ settings.currency_symbol }})</th>
+          <th style="width:230px;">Status</th>
+          <th style="width:110px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td>
+            {% if job.photo %}
+            <img src="{{ job.photo.url }}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px;">
+            {% else %}
+            <span class="text-secondary"><i class="bi bi-image" aria-hidden="true"></i></span>
+            {% endif %}
+          </td>
+          <td>
+            {% comment %}Click to copy — the same reasoning as the order list:
+               a 16-character reference read down a phone line is where
+               transcription errors come from.{% endcomment %}
+            <button type="button" class="order-track-ref" data-track="{{ job.tracking_number }}"
+                    title="Copy tracking number">{{ job.tracking_number }}</button>
+          </td>
+          <td style="font-weight:600;">{{ job.description }}</td>
+          <td>
+            {% if job.customer %}{{ job.customer.name }}
+            {% elif job.contact_name %}{{ job.contact_name }}<br>
+              <span class="text-secondary small">{{ job.contact_phone }}</span>
+            {% else %}<span class="text-secondary">—</span>{% endif %}
+          </td>
+          <td>{{ job.weight_kg }} kg{% if job.cbm %}<br><span class="text-secondary small">{{ job.cbm }} CBM</span>{% endif %}</td>
+          <td style="font-weight:700;">{{ job.shipping_price }}</td>
+          <td>
+            <select class="form-select form-select-sm job-status" data-job="{{ job.id }}"
+                    aria-label="Status for {{ job.tracking_number }}">
+              {% for value, label in status_choices %}
+              <option value="{{ value }}" {% if job.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="progress mt-1" style="height:4px;">
+              <div class="progress-bar job-progress" data-job="{{ job.id }}"
+                   style="width:{{ job.progress_percent }}%;"></div>
+            </div>
+          </td>
+          <td>
+            <button class="btn btn-sm btn-outline-secondary" type="button"
+                    onclick='openJob({{ job.id }}, {{ job.description|escapejs|stringformat:"r" }})'
+                    data-job-json='{"id":{{ job.id }},"customer":{{ job.customer_id|default:"null" }},"contact_name":"{{ job.contact_name|escapejs }}","contact_phone":"{{ job.contact_phone|escapejs }}","description":"{{ job.description|escapejs }}","weight_kg":"{{ job.weight_kg }}","carton_qty":"{{ job.carton_qty|default:'' }}","cbm":"{{ job.cbm|default:'' }}","shipping_price":"{{ job.shipping_price }}","status":"{{ job.status }}","notes":"{{ job.notes|escapejs }}"}'>
+              Edit
+            </button>
+            <form method="post" action="{% url 'logistics_order_delete' job.id %}" class="d-inline"
+                  onsubmit="return confirm('Delete {{ job.tracking_number }}? This cannot be undone.');">
+              {% csrf_token %}
+              <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="text-center py-5 text-secondary">
+    <i class="bi bi-truck" style="font-size:32px;" aria-hidden="true"></i>
+    <p class="mt-3 mb-0">
+      {% if query or active_status %}No logistics orders match that search.
+      {% else %}No logistics orders yet. Create one for goods a customer already owns that you are shipping for them.{% endif %}
+    </p>
+  </div>
+  {% endif %}
+</div>
+
+{# ---- Create / edit modal ------------------------------------------------ #}
+<div class="modal fade" id="jobModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form id="jobForm" method="post" enctype="multipart/form-data"
+            action="{% url 'logistics_order_create' %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h5 class="modal-title" id="jobModalTitle">New logistics order</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row g-3">
+            <div class="col-md-12">
+              <label class="form-label" for="job_description">What is being shipped *</label>
+              <input type="text" class="form-control" id="job_description" name="description"
+                     placeholder="e.g. 3 cartons LED strip lights" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="job_customer">Customer</label>
+              <select class="form-select" id="job_customer" name="customer_id">
+                <option value="">— not a registered customer —</option>
+                {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+              </select>
+              <div class="form-text">Leave blank for a walk-in and fill in the contact below.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="job_contact_name">Contact name</label>
+              <input type="text" class="form-control" id="job_contact_name" name="contact_name">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="job_contact_phone">Contact phone</label>
+              <input type="text" class="form-control" id="job_contact_phone" name="contact_phone">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label" for="job_weight">Weight (KG) *</label>
+              <input type="number" step="0.001" min="0" class="form-control" id="job_weight" name="weight_kg" value="0" required>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="job_cartons">Cartons</label>
+              <input type="number" min="0" class="form-control" id="job_cartons" name="carton_qty">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="job_cbm">CBM</label>
+              <input type="number" step="0.001" min="0" class="form-control" id="job_cbm" name="cbm">
+              <div class="form-text">Sea freight is priced on this.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label" for="job_price">Shipping price ({{ settings.currency_symbol }}) *</label>
+              <input type="number" step="0.01" min="0" class="form-control" id="job_price" name="shipping_price" value="0" required>
+            </div>
+
+            <div class="col-md-6">
+              <label class="form-label" for="job_photo">Photo of the goods</label>
+              <input type="file" class="form-control" id="job_photo" name="photo" accept="image/*">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="job_status">Status</label>
+              <select class="form-select" id="job_status" name="status">
+                {% for value, label in status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+              </select>
+            </div>
+
+            <div class="col-12">
+              <label class="form-label" for="job_notes">Notes</label>
+              <textarea class="form-control" id="job_notes" name="notes" rows="2"></textarea>
+            </div>
+          </div>
+          <p class="text-secondary small mb-0 mt-3">
+            <i class="bi bi-info-circle" aria-hidden="true"></i>
+            The tracking number is generated automatically and cannot be edited — it is
+            already on the customer's paperwork by the time anyone would want to change it.
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+  .order-track-ref {
+    display: inline-block; padding: 2px 7px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 11.5px; font-weight: 600;
+    color: var(--text-secondary); background: rgba(0,0,0,.05);
+    border: 1px solid var(--border-color); border-radius: 5px; cursor: pointer;
+  }
+  .order-track-ref:hover { color: var(--accent-3); border-color: var(--accent-3); }
+  .order-track-ref.copied { color: #157f4a; border-color: #157f4a; }
+</style>
+<script>
+  var jobModal = null;
+
+  function openJob(id) {
+    var form = document.getElementById('jobForm');
+    form.reset();
+    if (id) {
+      var btn = document.querySelector('button[data-job-json*="\\"id\\":' + id + ',"]');
+      var data = btn ? JSON.parse(btn.dataset.jobJson) : null;
+      if (data) {
+        form.action = '/orders/logistics/' + id + '/save/';
+        document.getElementById('jobModalTitle').textContent = 'Edit logistics order';
+        document.getElementById('job_description').value = data.description || '';
+        document.getElementById('job_customer').value = data.customer || '';
+        document.getElementById('job_contact_name').value = data.contact_name || '';
+        document.getElementById('job_contact_phone').value = data.contact_phone || '';
+        document.getElementById('job_weight').value = data.weight_kg || '0';
+        document.getElementById('job_cartons').value = data.carton_qty || '';
+        document.getElementById('job_cbm').value = data.cbm || '';
+        document.getElementById('job_price').value = data.shipping_price || '0';
+        document.getElementById('job_status').value = data.status || 'preparing';
+        document.getElementById('job_notes').value = data.notes || '';
+      }
+    } else {
+      form.action = '{% url "logistics_order_create" %}';
+      document.getElementById('jobModalTitle').textContent = 'New logistics order';
+    }
+    jobModal = jobModal || new bootstrap.Modal(document.getElementById('jobModal'));
+    jobModal.show();
+  }
+
+  // Status change from the list, without opening the form.
+  document.addEventListener('change', function (event) {
+    var sel = event.target.closest('.job-status');
+    if (!sel) return;
+    var id = sel.dataset.job;
+    var body = new FormData();
+    body.append('status', sel.value);
+    body.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+    fetch('/orders/logistics/' + id + '/status/', {
+      method: 'POST', body: body, headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (!d.success) return;
+        var bar = document.querySelector('.job-progress[data-job="' + id + '"]');
+        if (bar) bar.style.width = d.progress + '%';
+      })
+      .catch(function () {});
+  });
+
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest('.order-track-ref');
+    if (!btn) return;
+    var original = btn.textContent;
+    var done = function () {
+      btn.textContent = 'Copied'; btn.classList.add('copied');
+      setTimeout(function () { btn.textContent = original; btn.classList.remove('copied'); }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(btn.dataset.track).then(done).catch(function () {});
+    }
+  });
+</script>
+{% endblock %}

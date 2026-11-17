@@ -1,0 +1,209 @@
+{% extends 'portal/base.html' %}
+{% load static %}
+
+{% comment %}
+PUBLIC shipment tracking. No login, and no customer information of any kind.
+
+The view hands this template a plain dict of whitelisted fields rather than an
+Order — see orders/views.py::_build_tracking_view for what is excluded and why.
+Nothing here should ever reach through to `order.` anything; if a field is
+needed, add it to that whitelist so the decision stays in one reviewable place.
+
+Context:
+    query       what the visitor typed, echoed back into the box
+    searched    True once a lookup has been attempted
+    not_found   True when the reference matched nothing
+    result      dict: tracking_number, placed_on, status_label, blocks,
+                total_items, all_delivered
+{% endcomment %}
+
+{% block title %}Track your shipment — {{ settings.company_name|default:"Mudassir LLC" }}{% endblock %}
+{% block meta_description %}Track a Mudassir LLC shipment from China to the UAE, Saudi Arabia and beyond. Enter your tracking number to see each shipment block and where it has reached.{% endblock %}
+
+{% comment %}Not indexable. A tracking URL carries the reference in its query
+   string and the number is a bearer credential — a page that reached Google's
+   index would put live references into search results.
+
+   Overrides base.html's `meta_robots` block. base.html has no `extra_head`, and
+   a child template defining a block the parent does not have renders NOTHING —
+   so writing this as extra_head would have silently left the page indexable.
+{% endcomment %}
+{% block meta_robots %}noindex, nofollow{% endblock %}
+
+{% block content %}
+<section class="section-padding">
+  <div class="container" style="max-width: 860px;">
+
+    <div class="text-center mb-4">
+      <span class="section-label">Shipment Tracking</span>
+      <h1 class="section-title">Track your goods</h1>
+      <p class="section-subtitle mx-auto">
+        Enter the tracking number from your order confirmation. No account needed.
+      </p>
+    </div>
+
+    <form method="get" action="{% url 'track_shipment' %}" class="track-form mb-4">
+      <label class="visually-hidden" for="trackNumber">Tracking number</label>
+      <div class="d-flex gap-2 flex-wrap justify-content-center">
+        <input type="text" id="trackNumber" name="number" class="form-control"
+               value="{{ query }}" autocomplete="off" spellcheck="false"
+               placeholder="e.g. MLK-7F3K-9QX2-VB4T" style="max-width: 420px;">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-search me-2"></i>Track
+        </button>
+      </div>
+      <p class="text-center small text-secondary mt-2 mb-0">
+        Dashes and capitals are optional.
+      </p>
+    </form>
+
+    {% if searched and not_found %}
+    <div class="track-empty text-center">
+      <i class="bi bi-question-circle" aria-hidden="true"></i>
+      <h2 class="h5 mt-3 mb-2">We could not find that tracking number</h2>
+      <p class="text-secondary mb-3">
+        Check it against your order confirmation — it is easy to mistype. If it still
+        does not work, send it to us and we will look it up.
+      </p>
+      <a href="{% url 'contact_page' %}" class="btn btn-outline-secondary btn-sm">Contact us</a>
+    </div>
+    {% endif %}
+
+    {% if result %}
+    <div class="track-result">
+
+      <div class="track-head">
+        <div>
+          <p class="track-head__label">Tracking number</p>
+          <p class="track-head__value">{{ result.tracking_number }}</p>
+        </div>
+        <div class="text-end">
+          <p class="track-head__label">Placed</p>
+          <p class="track-head__value">{{ result.placed_on|date:"d M Y" }}</p>
+        </div>
+      </div>
+
+      {% if result.all_delivered %}
+      <div class="track-banner track-banner--done">
+        <i class="bi bi-check-circle-fill" aria-hidden="true"></i>
+        All {{ result.blocks|length }} shipment{{ result.blocks|length|pluralize }} delivered.
+      </div>
+      {% endif %}
+
+      {% comment %}Shipment blocks. Each travels separately and has its own
+         timeline, which is the whole reason an order is split into them.
+      {% endcomment %}
+      {% for block in result.blocks %}
+      <div class="track-block">
+
+        <div class="track-block__head">
+          {% comment %}A lead picture of the consignment. For a product order it
+             is the first item's photo; for a freight job it is the photo the
+             office uploaded when booking. Guarded, because .src is '' when the
+             file is missing — an unguarded <img> would render a broken frame,
+             which reads as a broken page rather than as "no photo yet".
+
+             alt is empty on purpose: the shipment name sits immediately beside
+             it in the heading, so describing the picture would make a screen
+             reader announce the same thing twice.
+          {% endcomment %}
+          {% if block.image %}
+          <img src="{{ block.image }}" alt="" class="track-block__thumb" loading="lazy">
+          {% endif %}
+          <h2 class="track-block__title">{{ block.name }}</h2>
+          {% if block.status %}
+          <span class="track-badge {% if block.status.is_delivered %}track-badge--done{% endif %}">
+            {{ block.status.label }}
+          </span>
+          {% else %}
+          <span class="track-badge track-badge--idle">Not started</span>
+          {% endif %}
+        </div>
+
+        <ul class="track-meta">
+          {% if block.method %}<li>{{ block.method }}</li>{% endif %}
+          {% if block.cargo_type %}<li>{{ block.cargo_type }}</li>{% endif %}
+          {% if block.cartons %}<li>{{ block.cartons }} carton{{ block.cartons|pluralize }}</li>{% endif %}
+          {% if block.weight %}<li>{{ block.weight }} kg</li>{% endif %}
+          {% if block.cbm %}<li>{{ block.cbm }} CBM</li>{% endif %}
+        </ul>
+
+        {% if block.status %}
+        <div class="ship-timeline">
+          {% for step in block.status.steps %}
+          <div class="ship-step {% if step.done %}done{% endif %}">
+            <span class="ship-dot"></span>
+            <span class="ship-label">{{ step.label }}</span>
+          </div>
+          {% if not forloop.last %}<div class="ship-line {% if step.done %}done{% endif %}"></div>{% endif %}
+          {% endfor %}
+        </div>
+        {% if block.status.note %}
+        <p class="track-note"><i class="bi bi-info-circle me-1"></i>{{ block.status.note }}</p>
+        {% endif %}
+        {% comment %}A timestamp only where somebody actually set the status.
+
+           Every block now carries a status — one with none set is pinned to
+           "Preparing" so the customer sees a timeline rather than a blank. But
+           that stage was inferred, not confirmed, and printing "Last update" with
+           an empty date (updated_at is None) reads as a broken page, while
+           printing today's date would claim a check nobody made.
+        {% endcomment %}
+        {% if block.status.confirmed %}
+        <p class="track-updated">Last update {{ block.status.updated_at|date:"d M Y, H:i" }}</p>
+        {% else %}
+        <p class="track-updated">Awaiting the first scan. This shipment is being prepared.</p>
+        {% endif %}
+        {% endif %}
+
+        {% comment %}Contents: what is in the box and how many. No prices — see
+           the note at the top of orders/views.py's tracking section.
+        {% endcomment %}
+        <table class="track-items">
+          <caption class="visually-hidden">Contents of {{ block.name }}</caption>
+          <thead>
+            <tr><th scope="col">Item</th><th scope="col" class="text-end">Qty</th></tr>
+          </thead>
+          <tbody>
+            {% for item in block.items %}
+            <tr>
+              <td class="track-items__cell">
+                {% if item.image %}
+                <img src="{{ item.image }}" alt="" class="track-item__thumb" loading="lazy">
+                {% else %}
+                {% comment %}A placeholder rather than nothing, so the name column
+                   stays on one vertical line whether or not a photo exists.{% endcomment %}
+                <span class="track-item__thumb track-item__thumb--empty" aria-hidden="true">
+                  <i class="bi bi-box-seam"></i>
+                </span>
+                {% endif %}
+                <span class="track-item__name">
+                  {{ item.name }}
+                  {% if item.variant %}<span class="track-variant">{{ item.variant }}</span>{% endif %}
+                </span>
+              </td>
+              <td class="text-end">{{ item.quantity }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+      </div>
+      {% empty %}
+      <div class="track-empty text-center">
+        <p class="text-secondary mb-0">This order has no shipments yet. Check back shortly.</p>
+      </div>
+      {% endfor %}
+
+      <p class="track-privacy">
+        <i class="bi bi-shield-check me-1"></i>
+        This page shows shipment contents and progress only. No customer details,
+        prices or totals are shown to anyone holding this link.
+      </p>
+
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

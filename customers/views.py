@@ -22,11 +22,24 @@ Django Concepts Used:
 """
 
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404
+from django.contrib import messages
+from django.shortcuts import render, get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponse
-from django.views.decorators.csrf import csrf_exempt
+# NOTE: @csrf_exempt was removed from the views in this file. The admin UI now
+# attaches X-CSRFToken to every same-origin state-changing fetch() automatically
+# (see the wrapper at the top of static/main.js), so these endpoints are
+# protected again without any call site needing to change.
 from django.db.models import Q
 from .models import Customer, CustomerProduct
+
+# Role-aware access guard: only users whose profile grants the 'customers' module
+# (admins always, or staff with perm_customers) may reach these views. The old
+# blanket @login_required let ANY authenticated account — including portal
+# customers — manage the whole customer database.
+from accounts.decorators import module_required
+# Removes the linked Django User login when a customer is deleted, so no orphaned
+# account can still authenticate afterwards.
+from accounts.services import delete_customer_user
 
 from django.core.paginator import Paginator
 
@@ -38,7 +51,7 @@ import re
 import datetime
 
 
-@login_required
+@module_required('customers')
 def customer_list(request):
     """
     Display the customer list page for the admin dashboard.
@@ -88,8 +101,7 @@ def customer_list(request):
     })
 
 
-@login_required
-@csrf_exempt
+@module_required('customers')
 def add_customer(request):
     """
     AJAX endpoint: Add a new customer to the database.
@@ -120,8 +132,7 @@ def add_customer(request):
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 
-@login_required
-@csrf_exempt
+@module_required('customers')
 def edit_customer(request):
     """
     AJAX endpoint: Edit an existing customer's details.
@@ -159,8 +170,7 @@ def edit_customer(request):
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 
-@login_required
-@csrf_exempt
+@module_required('customers')
 def delete_customer(request, customer_id):
     """
     AJAX endpoint: Delete a customer from the database.
@@ -183,14 +193,20 @@ def delete_customer(request, customer_id):
     if request.method == 'POST':
         try:
             customer = Customer.objects.get(id=customer_id)
+            # Remove the linked login first; otherwise the Customer delete would
+            # cascade away the Profile but leave a User that can still sign in.
+            delete_customer_user(customer)
+            name = customer.name
             customer.delete()
+            from accounts.services import log_action
+            log_action(request, 'customer.delete', target=name)
             return JsonResponse({'success': True, 'message': 'Customer deleted!'})
         except Customer.DoesNotExist:
             return JsonResponse({'success': False, 'message': 'Customer not found'})
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 
-@login_required
+@module_required('customers')
 def customer_products(request, customer_id):
     """
     Display the product assignment page for a specific customer.
@@ -233,8 +249,7 @@ def customer_products(request, customer_id):
     })
 
 
-@login_required
-@csrf_exempt
+@module_required('customers')
 def assign_product(request, customer_id):
     """
     AJAX endpoint: Assign a product to a customer.
@@ -272,8 +287,7 @@ def assign_product(request, customer_id):
     return JsonResponse({'success': True, 'message': f'"{product.name}" assigned successfully.'})
 
 
-@login_required
-@csrf_exempt
+@module_required('customers')
 def remove_product(request, customer_id, product_id):
     """
     AJAX endpoint: Remove a product assignment from a customer.
@@ -304,7 +318,7 @@ def remove_product(request, customer_id, product_id):
     return JsonResponse({'success': False, 'message': 'Assignment not found.'})
 
 
-@login_required
+@module_required('customers')
 def customer_quotation(request, customer_id):
     """
     Generate a professional customer quotation as a styled Excel (.xlsx) file.
@@ -352,9 +366,19 @@ def customer_quotation(request, customer_id):
         .prefetch_related('product__images')
     )
 
-    # If the customer has no assigned products, return an error message
+    # Nothing to quote.
+    #
+    # This answered with a bare 'No products assigned to this customer.' at
+    # status 400. The operator clicked a download and got a white page carrying
+    # one sentence, with no way back and nothing to click - and a 400 reads as a
+    # broken link rather than an empty customer. Sending them to the page where
+    # products are assigned turns the dead end into the next step.
     if not assigned:
-        return HttpResponse('No products assigned to this customer.', status=400)
+        messages.warning(
+            request,
+            f'{customer.name} has no products assigned yet, so there is nothing '
+            'to quote. Assign products first, then download the quotation.')
+        return redirect('customer_products', customer_id=customer.id)
 
     # --- Exchange rate configuration ---
     # Check if currency conversion is enabled and the exchange rate is valid (> 0)
@@ -591,7 +615,7 @@ def customer_quotation(request, customer_id):
 
         # Embed the first product image in column 2 (if available)
         has_image = False
-        first_img = prod.images.first()
+        first_img = prod.primary_image
         if first_img:
             # Construct the full filesystem path to the image
             img_path = os.path.join(django_settings.MEDIA_ROOT, str(first_img.image))

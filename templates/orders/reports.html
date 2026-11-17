@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load script_json %}
 {% load static %}
 
 {% block title %}Reports — Logistic Manager{% endblock %}
@@ -10,7 +11,10 @@
 <a href="{% url 'reports_export_excel' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn-glow me-2">
     <i class="bi bi-file-earmark-excel"></i> Export Excel
 </a>
-<a href="{% url 'reports_export_pdf' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn-glow" style="background:linear-gradient(135deg,#ef4444,#dc2626)">
+{% comment %}The red gradient here was dropped with the monochrome rebrand: red is
+reserved for destructive and error states, and exporting a PDF is neither. Both
+export buttons now share the standard button treatment.{% endcomment %}
+<a href="{% url 'reports_export_pdf' %}?start_date={{ start_date }}&end_date={{ end_date }}" class="btn-glow">
     <i class="bi bi-file-earmark-pdf"></i> Export PDF
 </a>
 {% endblock %}
@@ -131,32 +135,41 @@
  * The |safe filter prevents HTML escaping of the JSON strings.
  */
 (function() {
-    var revenueLabels = {{ revenue_labels|safe }};
-    var revenueData = {{ revenue_data|safe }};
-    var revenueOrderCounts = {{ revenue_order_counts|safe }};
+    var revenueLabels = {{ revenue_labels|script_json }};
+    var revenueData = {{ revenue_data|script_json }};
+    var revenueOrderCounts = {{ revenue_order_counts|script_json }};
 
-    var topProductNames = {{ top_product_names|safe }};
-    var topProductQtys = {{ top_product_qtys|safe }};
+    var topProductNames = {{ top_product_names|script_json }};
+    var topProductQtys = {{ top_product_qtys|script_json }};
 
-    var topCustomerNames = {{ top_customer_names|safe }};
-    var topCustomerRevenues = {{ top_customer_revenues|safe }};
+    var topCustomerNames = {{ top_customer_names|script_json }};
+    var topCustomerRevenues = {{ top_customer_revenues|script_json }};
 
-    var methodLabels = {{ method_labels|safe }};
-    var methodCounts = {{ method_counts|safe }};
+    var methodLabels = {{ method_labels|script_json }};
+    var methodCounts = {{ method_counts|script_json }};
 
-    var paymentLabels = {{ payment_labels|safe }};
-    var paymentCounts = {{ payment_counts|safe }};
+    var paymentLabels = {{ payment_labels|script_json }};
+    var paymentCounts = {{ payment_counts|script_json }};
 
-    var statusLabels = {{ status_labels|safe }};
-    var statusCounts = {{ status_counts|safe }};
+    var statusLabels = {{ status_labels|script_json }};
+    var statusCounts = {{ status_counts|script_json }};
 
-    // Common dark theme chart options
+    // Shared chart options. These were left over from an earlier dark theme —
+    // pale #cbd5e1 labels on a dark tooltip — while the page itself has been
+    // light for some time, so the axis labels were washing out against the white
+    // card. They now use the same neutral ink tokens as the rest of the UI.
     var darkOptions = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { labels: { color: '#cbd5e1', font: { size: 12 } } },
-            tooltip: { backgroundColor: '#1e293b', borderColor: '#334155', borderWidth: 1 },
+            legend: { labels: { color: BRAND.text, font: { size: 12 } } },
+            tooltip: {
+                backgroundColor: BRAND.surface,
+                borderColor: BRAND.border,
+                borderWidth: 1,
+                titleColor: BRAND.ink,
+                bodyColor: BRAND.text
+            },
         },
     };
 
@@ -172,8 +185,8 @@
                 {
                     label: 'Revenue ({{ currency }})',
                     data: revenueData,
-                    backgroundColor: 'rgba(245, 166, 35, 0.7)',
-                    borderColor: '#818cf8',
+                    backgroundColor: 'rgba(176, 132, 33, 0.75)',
+                    borderColor: BRAND.series[0],
                     borderWidth: 1,
                     borderRadius: 5,
                     yAxisID: 'yRevenue',
@@ -182,11 +195,11 @@
                     label: 'Orders',
                     data: revenueOrderCounts,
                     type: 'line',
-                    borderColor: '#34d399',
-                    backgroundColor: 'rgba(52, 211, 153, 0.15)',
+                    borderColor: BRAND.series[1],
+                    backgroundColor: 'rgba(42, 120, 214, 0.15)',
                     borderWidth: 2,
                     pointRadius: 4,
-                    pointBackgroundColor: '#34d399',
+                    pointBackgroundColor: BRAND.series[1],
                     fill: true,
                     tension: 0.3,
                     yAxisID: 'yOrders',
@@ -197,18 +210,18 @@
             ...darkOptions,
             interaction: { mode: 'index', intersect: false },
             scales: {
-                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+                x: { ticks: { color: BRAND.muted }, grid: { color: BRAND.grid } },
                 yRevenue: {
                     position: 'left',
-                    ticks: { color: '#94a3b8' },
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    title: { display: true, text: 'Revenue ({{ currency }})', color: '#64748b', font: { size: 11 } }
+                    ticks: { color: BRAND.muted },
+                    grid: { color: BRAND.grid },
+                    title: { display: true, text: 'Revenue ({{ currency }})', color: BRAND.muted, font: { size: 11 } }
                 },
                 yOrders: {
                     position: 'right',
-                    ticks: { color: '#34d399' },
+                    ticks: { color: BRAND.series[1] },
                     grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'Orders', color: '#34d399', font: { size: 11 } }
+                    title: { display: true, text: 'Orders', color: BRAND.series[1], font: { size: 11 } }
                 },
             }
         }
@@ -225,8 +238,8 @@
             datasets: [{
                 label: 'Quantity Sold',
                 data: topProductQtys,
-                backgroundColor: 'rgba(139, 92, 246, 0.7)',
-                borderColor: '#a78bfa',
+                backgroundColor: 'rgba(176, 132, 33, 0.75)',
+                borderColor: BRAND.series[0],
                 borderWidth: 1,
                 borderRadius: 5,
             }]
@@ -235,8 +248,8 @@
             ...darkOptions,
             indexAxis: 'y',
             scales: {
-                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                y: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+                x: { ticks: { color: BRAND.muted }, grid: { color: BRAND.grid } },
+                y: { ticks: { color: BRAND.text }, grid: { display: false } },
             }
         }
     });
@@ -252,8 +265,8 @@
             datasets: [{
                 label: 'Revenue ({{ currency }})',
                 data: topCustomerRevenues,
-                backgroundColor: 'rgba(16, 185, 129, 0.7)',
-                borderColor: '#34d399',
+                backgroundColor: 'rgba(176, 132, 33, 0.75)',
+                borderColor: BRAND.series[0],
                 borderWidth: 1,
                 borderRadius: 5,
             }]
@@ -262,8 +275,8 @@
             ...darkOptions,
             indexAxis: 'y',
             scales: {
-                x: { ticks: { color: '#94a3b8' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-                y: { ticks: { color: '#cbd5e1' }, grid: { display: false } },
+                x: { ticks: { color: BRAND.muted }, grid: { color: BRAND.grid } },
+                y: { ticks: { color: BRAND.text }, grid: { display: false } },
             }
         }
     });
@@ -271,7 +284,9 @@
     // ---------------------------------------------------------------
     // Shipping Method Distribution (Doughnut)
     // ---------------------------------------------------------------
-    var shipColors = ['#6366f1', '#8b5cf6', '#a78bfa', '#34d399', '#fbbf24', '#f87171'];
+    // Pie/doughnut slices all touch each other, so this uses the all-pairs
+    // verified slice order rather than the bar/line series order.
+    var shipColors = BRAND.slices;
     var shipCtx = document.getElementById('shippingMethodChart').getContext('2d');
     new Chart(shipCtx, {
         type: 'doughnut',
@@ -280,7 +295,7 @@
             datasets: [{
                 data: methodCounts,
                 backgroundColor: shipColors,
-                borderColor: '#1a1a2e',
+                borderColor: BRAND.surface,
                 borderWidth: 2,
             }]
         },
@@ -289,7 +304,7 @@
             cutout: '60%',
             plugins: {
                 ...darkOptions.plugins,
-                legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 11 }, padding: 16 } },
+                legend: { position: 'bottom', labels: { color: BRAND.text, font: { size: 11 }, padding: 16 } },
             }
         }
     });
@@ -297,8 +312,8 @@
     // ---------------------------------------------------------------
     // Payment Status Breakdown (Doughnut)
     // ---------------------------------------------------------------
-    var payColors = { 'Unpaid': '#ef4444', 'Partial': '#f59e0b', 'Paid': '#10b981' };
-    var payBgColors = paymentLabels.map(function(l) { return payColors[l] || '#94a3b8'; });
+    var payColors = { 'Unpaid': '#B3261E', 'Partial': '#C2410C', 'Paid': '#157F4A' };
+    var payBgColors = paymentLabels.map(function(l) { return payColors[l] || BRAND.muted; });
     var payCtx = document.getElementById('paymentStatusChart').getContext('2d');
     new Chart(payCtx, {
         type: 'doughnut',
@@ -307,7 +322,7 @@
             datasets: [{
                 data: paymentCounts,
                 backgroundColor: payBgColors,
-                borderColor: '#1a1a2e',
+                borderColor: BRAND.surface,
                 borderWidth: 2,
             }]
         },
@@ -316,7 +331,7 @@
             cutout: '60%',
             plugins: {
                 ...darkOptions.plugins,
-                legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 11 }, padding: 16 } },
+                legend: { position: 'bottom', labels: { color: BRAND.text, font: { size: 11 }, padding: 16 } },
             }
         }
     });
@@ -324,8 +339,8 @@
     // ---------------------------------------------------------------
     // Order Status Breakdown (Pie)
     // ---------------------------------------------------------------
-    var statusColors = { 'Draft': '#f59e0b', 'Confirmed': '#10b981' };
-    var statusBgColors = statusLabels.map(function(l) { return statusColors[l] || '#94a3b8'; });
+    var statusColors = { 'Draft': '#C2410C', 'Confirmed': '#157F4A' };
+    var statusBgColors = statusLabels.map(function(l) { return statusColors[l] || BRAND.muted; });
     var statusCtx = document.getElementById('orderStatusChart').getContext('2d');
     new Chart(statusCtx, {
         type: 'pie',
@@ -334,7 +349,7 @@
             datasets: [{
                 data: statusCounts,
                 backgroundColor: statusBgColors,
-                borderColor: '#1a1a2e',
+                borderColor: BRAND.surface,
                 borderWidth: 2,
             }]
         },
@@ -342,7 +357,7 @@
             ...darkOptions,
             plugins: {
                 ...darkOptions.plugins,
-                legend: { position: 'bottom', labels: { color: '#cbd5e1', font: { size: 11 }, padding: 16 } },
+                legend: { position: 'bottom', labels: { color: BRAND.text, font: { size: 11 }, padding: 16 } },
             }
         }
     });

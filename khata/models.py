@@ -24,6 +24,10 @@ Business Concepts:
 # Import Django's ORM models module for defining database fields
 from django.db import models
 
+# timezone.now is used as the default for LedgerEntry.date. It is passed as a
+# reference (no parentheses) so it is evaluated at insert time, not at import.
+from django.utils import timezone
+
 # Import the Customer model from the customers app. Each ledger entry belongs to one customer.
 from customers.models import Customer
 
@@ -102,14 +106,41 @@ class LedgerEntry(models.Model):
     # the primary operating currency. The choices restrict input to supported currencies.
     currency = models.CharField(max_length=10, choices=CURRENCY_CHOICES, default='AED')
 
-    # auto_now_add=True: Automatically sets the field to the current date and time when the
-    # LedgerEntry is FIRST created. This timestamp serves as the official record date for the transaction.
-    date = models.DateTimeField(auto_now_add=True)
+    # The date the transaction HAPPENED, which is not always the date it was typed in.
+    #
+    # This was auto_now_add=True, which made the field unwritable: Django ignores
+    # any value you assign and stamps the moment the row was inserted. For an
+    # account book that is wrong in two ways. A payment received on Tuesday and
+    # entered on Friday was filed under Friday, so a statement filtered to a date
+    # range reported the wrong figures. And an import of historical entries would
+    # have stamped every single one with the import date, collapsing years of
+    # ledger history onto one day and destroying the running balance.
+    #
+    # default=timezone.now keeps the same behaviour when nothing is supplied - a
+    # new entry still defaults to now - while allowing a real transaction date to
+    # be set. Indexed because every ledger screen and every export filters and
+    # orders on it.
+    date = models.DateTimeField(
+        default=timezone.now,
+        db_index=True,
+        help_text='When the transaction took place, which may be earlier than when it was entered.',
+    )
 
     # Optional text description explaining the purpose of this transaction.
     # Examples: "Payment for Order #42", "Advance deposit for June shipments", "Refund for cancelled order".
     # blank=True means the field is optional in forms.
     description = models.TextField(blank=True)
+
+    # Optional link to the order this entry pays for. Set by the "Record payment"
+    # flow so an order's paid-vs-total progress can be computed directly from the
+    # ledger (SET_NULL keeps the accounting row even if the order is deleted).
+    order = models.ForeignKey(
+        'orders.Order',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='ledger_entries',
+    )
 
     def __str__(self):
         """

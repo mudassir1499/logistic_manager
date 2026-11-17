@@ -93,6 +93,27 @@ urlpatterns = [
     # credit (refund), or adjustment. Each entry affects the customer's
     # running balance. This is how the business records all money movements.
     # -------------------------------------------------------------------------
+    # -------------------------------------------------------------------------
+    # EXPORT CSV: The ledger as data rather than a document
+    # -------------------------------------------------------------------------
+    # URL: /khata/export-csv/                    -> every customer
+    #      /khata/customer/5/export-csv/         -> one customer
+    # Both accept ?from= and ?to= and honour them exactly as the on-screen
+    # filter does. The columns match what the importer accepts, so an export can
+    # be edited in Excel and uploaded straight back.
+    # -------------------------------------------------------------------------
+    path('export-csv/', views.export_ledger_csv, name='export_ledger_csv_all'),
+    path('customer/<int:customer_id>/export-csv/', views.export_ledger_csv, name='export_ledger_csv'),
+
+    # -------------------------------------------------------------------------
+    # IMPORT CSV: Load an existing account book into the ledger
+    # -------------------------------------------------------------------------
+    # URL: /khata/import-csv/   (POST, multipart)
+    # Send dry_run=1 to validate and preview without writing. Rows are matched
+    # to customers by name; the whole file is rejected if any row is bad.
+    # -------------------------------------------------------------------------
+    path('import-csv/', views.import_ledger_csv, name='import_ledger_csv'),
+
     path('add/', views.add_entry, name='add_entry'),
 
     # -------------------------------------------------------------------------

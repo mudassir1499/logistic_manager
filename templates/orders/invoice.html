@@ -4,7 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice #{{ order.id }} — {{ order.customer.name }} — {{ order.date|date:"d M Y" }}</title>
+    {% comment %}The title becomes the default filename when the invoice is saved as
+       a PDF from the print dialog, so it uses the real invoice reference.{% endcomment %}
+    <title>Invoice {{ order.display_reference }} — {{ order.customer.name }} — {{ order.date|date:"d M Y" }}</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
@@ -159,6 +161,46 @@
         }
 
         /* Totals section */
+        /* Logo in the invoice header. Height-capped so a tall or wide upload
+           cannot push the company details off the first page. */
+        .invoice-logo { max-height: 64px; max-width: 220px; margin-bottom: 8px; display: block; }
+
+        /* Payment details block — bank transfer information the customer needs to
+           actually pay. break-inside avoids it splitting across printed pages. */
+        .payment-details {
+            margin-top: 24px;
+            padding: 14px 18px;
+            border: 1px solid #d9d9e3;
+            border-radius: 8px;
+            background: #fafaff;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+        .payment-details-title {
+            font-weight: 700;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            margin-bottom: 8px;
+            color: #8A661A;
+        }
+        .payment-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .payment-table td { padding: 3px 0; vertical-align: top; }
+        .payment-table td:first-child { color: #666; width: 150px; }
+        .payment-ref { margin-top: 8px; font-size: 12px; color: #444; }
+
+        .invoice-terms {
+            margin-top: 16px;
+            padding: 12px 18px;
+            border: 1px solid #e6e6ee;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.55;
+            color: #444;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
         .totals-section {
             display: flex;
             justify-content: flex-end;
@@ -373,16 +415,37 @@ function toggleInvoiceType() {
 
     
     
+    {% comment %}--------------------------------------------------------------------
+       INVOICE HEADER
+       ---------------------------------------------------------------------------
+       Now carries the logo and the tax registration number. A UAE tax invoice must
+       show the supplier's TRN for a VAT-registered customer to reclaim input tax —
+       without it, this document is of limited use to exactly the professional
+       buyers the business wants. The TRN block hides itself if no TRN is set, so
+       a non-VAT-registered business is not forced to show an empty field.
+       -----------------------------------------------------------------{% endcomment %}
     <div class="invoice-header">
         <div>
+            {% if settings.logo_wide or settings.logo %}
+            <img src="{% if settings.logo_wide %}{{ settings.logo_wide.url }}{% else %}{{ settings.logo.url }}{% endif %}"
+                 alt="{{ settings.company_name }}" class="invoice-logo">
+            {% endif %}
             <div class="company-name">{{ settings.company_name }}</div>
             <div class="company-info">{% if settings.company_phone %}📞 {{ settings.company_phone }}{% endif %}
 {% if settings.company_address %}{{ settings.company_address }}{% endif %}</div>
+            {% if settings.tax_registration_number %}
+            <div class="company-info" style="margin-top:4px;"><strong>TRN:</strong> {{ settings.tax_registration_number }}</div>
+            {% endif %}
         </div>
         <div class="invoice-badge">
-            <div class="invoice-title" id="invoiceTitleText">Invoice</div>
-            <div class="invoice-num"># {{ order.id }}</div>
+            <div class="invoice-title" id="invoiceTitleText">{% if settings.tax_registration_number %}Tax Invoice{% else %}Invoice{% endif %}</div>
+            {% comment %}display_reference is the allocated invoice number (INV-0042),
+               falling back to "#<id>" for orders that predate numbering.{% endcomment %}
+            <div class="invoice-num">{{ order.display_reference }}</div>
             <div class="invoice-date">{{ order.date|date:"d M Y" }}</div>
+            {% if order.payment_due_date %}
+            <div class="invoice-date">Due: <strong>{{ order.payment_due_date|date:"d M Y" }}</strong></div>
+            {% endif %}
         </div>
     </div>
 
@@ -632,9 +695,42 @@ function toggleInvoiceType() {
     </div>
 
     
+    {% comment %}--------------------------------------------------------------------
+       PAYMENT DETAILS
+       ---------------------------------------------------------------------------
+       Until now the invoice told the customer what they owed but not how to pay
+       it, so every payment began with a message asking for bank details. Each
+       line hides itself when empty, so a partially filled bank section still
+       prints cleanly and the whole block disappears if none of it is configured.
+       -----------------------------------------------------------------{% endcomment %}
+    {% if settings.bank_name or settings.bank_iban or settings.bank_account_number %}
+    <div class="payment-details">
+        <div class="payment-details-title">Payment Details</div>
+        <table class="payment-table">
+            {% if settings.bank_account_name %}<tr><td>Account Name</td><td><strong>{{ settings.bank_account_name }}</strong></td></tr>{% endif %}
+            {% if settings.bank_name %}<tr><td>Bank</td><td>{{ settings.bank_name }}</td></tr>{% endif %}
+            {% if settings.bank_branch %}<tr><td>Branch</td><td>{{ settings.bank_branch }}</td></tr>{% endif %}
+            {% if settings.bank_account_number %}<tr><td>Account Number</td><td>{{ settings.bank_account_number }}</td></tr>{% endif %}
+            {% if settings.bank_iban %}<tr><td>IBAN</td><td><strong>{{ settings.bank_iban }}</strong></td></tr>{% endif %}
+            {% if settings.bank_swift %}<tr><td>SWIFT / BIC</td><td>{{ settings.bank_swift }}</td></tr>{% endif %}
+        </table>
+        <div class="payment-ref">
+            Please quote <strong>{{ order.display_reference }}</strong> as the payment reference.
+        </div>
+    </div>
+    {% endif %}
+
+    {% if settings.invoice_terms %}
+    <div class="invoice-terms">
+        <div class="payment-details-title">Terms &amp; Conditions</div>
+        <div>{{ settings.invoice_terms|linebreaksbr }}</div>
+    </div>
+    {% endif %}
+
     <div class="invoice-footer">
         Thank you for your business! &nbsp;·&nbsp; {{ settings.company_name }}
         {% if settings.company_phone %} &nbsp;·&nbsp; {{ settings.company_phone }}{% endif %}
+        {% if settings.tax_registration_number %} &nbsp;·&nbsp; TRN {{ settings.tax_registration_number }}{% endif %}
     </div>
 
 </div>

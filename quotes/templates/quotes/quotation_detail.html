@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ quotation.number }}{% endblock %}
+{% block page_title %}{{ quotation.number }}{% endblock %}
+{% block nav_quotes %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in d-flex flex-wrap justify-content-between align-items-start gap-3">
+  <div>
+    <h1 class="page-title"><i class="bi bi-file-earmark-text me-2"></i>{{ quotation.number }}</h1>
+    <p class="text-secondary mb-0">
+      {{ quotation.customer.name }}
+      {% if quotation.request_id %} · from request #{{ quotation.request_id }}{% endif %}
+    </p>
+  </div>
+  <div class="d-flex gap-2 align-items-center">
+    {% if quotation.status == 'accepted' %}<span class="badge bg-success fs-6">Accepted</span>
+    {% elif quotation.status == 'declined' %}<span class="badge bg-danger fs-6">Declined</span>
+    {% elif quotation.status == 'sent' %}<span class="badge bg-primary fs-6">Sent</span>
+    {% elif quotation.status == 'expired' %}<span class="badge bg-secondary fs-6">Expired</span>
+    {% else %}<span class="badge bg-secondary fs-6">Draft</span>{% endif %}
+    <a href="{% url 'quotation_list' %}" class="btn btn-sm btn-outline-secondary">Back to list</a>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-lg-8">
+
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong>Lines</strong>
+        <span class="text-secondary small">{{ quotation.currency }} {{ quotation.subtotal|floatformat:2 }} total</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table mb-0 align-middle">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th class="text-center">Qty</th>
+              <th class="text-end">Unit</th>
+              <th class="text-end">Line</th>
+              {% comment %}Cost and margin are internal. They are rendered only
+                 on this back-office screen and never on anything sent out.
+              {% endcomment %}
+              <th class="text-end text-secondary">Margin</th>
+              {% if can_edit %}<th></th>{% endif %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <td>
+                {{ item.label }}
+                {% if item.product_id %}
+                <div class="text-secondary" style="font-size:11.5px;">{{ item.product.sku }}</div>
+                {% else %}
+                <div class="text-secondary" style="font-size:11.5px;">not in catalogue</div>
+                {% endif %}
+              </td>
+              <td class="text-center">{{ item.quantity }}</td>
+              <td class="text-end">{{ item.unit_price|floatformat:2 }}</td>
+              <td class="text-end">{{ item.line_total|floatformat:2 }}</td>
+              <td class="text-end text-secondary">
+                {% if item.line_margin is not None %}{{ item.line_margin|floatformat:2 }}
+                {% else %}&mdash;{% endif %}
+              </td>
+              {% if can_edit %}
+              <td class="text-end">
+                <form method="post" action="{% url 'quotation_delete_item' quotation.id item.id %}">
+                  {% csrf_token %}
+                  <button class="btn btn-sm btn-outline-danger" title="Remove line">
+                    <i class="bi bi-x-lg"></i>
+                  </button>
+                </form>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center text-secondary py-4">No lines yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {% if can_edit %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Add a line</strong></div>
+      <div class="card-body">
+        <form method="post" action="{% url 'quotation_add_item' quotation.id %}" class="row g-2 align-items-end">
+          {% csrf_token %}
+          <div class="col-12 col-md-4">
+            <label class="form-label small mb-1">Catalogue product</label>
+            <select name="product" class="form-select form-select-sm">
+              <option value="">— none —</option>
+              {% for p in products %}<option value="{{ p.id }}">{{ p.name|truncatechars:60 }}</option>{% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-3">
+            <label class="form-label small mb-1">or description</label>
+            <input type="text" name="description" class="form-control form-control-sm"
+                   placeholder="e.g. Custom printed carton">
+          </div>
+          <div class="col-4 col-md-1">
+            <label class="form-label small mb-1">Qty</label>
+            <input type="number" name="quantity" value="1" min="1" class="form-control form-control-sm">
+          </div>
+          <div class="col-4 col-md-2">
+            <label class="form-label small mb-1">Unit price</label>
+            <input type="text" name="unit_price" class="form-control form-control-sm" placeholder="0.00">
+          </div>
+          <div class="col-4 col-md-2">
+            <label class="form-label small mb-1" title="Internal only">Unit cost</label>
+            <input type="text" name="unit_cost" class="form-control form-control-sm" placeholder="optional">
+          </div>
+          <div class="col-12">
+            <button class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i>Add line</button>
+            <span class="text-secondary ms-2" style="font-size:12px;">
+              Unit cost is internal — it never appears on anything the customer sees.
+            </span>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if quotation.notes %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Notes to the customer</strong></div>
+      <div class="card-body"><p class="mb-0">{{ quotation.notes|linebreaksbr }}</p></div>
+    </div>
+    {% endif %}
+    {% if quotation.internal_notes %}
+    <div class="card mb-3">
+      <div class="card-header"><strong>Internal notes</strong> <span class="text-secondary small">— not shown to the customer</span></div>
+      <div class="card-body"><p class="mb-0">{{ quotation.internal_notes|linebreaksbr }}</p></div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-12 col-lg-4">
+    <div class="card mb-3">
+      <div class="card-header"><strong>Actions</strong></div>
+      <div class="card-body d-grid gap-2">
+
+        {% if quotation.status == 'draft' %}
+        <form method="post" action="{% url 'quotation_action' quotation.id %}">
+          {% csrf_token %}<input type="hidden" name="action" value="send">
+          <button class="btn btn-primary w-100"><i class="bi bi-send me-1"></i>Mark as sent</button>
+        </form>
+        <p class="text-secondary mb-0" style="font-size:12px;">
+          Sending locks the lines. A quote the customer is holding should not change
+          underneath them.
+        </p>
+
+        {% elif quotation.status == 'sent' %}
+        <form method="post" action="{% url 'quotation_action' quotation.id %}">
+          {% csrf_token %}<input type="hidden" name="action" value="accept">
+          <button class="btn btn-success w-100"><i class="bi bi-check-lg me-1"></i>Customer accepted</button>
+        </form>
+        <form method="post" action="{% url 'quotation_action' quotation.id %}" class="mt-2">
+          {% csrf_token %}<input type="hidden" name="action" value="decline">
+          <input type="text" name="reason" class="form-control form-control-sm mb-2"
+                 placeholder="Why was it lost? (price, lead time, went elsewhere…)">
+          <button class="btn btn-outline-danger w-100">Mark as declined</button>
+        </form>
+        <form method="post" action="{% url 'quotation_action' quotation.id %}">
+          {% csrf_token %}<input type="hidden" name="action" value="expire">
+          <button class="btn btn-outline-secondary w-100">Mark as expired</button>
+        </form>
+
+        {% elif quotation.status == 'accepted' and not quotation.order_id %}
+        <form method="post" action="{% url 'quotation_convert' quotation.id %}">
+          {% csrf_token %}
+          <button class="btn btn-primary w-100"><i class="bi bi-box-seam me-1"></i>Convert to order</button>
+        </form>
+        <p class="text-secondary mb-0" style="font-size:12px;">
+          Only lines with a catalogue product can go on an order. Anything else is
+          listed so you know what still needs handling by hand.
+        </p>
+
+        {% elif quotation.order_id %}
+        <a href="/orders/" class="btn btn-outline-secondary w-100">
+          <i class="bi bi-box-seam me-1"></i>Became order #{{ quotation.order_id }}
+        </a>
+
+        {% else %}
+        <p class="text-secondary mb-0" style="font-size:13px;">
+          This quotation is {{ quotation.get_status_display|lower }}; there is nothing
+          further to do with it.
+        </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><strong>Details</strong></div>
+      <div class="card-body" style="font-size:13.5px;">
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Customer</span><span>{{ quotation.customer.name }}</span></div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Currency</span><span>{{ quotation.currency }}</span></div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Value</span>
+          <span class="fw-semibold">{{ quotation.currency }} {{ quotation.subtotal|floatformat:2 }}</span></div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Valid until</span>
+          <span>
+            {% if quotation.valid_until %}{{ quotation.valid_until|date:"d M Y" }}
+              {% if quotation.is_overdue %}<span class="badge bg-warning text-dark ms-1">overdue</span>{% endif %}
+            {% else %}&mdash;{% endif %}
+          </span></div>
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Created</span><span>{{ quotation.created_at|date:"d M Y" }}</span></div>
+        {% if quotation.sent_at %}
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Sent</span><span>{{ quotation.sent_at|date:"d M Y" }}</span></div>
+        {% endif %}
+        {% if quotation.decided_at %}
+        <div class="d-flex justify-content-between py-1">
+          <span class="text-secondary">Decided</span><span>{{ quotation.decided_at|date:"d M Y" }}</span></div>
+        {% endif %}
+        {% if quotation.decline_reason %}
+        <div class="py-1">
+          <span class="text-secondary d-block">Reason lost</span>
+          <span>{{ quotation.decline_reason }}</span></div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

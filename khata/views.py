@@ -22,7 +22,9 @@ Django Concepts Used:
 - Decimal: Used for all money calculations to avoid floating-point errors.
 """
 
+import csv
 import io
+import re
 from collections import defaultdict
 from datetime import date, datetime, time
 from decimal import Decimal, InvalidOperation
@@ -31,10 +33,12 @@ from django.contrib.auth.decorators import login_required
 # Role-aware access guard: only users whose profile grants the 'khata' module
 # (admins always, or staff with perm_khata) may reach these views.
 from accounts.decorators import module_required
+from django.db import transaction
 from django.db.models import Count, Sum
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, HttpResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.utils import timezone
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST
 
 from customers.models import Customer
@@ -595,6 +599,412 @@ def export_ledger_pdf(request, customer_id):
     return FileResponse(buffer, as_attachment=True, filename=f'ledger_{slug}{suffix}.pdf')
 
 
+# =============================================================================
+# CSV IMPORT / EXPORT
+# =============================================================================
+# The ledger could only leave the system as a PDF, which is a document for a
+# human to read, not data. There was no way to get an existing account book IN
+# at all, so a business moving over from a spreadsheet had to retype years of
+# history, and no way to get the numbers OUT into anything an accountant could
+# reconcile.
+#
+# The export and the import speak the SAME column set deliberately: whatever you
+# download can be edited and uploaded back without translation.
+# =============================================================================
+
+# The canonical column order. Export writes these; import accepts them in any
+# order, matched by header name.
+LEDGER_CSV_COLUMNS = ['date', 'customer', 'entry_type', 'amount', 'currency', 'description']
+
+# Words people actually type in a spreadsheet for the two entry types. The
+# ledger's own vocabulary ("credit" money in, "debit" money owed) is not what a
+# non-accountant reaches for, and rejecting a file over the word "payment" is a
+# pointless obstacle.
+ENTRY_TYPE_SYNONYMS = {
+    'credit': LedgerEntry.CREDIT,
+    'cr': LedgerEntry.CREDIT,
+    'payment': LedgerEntry.CREDIT,
+    'paid': LedgerEntry.CREDIT,
+    'received': LedgerEntry.CREDIT,
+    'in': LedgerEntry.CREDIT,
+    'debit': LedgerEntry.DEBIT,
+    'dr': LedgerEntry.DEBIT,
+    'charge': LedgerEntry.DEBIT,
+    'invoice': LedgerEntry.DEBIT,
+    'owed': LedgerEntry.DEBIT,
+    'out': LedgerEntry.DEBIT,
+}
+
+# Accepted date formats, tried in order. ISO first because that is what the
+# export writes and therefore what a round-tripped file contains. The rest cover
+# what Excel produces in a UAE/UK locale.
+_DATE_FORMATS = [
+    '%Y-%m-%d %H:%M:%S',
+    '%Y-%m-%d %H:%M',
+    '%Y-%m-%d',
+    '%d/%m/%Y %H:%M',
+    '%d/%m/%Y',
+    '%d-%m-%Y',
+    '%d.%m.%Y',
+]
+
+
+def _parse_entry_datetime(raw):
+    """
+    Parse a user-supplied date into an aware datetime, or None if unparseable.
+
+    Args:
+        raw (str): Date text from a form field or a CSV cell.
+
+    Returns:
+        datetime | None: Timezone-aware datetime, or None when nothing matched.
+
+    Note on ambiguity:
+        '03/04/2026' is deliberately read as 3 April, not 4 March. This business
+        operates in the UAE and sources from China; day-first is the convention
+        in both. The export writes ISO dates precisely so a round trip is never
+        ambiguous.
+    """
+    raw = (raw or '').strip()
+    if not raw:
+        return None
+    for fmt in _DATE_FORMATS:
+        try:
+            parsed = datetime.strptime(raw, fmt)
+        except ValueError:
+            continue
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed)
+        return parsed
+    return None
+
+
+def _ledger_csv_rows(entries):
+    """
+    Yield CSV rows for a queryset of ledger entries, header first.
+
+    Args:
+        entries (QuerySet): LedgerEntry rows, already filtered and ordered.
+
+    Yields:
+        list: One row of cell values.
+    """
+    yield LEDGER_CSV_COLUMNS
+    for entry in entries:
+        yield [
+            timezone.localtime(entry.date).strftime('%Y-%m-%d %H:%M'),
+            entry.customer.name,
+            entry.entry_type,
+            f'{entry.amount:.2f}',
+            entry.currency,
+            (entry.description or '').replace('\r\n', ' ').replace('\n', ' '),
+        ]
+
+
+@module_required('khata')
+def export_ledger_csv(request, customer_id=None):
+    """
+    Download ledger entries as CSV — one customer, or the whole book.
+
+    Args:
+        request (HttpRequest): GET, optionally with ?from= and ?to= dates.
+        customer_id (int, optional): Restrict to one customer. None exports all.
+
+    Returns:
+        HttpResponse: A text/csv attachment.
+
+    Why UTF-8 BOM:
+        Customer names and descriptions contain Arabic and Chinese. Excel on
+        Windows assumes the system codepage for a .csv with no BOM and renders
+        those as mojibake, which looks like data loss to the person opening it.
+        utf-8-sig writes the marker that makes Excel read it as UTF-8.
+    """
+    entries = LedgerEntry.objects.select_related('customer')
+
+    customer = None
+    if customer_id is not None:
+        customer = get_object_or_404(Customer, id=customer_id)
+        entries = entries.filter(customer=customer)
+
+    date_from, date_to = _parse_date_range(request)
+    entries = _filter_by_date(entries, date_from, date_to)
+    entries = entries.order_by('date', 'id')
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    for row in _ledger_csv_rows(entries):
+        writer.writerow(row)
+
+    stem = slugify(customer.name) if customer else 'all-customers'
+    span = ''
+    if date_from or date_to:
+        span = f"_{date_from or 'start'}_to_{date_to or 'today'}"
+    filename = f'ledger_{stem}{span}.csv'
+
+    response = HttpResponse(
+        buffer.getvalue().encode('utf-8-sig'),
+        content_type='text/csv; charset=utf-8',
+    )
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response
+
+
+def _read_csv_rows(upload):
+    """
+    Decode an uploaded CSV into dicts keyed by lowercased header.
+
+    Args:
+        upload (UploadedFile): The submitted file.
+
+    Returns:
+        tuple[list, str]: (rows, error). `error` is non-empty on failure.
+
+    Encoding:
+        utf-8-sig first, because a file exported from here or saved by Excel as
+        "CSV UTF-8" carries a BOM that would otherwise appear inside the first
+        header name and break the column match. cp1252 is the fallback for a
+        plain Excel "CSV" save on a Western Windows machine.
+    """
+    raw = upload.read()
+    text = None
+    for encoding in ('utf-8-sig', 'cp1252'):
+        try:
+            text = raw.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        return [], 'Could not read the file. Save it as CSV UTF-8 and try again.'
+
+    try:
+        # Sniffing handles the semicolon delimiter Excel writes in several
+        # European locales. A short or odd file defeats it, so comma is assumed.
+        dialect = csv.Sniffer().sniff(text[:4096], delimiters=',;\t')
+    except csv.Error:
+        dialect = csv.excel
+
+    reader = csv.DictReader(io.StringIO(text), dialect=dialect)
+    if not reader.fieldnames:
+        return [], 'That file has no header row.'
+
+    normalised = [(name or '').strip().lower() for name in reader.fieldnames]
+    missing = [c for c in ('customer', 'entry_type', 'amount') if c not in normalised]
+    if missing:
+        return [], (
+            'Missing required column(s): ' + ', '.join(missing) + '. '
+            'Expected headers: ' + ', '.join(LEDGER_CSV_COLUMNS) + '.'
+        )
+
+    rows = []
+    for record in reader:
+        rows.append({
+            (key or '').strip().lower(): (value or '').strip()
+            for key, value in record.items()
+        })
+    return rows, ''
+
+
+@module_required('khata')
+@require_POST
+def import_ledger_csv(request):
+    """
+    Import ledger entries from a CSV file.
+
+    Args:
+        request (HttpRequest): POST with `csv_file`, optional `dry_run=1`.
+
+    Returns:
+        JsonResponse: {'success', 'message', 'created', 'skipped', 'errors', ...}
+
+    Two decisions worth stating plainly, both because this is money:
+
+    ALL OR NOTHING. Every row is validated before anything is written, and the
+    write runs inside one transaction. A partly-applied import of an account
+    book is worse than a rejected one: the balances are wrong, and nobody knows
+    which rows landed. If any row fails, the whole file is rejected and every
+    problem is reported at once so it can be fixed in a single pass.
+
+    DUPLICATES ARE SKIPPED, NOT INSERTED. Uploading the same file twice would
+    otherwise silently double every balance in it. A row matching an existing
+    entry on customer, date, type, amount, currency and description is treated
+    as already imported. That makes a re-run safe and makes "did that upload
+    work?" a question you can answer by simply doing it again.
+    """
+    upload = request.FILES.get('csv_file')
+    if not upload:
+        return JsonResponse({'success': False, 'message': 'Choose a CSV file first.'})
+    if upload.size > 5 * 1024 * 1024:
+        return JsonResponse({'success': False, 'message': 'That file is larger than 5 MB.'})
+
+    rows, read_error = _read_csv_rows(upload)
+    if read_error:
+        return JsonResponse({'success': False, 'message': read_error})
+    if not rows:
+        return JsonResponse({'success': False, 'message': 'That file has no data rows.'})
+    if len(rows) > 5000:
+        return JsonResponse({
+            'success': False,
+            'message': f'{len(rows)} rows is more than one import can take. Split the file into blocks of 5,000.',
+        })
+
+    # Customers are matched by name, case-insensitively. Built once up front
+    # rather than a query per row: a 5,000-row file would otherwise be 5,000
+    # round trips. A name used by two customers is ambiguous and is reported
+    # rather than guessed at.
+    by_name = defaultdict(list)
+    for customer in Customer.objects.all():
+        by_name[customer.name.strip().lower()].append(customer)
+
+    errors = []
+    staged = []
+
+    for index, row in enumerate(rows, start=2):    # start=2: row 1 is the header
+        def fail(message):
+            errors.append(f'Row {index}: {message}')
+
+        name = row.get('customer', '')
+        if not name:
+            fail('customer is blank.')
+            continue
+        matches = by_name.get(name.lower(), [])
+        if not matches:
+            fail(f'no customer named "{name}".')
+            continue
+        if len(matches) > 1:
+            fail(f'"{name}" matches {len(matches)} customers. Rename them so they are distinct.')
+            continue
+        customer = matches[0]
+
+        entry_type = ENTRY_TYPE_SYNONYMS.get(row.get('entry_type', '').lower())
+        if not entry_type:
+            fail(f'entry_type "{row.get("entry_type", "")}" is not credit or debit.')
+            continue
+
+        # Strip thousands separators and currency symbols that survive a
+        # spreadsheet export: "1,250.00" and "AED 1250" are both meant as 1250.
+        raw_amount = re.sub(r'[^\d.\-]', '', row.get('amount', ''))
+        try:
+            amount = Decimal(raw_amount)
+        except (InvalidOperation, ValueError):
+            fail(f'amount "{row.get("amount", "")}" is not a number.')
+            continue
+        if amount <= 0:
+            fail('amount must be greater than zero.')
+            continue
+        if amount >= Decimal('100000000'):
+            fail('amount is too large.')
+            continue
+
+        currency = (row.get('currency') or 'AED').upper()
+        if currency not in VALID_CURRENCIES:
+            fail(f'currency "{currency}" is not one of {", ".join(sorted(VALID_CURRENCIES))}.')
+            continue
+
+        raw_date = row.get('date', '')
+        if raw_date:
+            entry_date = _parse_entry_datetime(raw_date)
+            if entry_date is None:
+                fail(f'date "{raw_date}" is not a date. Use YYYY-MM-DD.')
+                continue
+        else:
+            # No date column, or a blank cell. Defaulting to now is right for a
+            # file of today's transactions and wrong for historical data, so the
+            # count is reported back rather than passing silently.
+            entry_date = timezone.now()
+
+        staged.append({
+            'customer': customer,
+            'entry_type': entry_type,
+            'amount': amount.quantize(Decimal('0.01')),
+            'currency': currency,
+            'description': row.get('description', '')[:2000],
+            'date': entry_date,
+            'dated': bool(raw_date),
+        })
+
+    if errors:
+        return JsonResponse({
+            'success': False,
+            'message': f'{len(errors)} row(s) have problems. Nothing was imported.',
+            # Capped so one badly-formed file cannot return a megabyte of text.
+            'errors': errors[:50],
+            'error_count': len(errors),
+        })
+
+    # Duplicate detection. One query covering the customers and date span in the
+    # file, rather than a lookup per row.
+    dates = [item['date'] for item in staged]
+    existing = LedgerEntry.objects.filter(
+        customer__in={item['customer'].id for item in staged},
+        date__gte=min(dates),
+        date__lte=max(dates),
+    ).values_list('customer_id', 'date', 'entry_type', 'amount', 'currency', 'description')
+    seen = {
+        (cid, d.replace(microsecond=0), etype, amt, cur, (desc or '').strip())
+        for cid, d, etype, amt, cur, desc in existing
+    }
+
+    fresh, duplicates = [], 0
+    for item in staged:
+        key = (
+            item['customer'].id, item['date'].replace(microsecond=0), item['entry_type'],
+            item['amount'], item['currency'], item['description'].strip(),
+        )
+        if key in seen:
+            duplicates += 1
+            continue
+        seen.add(key)          # also catches rows duplicated within the file itself
+        fresh.append(item)
+
+    undated = sum(1 for item in fresh if not item['dated'])
+
+    if request.POST.get('dry_run') == '1':
+        return JsonResponse({
+            'success': True,
+            'dry_run': True,
+            'created': len(fresh),
+            'skipped': duplicates,
+            'undated': undated,
+            'message': _describe_import(len(fresh), duplicates, undated, applied=False),
+        })
+
+    with transaction.atomic():
+        LedgerEntry.objects.bulk_create([
+            LedgerEntry(
+                customer=item['customer'],
+                entry_type=item['entry_type'],
+                amount=item['amount'],
+                currency=item['currency'],
+                description=item['description'],
+                date=item['date'],
+            )
+            for item in fresh
+        ])
+
+    return JsonResponse({
+        'success': True,
+        'created': len(fresh),
+        'skipped': duplicates,
+        'undated': undated,
+        'message': _describe_import(len(fresh), duplicates, undated, applied=True),
+    })
+
+
+def _describe_import(created, duplicates, undated, applied):
+    """Build the sentence shown after an import or its preview."""
+    verb = 'Imported' if applied else 'Ready to import'
+    parts = [f'{verb} {created} entr' + ('y' if created == 1 else 'ies') + '.']
+    if duplicates:
+        parts.append(
+            f'{duplicates} skipped as already in the ledger.'
+        )
+    if undated:
+        parts.append(
+            f'{undated} had no date and will be filed under today.'
+        )
+    return ' '.join(parts)
+
+
 @module_required('khata')
 @require_POST
 def add_entry(request):
@@ -632,12 +1042,27 @@ def add_entry(request):
     if amount >= Decimal('100000000'):
         return JsonResponse({'success': False, 'message': 'Amount is too large'})
 
+    # Optional: the date the transaction actually happened. Money received on
+    # Tuesday and entered on Friday belongs on Tuesday, or every date-filtered
+    # statement reports the wrong figures.
+    entry_date = timezone.now()
+    raw_date = (request.POST.get('date') or '').strip()
+    if raw_date:
+        parsed = _parse_entry_datetime(raw_date)
+        if parsed is None:
+            return JsonResponse({
+                'success': False,
+                'message': 'Invalid date. Use YYYY-MM-DD or YYYY-MM-DD HH:MM.',
+            })
+        entry_date = parsed
+
     LedgerEntry.objects.create(
         customer=customer,
         entry_type=entry_type,
         amount=amount.quantize(Decimal('0.01')),
         currency=currency,
         description=description,
+        date=entry_date,
     )
     return JsonResponse({'success': True, 'message': f'{entry_type.capitalize()} entry added!'})
 

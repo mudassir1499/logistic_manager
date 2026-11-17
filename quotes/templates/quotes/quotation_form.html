@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}New quotation{% endblock %}
+{% block page_title %}New quotation{% endblock %}
+{% block nav_quotes %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in">
+  <h1 class="page-title"><i class="bi bi-file-earmark-plus me-2"></i>New quotation</h1>
+  <p class="text-secondary mb-0">Who it is for and how long the price holds. Lines come next.</p>
+</div>
+
+<div class="row">
+  <div class="col-12 col-lg-7">
+    <div class="card">
+      <div class="card-body">
+        <form method="post" action="{% url 'quotation_create' %}">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label">Customer <span class="text-danger">*</span></label>
+            <select name="customer" class="form-select" required>
+              <option value="">— choose —</option>
+              {% for c in customers %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+            </select>
+          </div>
+
+          <div class="row g-3">
+            <div class="col-6">
+              <label class="form-label">Currency</label>
+              <input type="text" name="currency" value="{{ settings.currency_code|default:'AED' }}"
+                     class="form-control" maxlength="8">
+            </div>
+            <div class="col-6">
+              <label class="form-label">Valid until</label>
+              <input type="date" name="valid_until" value="{{ default_valid_until|date:'Y-m-d' }}"
+                     class="form-control">
+              <div class="form-text">Blank means no stated expiry.</div>
+            </div>
+          </div>
+
+          <div class="mb-3 mt-3">
+            <label class="form-label">Notes to the customer</label>
+            <textarea name="notes" rows="3" class="form-control"
+                      placeholder="Terms, lead time, what the price includes…"></textarea>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Internal notes</label>
+            <textarea name="internal_notes" rows="2" class="form-control"
+                      placeholder="Supplier options, margin thinking, risks"></textarea>
+            <div class="form-text">Never shown to the customer.</div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i>Create and add lines</button>
+            <a href="{% url 'quotation_list' %}" class="btn btn-outline-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-5">
+    <div class="card">
+      <div class="card-body">
+        <h6 class="mb-2">How this works</h6>
+        <ol class="text-secondary mb-0" style="font-size:13.5px; padding-left:18px;">
+          <li class="mb-2">Create the quotation here, then add priced lines — catalogue
+              products or free text for anything not in the catalogue yet.</li>
+          <li class="mb-2">Mark it <strong>sent</strong> when it goes to the customer. That
+              locks the lines, so what they are holding cannot change underneath them.</li>
+          <li class="mb-2">Record the outcome: accepted, declined (with the reason) or
+              expired. The reason is what makes the conversion rate worth reading.</li>
+          <li>An accepted quotation converts into an order, carrying its lines across.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

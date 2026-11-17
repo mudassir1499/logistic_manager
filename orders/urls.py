@@ -51,6 +51,16 @@ urlpatterns = [
     # -------------------------------------------------------------------------
     path('', views.order_list, name='order_list'),
 
+    # Apply one status change to many selected orders at once. Limited to
+    # reversible flags (placed / paid) — see the view docstring for why deletion
+    # is deliberately excluded from bulk operations.
+    # JSON catalogue search for the order builder and the quotation picker.
+    # Replaces embedding the whole catalogue in the order list's HTML, which
+    # made that page's size grow with the number of products.
+    path('product-lookup/', views.product_lookup, name='product_lookup'),
+
+    path('bulk-action/', views.bulk_order_action, name='bulk_order_action'),
+
     # -------------------------------------------------------------------------
     # ADD: Create a New Order
     # -------------------------------------------------------------------------
@@ -60,6 +70,15 @@ urlpatterns = [
     # the core transaction flow of the logistics business.
     # -------------------------------------------------------------------------
     path('add/', views.add_order, name='add_order'),
+
+    # Freight-only jobs: goods the customer already owns, that we ship. Separate
+    # from Order because there are no catalogue lines, no commission and no
+    # invoice - only a tracking reference and a status.
+    path('logistics/', views.logistics_order_list, name='logistics_order_list'),
+    path('logistics/save/', views.logistics_order_save, name='logistics_order_create'),
+    path('logistics/<int:job_id>/save/', views.logistics_order_save, name='logistics_order_edit'),
+    path('logistics/<int:job_id>/status/', views.logistics_order_status, name='logistics_order_status'),
+    path('logistics/<int:job_id>/delete/', views.logistics_order_delete, name='logistics_order_delete'),
 
     # -------------------------------------------------------------------------
     # EDIT: Modify an Existing Order
@@ -238,4 +257,20 @@ urlpatterns = [
     # URL: /orders/labels-zip/5/
     # -------------------------------------------------------------------------
     path('labels-zip/<int:order_id>/', views.download_order_labels_zip, name='download_order_labels_zip'),
+
+    # -------------------------------------------------------------------------
+    # SHIPMENT STATUS: set the transit status of one shipment block (POST)
+    # -------------------------------------------------------------------------
+    path('<int:order_id>/shipment-status/', views.set_shipment_status, name='set_shipment_status'),
+
+    # -------------------------------------------------------------------------
+    # MANAGE SHIPMENTS: per-order page listing every shipment block with a
+    # status selector (covers manual shipments the By Air/Sea tabs don't show)
+    # -------------------------------------------------------------------------
+    path('<int:order_id>/shipments/', views.manage_shipments, name='manage_shipments'),
+
+    # -------------------------------------------------------------------------
+    # RECORD PAYMENT: log a received payment against an order (ledger-linked)
+    # -------------------------------------------------------------------------
+    path('<int:order_id>/record-payment/', views.record_payment, name='record_payment'),
 ]

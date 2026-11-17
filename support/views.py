@@ -11,7 +11,10 @@ users pass implicitly, and staff pass only if granted the support permission.
 
 from django.contrib import messages
 from django.contrib.auth.models import User
+from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
 from accounts.decorators import module_required
 from settings_manager.models import CompanySettings
@@ -53,6 +56,7 @@ def queue(request):
     settings = CompanySettings.get_settings()
     status = request.GET.get('status', '')
     assignment = request.GET.get('assignment', '')
+    search = request.GET.get('q', '').strip()
 
     tickets = Ticket.objects.select_related('customer', 'assigned_to', 'created_by')
     if status:
@@ -61,6 +65,16 @@ def queue(request):
         tickets = tickets.filter(assigned_to=request.user)
     elif assignment == 'unassigned':
         tickets = tickets.filter(assigned_to__isnull=True)
+    if search:
+        tickets = tickets.filter(
+            Q(subject__icontains=search)
+            | Q(customer__name__icontains=search)
+            | Q(created_by__username__icontains=search)
+        )
+
+    # Paginate so the queue stays fast and scannable as tickets pile up.
+    paginator = Paginator(tickets, 20)
+    page_obj = paginator.get_page(request.GET.get('page'))
 
     counts = {
         'open': Ticket.objects.filter(status=Ticket.STATUS_OPEN).count(),
@@ -71,11 +85,14 @@ def queue(request):
 
     return render(request, 'support/queue.html', {
         'settings': settings,
-        'tickets': tickets,
+        'tickets': page_obj,
+        'page_obj': page_obj,
         'counts': counts,
         'status': status,
         'assignment': assignment,
+        'search': search,
         'status_choices': Ticket.STATUS_CHOICES,
+        'trail': [{'label': 'Support'}],
     })
 
 
@@ -105,6 +122,14 @@ def ticket_detail(request, ticket_id):
                 ticket.save()
                 if not is_internal:
                     notify_ticket_reply(ticket, msg, to_customer=True)
+                    # In-portal notification alongside the email.
+                    if ticket.customer_id:
+                        from accounts.services import notify_customer
+                        notify_customer(
+                            ticket.customer,
+                            f'Support replied to your ticket #{ticket.id} ({ticket.subject}).',
+                            notification_type='system',
+                        )
                 messages.success(request, 'Reply posted.')
 
         elif action == 'assign':
@@ -118,6 +143,8 @@ def ticket_detail(request, ticket_id):
             if new_status in dict(Ticket.STATUS_CHOICES):
                 ticket.status = new_status
                 ticket.save(update_fields=['status', 'updated_at'])
+                from accounts.services import log_action
+                log_action(request, 'ticket.status', target=f'Ticket #{ticket.id}', detail=new_status)
                 messages.success(request, 'Status updated.')
 
         return redirect('support_ticket_detail', ticket_id=ticket.id)
@@ -136,4 +163,8 @@ def ticket_detail(request, ticket_id):
         'thread': thread,
         'agents': agents,
         'status_choices': Ticket.STATUS_CHOICES,
+        'trail': [
+            {'label': 'Support', 'url': reverse('support_queue')},
+            {'label': f'#{ticket.id}'},
+        ],
     })

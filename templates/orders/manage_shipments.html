@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}Shipments — Order #{{ order.id }}{% endblock %}
+{% block page_title %}Manage Shipments{% endblock %}
+{% block nav_orders %}active{% endblock %}
+
+{% block content %}
+<div class="page-header animate-fade-in d-flex justify-content-between align-items-start flex-wrap gap-2">
+    <div>
+        <h1 class="page-title"><i class="bi bi-truck me-2"></i>Shipments — Order #{{ order.id }}</h1>
+        <p class="text-secondary mb-0">{{ order.customer.name }} · update each shipment's transit status; the customer sees it instantly on their order page</p>
+    </div>
+    <a href="/orders/" class="btn btn-outline-secondary btn-sm">Back to Orders</a>
+</div>
+
+{% if messages %}{% for m in messages %}
+<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>
+{% endfor %}{% endif %}
+
+{% for block in blocks %}
+<div class="card mb-3">
+    <div class="card-body">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <strong>Shipment #{{ block.shipment_no }}</strong>
+                {% if block.name %}<span class="text-secondary small">— {{ block.name }}</span>{% endif %}
+                <span class="badge bg-light text-dark border text-capitalize">{{ block.method }}</span>
+                {% if block.updated_at %}
+                <span class="small text-secondary">last update {{ block.updated_at|date:"M d, H:i" }}</span>
+                {% endif %}
+            </div>
+            <form method="post" action="{% url 'set_shipment_status' order.id %}" class="d-flex align-items-center gap-2 flex-wrap m-0">
+                {% csrf_token %}
+                <input type="hidden" name="shipment_no" value="{{ block.shipment_no }}">
+                <select name="status" class="form-select form-select-sm" style="min-width: 150px;">
+                    <option value="">— set status —</option>
+                    {% for value, label in status_choices %}
+                    <option value="{{ value }}" {% if block.status == value %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <input type="text" name="note" value="{{ block.note }}" class="form-control form-control-sm"
+                       placeholder="Note (e.g. vessel / AWB no.)" style="min-width: 200px;">
+                <button type="submit" class="btn btn-sm btn-primary"><i class="bi bi-check2 me-1"></i>Update</button>
+            </form>
+        </div>
+        <div class="small text-secondary">
+            {{ block.total_qty }} unit{{ block.total_qty|pluralize }} ·
+            {% for item in block.items %}{{ item.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        </div>
+    </div>
+</div>
+{% empty %}
+{% include 'includes/empty_state.html' with icon='bi-truck' title='This order has no items yet' text='Add items to the order first, then manage its shipments here.' %}
+{% endfor %}
+{% endblock %}

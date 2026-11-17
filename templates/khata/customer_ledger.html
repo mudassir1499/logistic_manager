@@ -23,6 +23,15 @@
     <i class="bi bi-file-earmark-pdf me-1"></i> Export PDF
 </a>
 
+{% comment %} CSV alongside the PDF, carrying the same date filter. The PDF is a document
+   to hand someone; this is the same figures as data an accountant can
+   reconcile, and it is the format the importer reads back. {% endcomment %}
+<a id="exportCsvBtn" href="/khata/customer/{{ customer.id }}/export-csv/{% if is_filtered %}?from={{ date_from }}&amp;to={{ date_to }}{% endif %}"
+   class="btn-ghost" style="margin-right:8px;"
+   data-bs-toggle="tooltip" title="Download these entries as a CSV spreadsheet">
+    <i class="bi bi-filetype-csv me-1"></i> Export CSV
+</a>
+
 <button class="btn-glow" onclick="openAddEntry()">
     <i class="bi bi-plus-circle"></i> Add Entry
 </button>
@@ -50,7 +59,7 @@
                 {% if balances %}
                     {% for currency, bal in balances.items %}
                     <div class="glass-card" style="padding:12px 20px;flex:1;min-width:120px;text-align:center;">
-                        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">{{ currency }}</div>
+                        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">{{ settings.currency_symbol }}</div>
                         <div style="font-size:22px;font-weight:800;{% if bal >= 0 %}color:var(--success){% else %}color:var(--danger){% endif %}">
                             {% if bal >= 0 %}+{% endif %}{{ bal }}
                         </div>
@@ -228,8 +237,10 @@ ajaxSubmit('addEntryForm', '/khata/add/', function() {
 // setupTableSearch is a utility function from main.js that filters table rows.
 setupTableSearch('entrySearch', 'entriesTable');
 
-// Date-range presets. Each fills the two date inputs and submits, so the table and
-// the Export PDF link stay in sync with one click.
+// Date-range presets. Each fills the two date inputs and submits. The reload is
+// what keeps the table and BOTH export links in step - the links carry the range
+// in their href and are re-rendered server-side, so there is nothing to sync by
+// hand and no way for a stale filter to end up in a download.
 function setLedgerPreset(preset) {
     var fromEl = document.getElementById('dateFrom');
     var toEl = document.getElementById('dateTo');

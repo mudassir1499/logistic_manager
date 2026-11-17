@@ -166,6 +166,51 @@ class Order(models.Model):
     # Order object is FIRST created. It never changes after that. This tracks when the order was placed.
     date = models.DateTimeField(auto_now_add=True, db_index=True)
 
+    # -------------------------------------------------------------------------
+    # INVOICE REFERENCE
+    # -------------------------------------------------------------------------
+    # Invoices used to be identified by the raw primary key ("#33"): not
+    # sequential, not gapless, and it changes meaning if data is ever migrated.
+    # This holds a proper reference (e.g. "INV-0042") allocated from
+    # CompanySettings the first time an invoice is produced for the order.
+    #
+    # Once written it is never regenerated, so a reference a customer has already
+    # filed against their own accounts stays stable no matter how many times the
+    # order is edited afterwards.
+    #
+    # Nullable because every existing order predates the field; those keep falling
+    # back to "#<id>" until an invoice is next generated for them.
+    # -------------------------------------------------------------------------
+    invoice_number = models.CharField(
+        max_length=40, blank=True, null=True, unique=True, db_index=True,
+        verbose_name='Invoice Number',
+        help_text='Assigned automatically when the first invoice is generated. Never changes afterwards.'
+    )
+
+    # -------------------------------------------------------------------------
+    # PUBLIC TRACKING NUMBER
+    # -------------------------------------------------------------------------
+    # What a buyer quotes to follow their goods at /track/ without logging in.
+    #
+    # RANDOM, NOT SEQUENTIAL, AND DELIBERATELY SO. A tracking page is readable by
+    # anyone holding the number, so a sequential reference (ORD-1, ORD-2 ...)
+    # would let anyone walk the whole order book: every product, every quantity,
+    # every shipment, for every customer. Twelve characters from an unambiguous
+    # 32-letter alphabet is about 1.1e18 combinations, which is not walkable.
+    #
+    # The alphabet excludes O/0 and I/1/L because these get read aloud down a
+    # phone and typed back by someone who is not looking at the original.
+    # -------------------------------------------------------------------------
+    # NULL rather than '' for "not yet assigned". A unique column permits many
+    # NULLs but only one empty string, so defaulting to '' would make the very
+    # first backfilled row collide with every other existing order.
+    tracking_number = models.CharField(
+        max_length=32, blank=True, null=True, default=None, unique=True, db_index=True,
+        verbose_name='Tracking Number',
+        help_text='Assigned automatically. Safe to share — the tracking page shows '
+                  'no customer details, prices or totals.',
+    )
+
     # DecimalField for the grand total of the order (product costs + shipping + commission + extras).
     # Default is 0. Calculated by the business logic in views, not by the database.
     total = models.DecimalField(max_digits=10, decimal_places=2, default=0)
@@ -241,6 +286,105 @@ class Order(models.Model):
             models.Index(fields=['status', 'date']),
         ]
 
+    @property
+    def display_reference(self):
+        """
+        The reference to show for this order: its invoice number, else "#<id>".
+
+        Lets templates print one thing whether or not an invoice has been issued,
+        so historical orders created before invoice numbering existed still read
+        sensibly.
+        """
+        return self.invoice_number or f'#{self.pk}'
+
+    def ensure_invoice_number(self):
+        """
+        Allocate this order's invoice number if it does not have one yet.
+
+        Returns:
+            str: The order's invoice reference.
+
+        Allocated lazily — on first invoice generation rather than at order
+        creation — so draft orders that are never invoiced do not consume numbers
+        and leave gaps in the sequence. Once set it is never reissued.
+        """
+        if self.invoice_number:
+            return self.invoice_number
+        from settings_manager.models import CompanySettings
+        self.invoice_number = CompanySettings.get_settings().allocate_invoice_number()
+        self.save(update_fields=['invoice_number'])
+        return self.invoice_number
+
+    # Excludes O, 0, I, 1, L: these are read aloud and typed back by someone who
+    # cannot see the original, and every one of them has a twin.
+    TRACKING_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+    TRACKING_PREFIX = 'MLK'
+
+    @staticmethod
+    def _new_tracking_number():
+        """A fresh random tracking reference, e.g. ``MLK-7F3K-9QX2-VB4T``."""
+        import secrets
+        groups = [
+            ''.join(secrets.choice(Order.TRACKING_ALPHABET) for _ in range(4))
+            for _ in range(3)
+        ]
+        return f'{Order.TRACKING_PREFIX}-' + '-'.join(groups)
+
+    def ensure_tracking_number(self):
+        """
+        Give this order a tracking number if it has none, and return it.
+
+        Retries on collision rather than trusting the odds. A duplicate would
+        raise IntegrityError at save time and lose the order the operator was in
+        the middle of creating — a loop costs nothing and removes the failure
+        mode entirely.
+
+        Returns:
+            str: The order's tracking reference.
+        """
+        if self.tracking_number:
+            return self.tracking_number
+        for _ in range(10):
+            candidate = self._new_tracking_number()
+            if not Order.objects.filter(tracking_number=candidate).exists():
+                self.tracking_number = candidate
+                if self.pk:
+                    self.save(update_fields=['tracking_number'])
+                return candidate
+        raise RuntimeError('Could not allocate a unique tracking number after 10 tries.')
+
+    def save(self, *args, **kwargs):
+        """
+        Assign a tracking number on first save.
+
+        Done here rather than in the order-creation view because orders are
+        created from four places — the back office, portal checkout, the API and
+        the admin — and an order without a tracking number is one a customer
+        cannot follow. Existing rows keep whatever they already have.
+        """
+        if not self.tracking_number:
+            # No save() call inside: this IS the save, and ensure_tracking_number
+            # would recurse. Only the value is taken here.
+            for _ in range(10):
+                candidate = self._new_tracking_number()
+                if not Order.objects.filter(tracking_number=candidate).exists():
+                    self.tracking_number = candidate
+                    break
+        super().save(*args, **kwargs)
+
+    @property
+    def payment_due_date(self):
+        """
+        Date payment falls due, from the configured default terms.
+
+        Returns:
+            datetime | None: The due date, or None for "due on receipt".
+        """
+        from datetime import timedelta
+        from settings_manager.models import CompanySettings
+        days = CompanySettings.get_settings().payment_terms_days
+        return (self.date + timedelta(days=days)) if days and self.date else None
+
     def __str__(self):
         """
         Returns a human-readable identifier for this order.
@@ -250,6 +394,75 @@ class Order(models.Model):
         """
         # self.id is the auto-generated primary key. Every Order gets a unique number automatically.
         return f"Order #{self.id} - {self.customer.name}"
+
+    # -------------------------------------------------------------------------
+    # WHATSAPP HANDOFF
+    # -------------------------------------------------------------------------
+    # Placing an order opens WhatsApp with the order already written out, addressed
+    # to the number configured in Settings. The team works out of WhatsApp, so an
+    # order that only exists in the database is an order nobody has seen yet.
+    #
+    # WHAT THIS IS NOT: it does not send anything. wa.me "click to chat" opens the
+    # customer's own WhatsApp with the text prefilled — they still press send.
+    # Actually sending on their behalf would need the WhatsApp Business API, an
+    # approved message template and a paid number. The upside of doing it this way
+    # is that the message comes from the customer's real number, so replying to it
+    # reaches them directly.
+    # -------------------------------------------------------------------------
+
+    def whatsapp_message(self, settings=None):
+        """
+        The order, written out as a plain-text WhatsApp message.
+
+        Args:
+            settings (CompanySettings | None): Reused when the caller already has it,
+                so rendering a page full of orders does not re-read the singleton.
+
+        Returns:
+            str: A multi-line summary — reference, customer, line items, total.
+        """
+        from settings_manager.models import CompanySettings
+        if settings is None:
+            settings = CompanySettings.get_settings()
+
+        symbol = settings.currency_symbol
+
+        lines = [
+            f'*New order {self.display_reference}*',
+            f'Customer: {self.customer.name}',
+            '',
+        ]
+        for item in self.items.select_related('product', 'variant'):
+            name = item.product.name
+            if item.variant_id:
+                name = f'{name} — {item.variant.name}'
+            lines.append(f'• {name}')
+            lines.append(f'   {item.quantity} × {symbol}{item.price} = {symbol}{item.quantity * item.price}')
+        lines.append('')
+        lines.append(f'*Total: {symbol}{self.total}*')
+        if self.customer.phone:
+            lines.append(f'Contact: {self.customer.phone}')
+        return '\n'.join(lines)
+
+    def whatsapp_url(self, settings=None):
+        """
+        The wa.me click-to-chat link for this order, or '' when unavailable.
+
+        Returns '' when no WhatsApp number is configured, so callers can hide the
+        button rather than render a link to a broken chat.
+        """
+        from urllib.parse import quote
+        from settings_manager.models import CompanySettings
+        if settings is None:
+            settings = CompanySettings.get_settings()
+
+        number = settings.whatsapp_digits
+        if not number:
+            return ''
+        # quote(), not urlencode(): wa.me wants the text as a path-style query
+        # value, and newlines must survive as %0A for the message to keep its
+        # line breaks.
+        return f'https://wa.me/{number}?text={quote(self.whatsapp_message(settings))}'
 
     @property
     def has_ready_to_ship_labels(self):
@@ -307,6 +520,24 @@ class OrderItem(models.Model):
     # on_delete=models.CASCADE: if the Product is deleted, the OrderItem is also deleted.
     # Note: In practice, products should probably use PROTECT to preserve order history.
     product = models.ForeignKey(Product, on_delete=models.PROTECT, db_index=True)
+
+    # Which variation of the product was ordered — the colour, size or kit the
+    # customer picked. NULL for products that have no variants, which is most of
+    # them, and for every line that predates variants existing.
+    #
+    # PROTECT, matching `product`: an order line is a record of what was bought,
+    # and deleting a variant must not quietly rewrite history into "the plain
+    # product". Retire a variation with is_active=False instead.
+    #
+    # The unit price is already stored on this row, so a variant's price flows
+    # through invoicing untouched even if the catalogue price changes later.
+    variant = models.ForeignKey(
+        'products.ProductVariant',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='order_items',
+    )
 
     # Shipment number for split shipments. Default is 1 (all items in one shipment).
     # If an order is split, some items might have shipment_no=1 and others shipment_no=2.
@@ -577,3 +808,178 @@ class Notification(models.Model):
         """
         recipient = self.user.username if self.user else (self.customer.name if self.customer else 'Unknown')
         return f"{self.get_notification_type_display()}: {self.message[:50]}... — {recipient}"
+
+
+class ShipmentStatus(models.Model):
+    """
+    Tracks where one shipment block of an order currently is in transit.
+
+    Orders are split into shipment blocks (OrderItem.shipment_no). Each block can
+    travel separately, so each gets its own status row. The admin updates the
+    status from the back office; the customer portal renders it as a timeline on
+    the order detail page — answering "where is my shipment?" without a ticket.
+    """
+
+    STATUS_PREPARING = 'preparing'
+    STATUS_ORDER_PLACED = 'order_placed'
+    STATUS_WAITING_PRODUCT = 'waiting_for_product'
+    STATUS_AT_WAREHOUSE = 'arrived_at_warehouse'
+    STATUS_WAITING_DISPATCH = 'waiting_for_dispatch'
+    STATUS_DISPATCHED = 'dispatched'
+    STATUS_ON_THE_WAY = 'on_the_way'
+    STATUS_AT_CUSTOMS = 'arrived_at_customs'
+    STATUS_WAITING_DELIVERY = 'waiting_for_delivery'
+    STATUS_DELIVERED = 'delivered'
+
+    # Declaration order IS the timeline order — STATUS_ORDER below is derived from
+    # it, so adding a step means editing this one list and nothing else.
+    STATUS_CHOICES = [
+        (STATUS_PREPARING, 'Preparing'),
+        (STATUS_ORDER_PLACED, 'Order Placed'),
+        (STATUS_WAITING_PRODUCT, 'Waiting for Product'),
+        (STATUS_AT_WAREHOUSE, 'Arrived at Warehouse'),
+        (STATUS_WAITING_DISPATCH, 'Waiting for Dispatch'),
+        (STATUS_DISPATCHED, 'Dispatched'),
+        (STATUS_ON_THE_WAY, 'On the Way'),
+        (STATUS_AT_CUSTOMS, 'Arrived at Customs'),
+        (STATUS_WAITING_DELIVERY, 'Waiting for Delivery to Customer'),
+        (STATUS_DELIVERED, 'Delivered'),
+    ]
+    # Ordered list used to render the timeline and compute progress. Derived from
+    # STATUS_CHOICES rather than repeated by hand: the two lists drifting apart
+    # would silently mis-order the customer's progress bar.
+    STATUS_ORDER = [value for value, _label in STATUS_CHOICES]
+
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='shipment_statuses')
+    shipment_no = models.PositiveIntegerField(default=1)
+    # 40 rather than the exact 20 the longest key needs: the previous column was
+    # sized to the longest value of the day, which left no room for a new step.
+    status = models.CharField(max_length=40, choices=STATUS_CHOICES, default=STATUS_PREPARING)
+    note = models.CharField(max_length=255, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('order', 'shipment_no')
+        verbose_name = 'Shipment Status'
+        verbose_name_plural = 'Shipment Statuses'
+
+    def __str__(self):
+        return f'Order #{self.order_id} shipment {self.shipment_no}: {self.get_status_display()}'
+
+    @property
+    def step_index(self):
+        """0-based position of the current status in the timeline."""
+        try:
+            return self.STATUS_ORDER.index(self.status)
+        except ValueError:
+            return 0
+
+
+class LogisticsOrder(models.Model):
+    """
+    A freight-only job: goods the customer already owns, that we ship.
+
+    WHY THIS IS NOT AN ``Order``
+
+    An Order is a purchase — it has catalogue products, line prices, a
+    commission and an invoice. A logistics job has none of that. The customer
+    already bought the goods (often direct from a factory, sometimes before they
+    ever spoke to us); what they are buying from us is the shipping. Forcing it
+    into Order would mean a row with no products, a zero total, and an invoice
+    that reads as if we sold nothing.
+
+    What it shares with Order is the two things a customer actually asks about:
+    the tracking reference and the status. Both use the same vocabulary here, so
+    ``/track/`` answers for either kind of job and staff learn one set of
+    statuses rather than two.
+    """
+
+    # The same status ladder shipments already use. Imported from ShipmentStatus
+    # rather than redeclared: two lists that drift apart would show a customer
+    # one status on the tracking page and a different one in the back office.
+    STATUS_CHOICES = ShipmentStatus.STATUS_CHOICES
+    STATUS_ORDER = ShipmentStatus.STATUS_ORDER
+
+    # Optional. Plenty of these start as a WhatsApp message from someone who is
+    # not a customer yet, and refusing to record the job until a Customer row
+    # exists is how jobs end up tracked in a notebook instead.
+    customer = models.ForeignKey(
+        Customer, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='logistics_orders',
+    )
+    # Who to contact when there is no Customer record.
+    contact_name = models.CharField(max_length=200, blank=True, default='')
+    contact_phone = models.CharField(max_length=50, blank=True, default='')
+
+    description = models.CharField(
+        max_length=255,
+        help_text='What is being shipped, e.g. "3 cartons LED strip lights".',
+    )
+    photo = models.ImageField(
+        upload_to='logistics_orders/', blank=True,
+        help_text='A photo of the goods or the cartons as received.',
+    )
+
+    weight_kg = models.DecimalField(
+        max_digits=10, decimal_places=3, default=0,
+        verbose_name='Weight (KG)',
+    )
+    # Cartons and volume, because sea freight is priced on CBM rather than
+    # weight and a job with neither cannot be quoted.
+    carton_qty = models.PositiveIntegerField(null=True, blank=True,
+                                             verbose_name='Cartons')
+    cbm = models.DecimalField(max_digits=10, decimal_places=3, null=True,
+                              blank=True, verbose_name='CBM')
+
+    shipping_price = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0,
+        help_text='What the customer pays for this shipment.',
+    )
+
+    # Same shape and generator as Order.tracking_number - random, not
+    # sequential, because the tracking page is public and a sequential
+    # reference would let anyone walk other people's shipments.
+    tracking_number = models.CharField(
+        max_length=32, unique=True, null=True, blank=True, db_index=True,
+        help_text='Assigned automatically. Safe to share.',
+    )
+    status = models.CharField(
+        max_length=40, choices=STATUS_CHOICES,
+        default=ShipmentStatus.STATUS_PREPARING, db_index=True,
+    )
+
+    notes = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Logistics Order'
+
+    def __str__(self):
+        who = self.customer.name if self.customer else (self.contact_name or 'Walk-in')
+        return f'{self.tracking_number or "unsaved"} — {who}'
+
+    def save(self, *args, **kwargs):
+        """Assign a tracking number on first save, exactly as Order does."""
+        if not self.tracking_number:
+            for _ in range(10):
+                candidate = Order._new_tracking_number()
+                if not (LogisticsOrder.objects.filter(tracking_number=candidate).exists()
+                        or Order.objects.filter(tracking_number=candidate).exists()):
+                    self.tracking_number = candidate
+                    break
+        super().save(*args, **kwargs)
+
+    @property
+    def status_label(self):
+        return dict(self.STATUS_CHOICES).get(self.status, self.status)
+
+    @property
+    def progress_percent(self):
+        """How far along the status ladder this job is, for a progress bar."""
+        try:
+            i = self.STATUS_ORDER.index(self.status)
+        except ValueError:
+            return 0
+        return int(round((i + 1) / len(self.STATUS_ORDER) * 100))

@@ -33,3 +33,13 @@ class OrderExtraCostAdmin(admin.ModelAdmin):
 
 admin.site.register(OrderNote)
 admin.site.register(Notification)
+
+
+from .models import ShipmentStatus
+
+
+@admin.register(ShipmentStatus)
+class ShipmentStatusAdmin(admin.ModelAdmin):
+    list_display = ('order', 'shipment_no', 'status', 'updated_at')
+    list_filter = ('status',)
+    raw_id_fields = ('order',)

@@ -6,10 +6,19 @@
 
 {% block topbar_actions %}
 
+<a href="/khata/export-csv/" class="btn-ghost" style="margin-right:8px;"
+   data-bs-toggle="tooltip" title="Download every ledger entry for every customer as a CSV">
+    <i class="bi bi-filetype-csv me-1"></i> Export CSV
+</a>
+
+<button class="btn-ghost" style="margin-right:8px;" data-bs-toggle="modal" data-bs-target="#importLedgerModal">
+    <i class="bi bi-upload me-1"></i> Import CSV
+</button>
+
 <button class="btn-glow" data-bs-toggle="modal" data-bs-target="#addEntryModal">
     <i class="bi bi-plus-circle"></i> New Entry
 </button>
-{% endblock %}  
+{% endblock %}
 
 {% block content %}
 
@@ -62,7 +71,7 @@
                 {% if s.balances %}
                     {% for currency, bal in s.balances.items %}
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="badge-glass badge-info" style="font-size:11px;">{{ currency }}</span>
+                        <span class="badge-glass badge-info" style="font-size:11px;">{{ settings.currency_symbol }}</span>
                         <span style="font-weight:700;font-size:15px;{% if bal >= 0 %}color:var(--success){% else %}color:var(--danger){% endif %}">
                             {% if bal >= 0 %}+{% endif %}{{ bal }}
                         </span>
@@ -134,6 +143,12 @@
             <label class="form-label">Amount</label>
             <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
           </div>
+          {% comment %} The date the money actually moved, which is not always today. Left
+             blank it defaults to now, so the quick path is unchanged. {% endcomment %}
+          <div class="mb-3">
+            <label class="form-label">Date <span style="color:var(--text-secondary);font-size:11px">(optional — defaults to today)</span></label>
+            <input type="date" name="date" class="form-control">
+          </div>
           <div class="mb-3">
             <label class="form-label">Description <span style="color:var(--text-secondary);font-size:11px">(optional)</span></label>
             <input type="text" name="description" class="form-control" placeholder="e.g. Payment for order #123">
@@ -145,7 +160,64 @@
   </div>
 </div>
 
-{% endblock %}  
+{% comment %} =========================================================================
+   IMPORT LEDGER CSV
+   =========================================================================
+   Deliberately a two-step dialog. "Check file" validates and reports what
+   would happen; "Import" writes. An account book is not something to load
+   blind, and the preview costs one request.
+   ====================================================================== {% endcomment %}
+<div class="modal fade" id="importLedgerModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-upload me-2"></i>Import Ledger Entries</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+
+        <div class="mb-3">
+          <label class="form-label">CSV file</label>
+          <input type="file" id="ledgerCsvFile" class="form-control" accept=".csv,text/csv">
+        </div>
+
+        <div style="font-size:12.5px;color:var(--text-secondary);line-height:1.6;">
+          <p class="mb-2"><strong>Columns</strong> — <code>date</code>, <code>customer</code>,
+             <code>entry_type</code>, <code>amount</code>, <code>currency</code>, <code>description</code>.
+             Any order; <code>customer</code>, <code>entry_type</code> and <code>amount</code> are required.</p>
+          <ul class="mb-2" style="padding-left:18px;">
+            <li><strong>customer</strong> must match a customer name already in the system, exactly (case does not matter).</li>
+            <li><strong>entry_type</strong> accepts credit / debit, and also payment, received, charge, invoice, cr, dr.</li>
+            <li><strong>date</strong> reads <code>YYYY-MM-DD</code> or <code>DD/MM/YYYY</code>. Blank means today.</li>
+            <li><strong>amount</strong> may carry separators and symbols — <code>1,250.00</code> and <code>AED 1250</code> both work.</li>
+          </ul>
+          <p class="mb-0">
+            An <a href="/khata/export-csv/">exported CSV</a> can be edited and uploaded back as-is.
+          </p>
+        </div>
+
+        <div class="blog-callout" style="margin-top:14px;padding:12px 14px;border:1px solid var(--border-color);border-radius:var(--radius-sm);background:var(--bg-input);font-size:12.5px;">
+          <strong>Safe to repeat.</strong> Rows already in the ledger are skipped, so re-uploading
+          the same file will not double any balance. If a single row is wrong the whole file is
+          rejected and nothing is written.
+        </div>
+
+        <div id="ledgerImportResult" class="mt-3" style="display:none;"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-ghost" id="ledgerCheckBtn" onclick="runLedgerImport(true)">
+          <i class="bi bi-search me-1"></i> Check file
+        </button>
+        <button type="button" class="btn-glow" id="ledgerImportBtn" onclick="runLedgerImport(false)">
+          <i class="bi bi-upload me-1"></i> Import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
 
 {% block extra_js %}
 <script>
@@ -163,6 +235,92 @@ function filterCustomers(q) {
 ajaxSubmit('addEntryForm', '/khata/add/', function() {
     bootstrap.Modal.getInstance(document.getElementById('addEntryModal')).hide();
     setTimeout(function() { location.reload(); }, 500);
+});
+
+/**
+ * Validate or apply a ledger CSV import.
+ *
+ * Args:
+ *     dryRun (bool): true to preview only, false to write the entries.
+ */
+function runLedgerImport(dryRun) {
+    var input = document.getElementById('ledgerCsvFile');
+    var box = document.getElementById('ledgerImportResult');
+
+    if (!input.files.length) {
+        showToast('Choose a CSV file first', 'error');
+        return;
+    }
+
+    var fd = new FormData();
+    fd.append('csv_file', input.files[0]);
+    if (dryRun) fd.append('dry_run', '1');
+    fd.append('csrfmiddlewaretoken', getCookie('csrftoken'));
+
+    fetch('/khata/import-csv/', {
+        method: 'POST',
+        body: fd,
+        loadingMessage: dryRun ? 'Checking the file...' : 'Importing entries...'
+    })
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+        box.style.display = '';
+
+        if (res.success) {
+            box.innerHTML =
+                '<div style="padding:12px 14px;border-radius:var(--radius-sm);' +
+                'border:1px solid rgba(21,127,74,0.35);background:rgba(21,127,74,0.08);' +
+                'font-size:13px;font-weight:600;color:#157F4A;">' +
+                escapeHtmlText(res.message) + '</div>';
+
+            if (!dryRun) {
+                showToast(res.message, 'success');
+                showLoading('Refreshing...');
+                setTimeout(function () { location.reload(); }, 900);
+            }
+            return;
+        }
+
+        // Failure. Row-level problems are listed so the whole file can be fixed
+        // in one pass rather than one upload per mistake.
+        var html =
+            '<div style="padding:12px 14px;border-radius:var(--radius-sm);' +
+            'border:1px solid rgba(194,65,12,0.35);background:rgba(194,65,12,0.08);' +
+            'font-size:13px;color:#C2410C;">' +
+            '<div style="font-weight:700;margin-bottom:6px;">' + escapeHtmlText(res.message) + '</div>';
+        if (res.errors && res.errors.length) {
+            html += '<ul style="margin:0;padding-left:18px;font-weight:500;">';
+            res.errors.forEach(function (line) {
+                html += '<li>' + escapeHtmlText(line) + '</li>';
+            });
+            html += '</ul>';
+            if (res.error_count > res.errors.length) {
+                html += '<div style="margin-top:6px;font-weight:600;">' +
+                        '...and ' + (res.error_count - res.errors.length) + ' more.</div>';
+            }
+        }
+        box.innerHTML = html + '</div>';
+        showToast(res.message, 'error');
+    })
+    .catch(function () { showToast('Could not reach the server', 'error'); });
+}
+
+/**
+ * Escape text for safe insertion into innerHTML.
+ *
+ * Error lines quote values straight from the uploaded file - a customer name, a
+ * currency code - so they are attacker-influenced text, not trusted markup.
+ */
+function escapeHtmlText(value) {
+    var div = document.createElement('div');
+    div.textContent = value == null ? '' : String(value);
+    return div.innerHTML;
+}
+
+// Clear the previous result whenever a different file is chosen, so a stale
+// "Ready to import 40 entries" cannot be read as applying to the new one.
+document.getElementById('ledgerCsvFile').addEventListener('change', function () {
+    document.getElementById('ledgerImportResult').style.display = 'none';
 });
 </script>
 {% endblock %}  

@@ -38,6 +38,7 @@
 </div>
 
 <div class="glass-card">
+    <div class="table-responsive">
     <table class="table-glass" id="ledgerTable">
         <thead>
             <tr>
@@ -86,6 +87,7 @@
             {% endfor %}  
         </tbody>
     </table>
+    </div>
 </div>
 
 <div class="modal fade" id="addEntryModal" tabindex="-1" aria-hidden="true">
@@ -98,8 +100,8 @@
       <div class="modal-body">
         <form id="addEntryForm" class="form-glass">
           <div class="mb-3">
-            <label class="form-label">Customer</label>
-            <select name="customer_id" class="form-select" required>
+            <label for="id_customer_id" class="form-label">Customer</label>
+            <select id="id_customer_id" name="customer_id" class="form-select" required>
               <option value="">Select customer...</option>
               {% for customer in customers %}
               <option value="{{ customer.id }}">{{ customer.name }}</option>
@@ -107,7 +109,7 @@
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Entry Type</label>
+            <span class="form-label d-block">Entry Type</span>
             <div class="d-flex gap-3">
                 <label class="d-flex align-items-center gap-2" style="cursor:pointer">
                     <input type="radio" name="entry_type" value="credit" required class="form-check-input" checked>
@@ -120,20 +122,20 @@
             </div>
           </div>
           <div class="mb-3">
-            <label class="form-label">Currency</label>
-            <select name="currency" class="form-select">
+            <label for="id_currency" class="form-label">Currency</label>
+            <select id="id_currency" name="currency" class="form-select">
               {% for code, label in currencies %}
               <option value="{{ code }}">{{ label }}</option>
               {% endfor %}  
             </select>
           </div>
           <div class="mb-3">
-            <label class="form-label">Amount</label>
-            <input type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
+            <label for="id_amount" class="form-label">Amount</label>
+            <input id="id_amount" type="number" name="amount" class="form-control" step="0.01" placeholder="0.00" required>
           </div>
           <div class="mb-3">
-            <label class="form-label">Description (Optional)</label>
-            <input type="text" name="description" class="form-control" placeholder="e.g. Payment for order #123">
+            <label for="id_description" class="form-label">Description (Optional)</label>
+            <input id="id_description" type="text" name="description" class="form-control" placeholder="e.g. Payment for order #123">
           </div>
           <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Add Entry</button>
         </form>

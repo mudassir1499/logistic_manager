@@ -33,6 +33,7 @@ Django Concepts Used:
 - request.POST.getlist(): Gets multiple values for the same form field name (e.g., product_id[], quantity[]).
 """
 
+import re
 import json
 import calendar
 import zipfile
@@ -42,20 +43,36 @@ from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from django.db.models import Sum, Count, Q, F
+
+# transaction.atomic makes order saves all-or-nothing. Editing an order deletes
+# every existing line item before re-creating them from the form, so a failure
+# part-way through previously destroyed data with no way to recover it.
+from django.db import transaction
 from django.db.models.functions import TruncMonth
 from django.http import JsonResponse, FileResponse, HttpResponse
 from django.contrib.auth.decorators import login_required
 # Role-aware access guard: only users whose profile grants the 'orders' module
 # (admins always, or staff with perm_orders) may reach these views.
 from accounts.decorators import module_required
-from django.shortcuts import render, get_object_or_404
-from django.views.decorators.csrf import csrf_exempt
+from django.shortcuts import render, get_object_or_404, redirect
+# NOTE: @csrf_exempt was removed from the views in this file. The admin UI now
+# attaches X-CSRFToken to every same-origin state-changing fetch() automatically
+# (see the wrapper at the top of static/main.js), so these endpoints are
+# protected again without any call site needing to change.
 
 from django.core.paginator import Paginator
+
+# Used by the bulk-action view: messages for the confirmation banner, reverse() to
+# build the fallback redirect, and url_has_allowed_host_and_scheme to reject a
+# `next` parameter pointing off-site (an open-redirect guard).
+from django.contrib import messages
+from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.core.mail import send_mail, get_connection
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from django.contrib.auth.models import User
+from django.contrib import messages
 
 # Typed email helper sends order-status emails from the dedicated order_status SMTP profile.
 from utils.email_utils import send_typed_email
@@ -65,7 +82,7 @@ from products.models import Product
 from settings_manager.models import CompanySettings
 from settings_manager.models import ShippingCompany
 
-from .models import Order, OrderItem, OrderExtraCost, OrderNote, Notification, SHIPPING_METHOD_CHOICES, CARGO_TYPE_CHOICES
+from .models import Order, OrderItem, OrderExtraCost, OrderNote, Notification, ShipmentStatus, SHIPPING_METHOD_CHOICES, CARGO_TYPE_CHOICES
 
 
 def _to_decimal(value, default='0'):
@@ -208,7 +225,17 @@ def _is_air_method(method):
     return method in {'air', 'ksa_air'}
 
 
-@module_required('orders')
+class _OrderBuildError(Exception):
+    """
+    Raised inside an atomic block to abort an order save and roll it back.
+
+    _build_order signals failure by RETURNING an error string, which cannot undo
+    work already written inside a transaction. Wrapping that string in an
+    exception lets the caller roll the transaction back and then report the same
+    message to the user unchanged.
+    """
+
+
 def _build_order(request, order=None):
     """
     Shared logic for creating a new order or updating an existing order from POST data.
@@ -250,7 +277,11 @@ def _build_order(request, order=None):
     shipment_volumetric_weights = request.POST.getlist('shipment_volumetric_weight')
     shipment_company_ids = request.POST.getlist('shipment_company_id')
     shipment_shipping_costs = request.POST.getlist('shipment_shipping_cost')
+    shipment_statuses = request.POST.getlist('shipment_status')
     is_checked_list = request.POST.getlist('is_checked')
+    # Per-line unit price. Blank falls back to the catalogue price, so a row
+    # added without touching the field behaves exactly as before.
+    unit_prices = request.POST.getlist('unit_price')
     status = request.POST.get('status', Order.STATUS_CONFIRMED)
     settings = CompanySettings.get_settings()
 
@@ -259,6 +290,32 @@ def _build_order(request, order=None):
         customer = Customer.objects.get(id=customer_id)
     except Customer.DoesNotExist:
         return None, 'Customer not found'
+
+    # -------------------------------------------------------------------------
+    # VALIDATE EVERY LINE ITEM BEFORE WRITING ANYTHING
+    # -------------------------------------------------------------------------
+    # The item loop below used to swallow ValueError/TypeError/DoesNotExist and
+    # `continue`, which meant a single mistyped quantity silently DELETED that
+    # line from the order while the response still reported success with a
+    # plausible total. On an order with fifteen lines nobody notices until the
+    # customer asks where their goods are.
+    #
+    # Validating up front turns that into a refusal with the offending row
+    # named, and — combined with the transaction wrapper on the callers — leaves
+    # the existing order untouched when a save is rejected.
+    # -------------------------------------------------------------------------
+    for index, (product_id, qty) in enumerate(zip(product_ids, quantities), start=1):
+        raw_qty = str(qty).strip()
+        if not raw_qty:
+            return None, f'Item {index}: quantity is missing.'
+        try:
+            parsed_qty = int(raw_qty)
+        except (ValueError, TypeError):
+            return None, f'Item {index}: "{raw_qty}" is not a valid quantity.'
+        if parsed_qty <= 0:
+            return None, f'Item {index}: quantity must be at least 1.'
+        if not Product.objects.filter(id=product_id).exists():
+            return None, f'Item {index}: the selected product no longer exists.'
 
     # Shipping companies (optional, multiple can be selected for an order)
     shipping_company_ids = request.POST.getlist('shipping_company_id')
@@ -283,13 +340,37 @@ def _build_order(request, order=None):
     calculated_weight = Decimal('0')
     calculated_cbm = Decimal('0')
     total_shipment_shipping = Decimal('0')
+    # Transit status submitted per shipment block (shipment_no -> status). Applied
+    # to ShipmentStatus rows after the order is saved. First non-empty wins.
+    submitted_shipment_status = {}
 
     # Iterate over all submitted products in parallel using zip()
     for index, (product_id, qty) in enumerate(zip(product_ids, quantities)):
         try:
             product = Product.objects.get(id=product_id)
             quantity = int(qty)
-            price = product.price
+
+            # THE LINE PRICE IS THE ORDER'S, NOT THE CATALOGUE'S.
+            #
+            # This read `product.price` unconditionally, which had two
+            # consequences. Staff could not agree a different figure with a
+            # customer - a bulk discount, a corrected quote - because the line
+            # always snapped back to the listing. And re-saving an existing
+            # order silently RE-PRICED it at today's catalogue price, so an
+            # order placed at 168 became an order at 195 the moment somebody
+            # opened it to change a shipping date. OrderItem.price exists
+            # precisely to freeze what was agreed; that guarantee was being
+            # broken by the edit path.
+            #
+            # Editing a line here never writes back to Product.price. The
+            # catalogue is the list price; this is what one customer paid once.
+            raw_price = unit_prices[index] if index < len(unit_prices) else ''
+            if str(raw_price).strip():
+                price = _to_decimal(raw_price, str(product.price))
+                if price < 0:
+                    price = product.price
+            else:
+                price = product.price
 
             # Parse per-item shipment details from the parallel form arrays
             # If the index is out of range, use sensible defaults
@@ -314,6 +395,10 @@ def _build_order(request, order=None):
                 except (ShippingCompany.DoesNotExist, ValueError, TypeError):
                     pass
             shipment_shipping_cost = _to_decimal(shipment_shipping_costs[index], '0') if index < len(shipment_shipping_costs) and str(shipment_shipping_costs[index]).strip() else Decimal('0')
+            # Transit status for this shipment block (first non-empty value wins).
+            raw_status = str(shipment_statuses[index]).strip() if index < len(shipment_statuses) else ''
+            if raw_status and shipment_no not in submitted_shipment_status:
+                submitted_shipment_status[shipment_no] = raw_status
             # Check if the item is marked as "checked" (used for invoice filtering)
             is_checked = str(is_checked_list[index]).strip().lower() in {'1', 'true', 'on', 'yes'} if index < len(is_checked_list) else False
 
@@ -322,9 +407,12 @@ def _build_order(request, order=None):
             total_shipment_shipping += shipment_shipping_cost
             total += price * quantity
             # Auto-calculation of weight/CBM from product data is disabled for now.
-        except (Product.DoesNotExist, ValueError, TypeError):
-            # Skip items where the product doesn't exist or the quantity is invalid
-            continue
+        except (Product.DoesNotExist, ValueError, TypeError) as exc:
+            # Everything here was already validated above, so reaching this point
+            # means something changed underneath us (e.g. a product deleted by
+            # another user mid-save). Fail loudly rather than silently dropping
+            # the line — the transaction on the caller rolls the whole save back.
+            raise ValueError(f'Item {index + 1} could not be saved: {exc}') from exc
 
     # Order-level weight and CBM (manual overrides or auto-calculated fallbacks)
     manual_weight = request.POST.get('total_weight', '').strip()
@@ -383,7 +471,238 @@ def _build_order(request, order=None):
     for ec in extra_costs_data:
         OrderExtraCost.objects.create(order=order, amount=ec['amount'], reason=ec['reason'])
 
+    # -------------------------------------------------------------------------
+    # Apply per-shipment transit statuses submitted on the form. We upsert the
+    # ShipmentStatus row and, only when the value actually changed, notify the
+    # customer and write an audit entry (so re-saving an order is not noisy).
+    # -------------------------------------------------------------------------
+    if submitted_shipment_status:
+        from accounts.services import log_action, notify_customer
+        valid_statuses = {c[0] for c in ShipmentStatus.STATUS_CHOICES}
+        existing = {ss.shipment_no: ss.status for ss in order.shipment_statuses.all()}
+        for sno, new_status in submitted_shipment_status.items():
+            if new_status not in valid_statuses:
+                continue
+            if existing.get(sno) == new_status:
+                continue  # unchanged — skip notification/audit
+            obj, _created = ShipmentStatus.objects.update_or_create(
+                order=order, shipment_no=sno, defaults={'status': new_status},
+            )
+            log_action(request, 'shipment.status', target=f'Order #{order.id} shipment {sno}',
+                       detail=obj.get_status_display())
+            notify_customer(
+                order.customer,
+                f'Shipment {sno} of order #{order.id} is now: {obj.get_status_display()}',
+                notification_type='shipment', order=order,
+            )
+
     return order, None
+
+
+def _stale_shipment_days():
+    """
+    How many days without movement makes a shipment "stuck".
+
+    Returns:
+        int: the configured threshold, or 0 when the warning is switched off.
+
+    Read from CompanySettings so the number can be tuned to how this business
+    actually runs — a sea consolidation legitimately sits for weeks, an air
+    shipment does not — rather than being a constant somebody has to redeploy.
+    """
+    from settings_manager.models import CompanySettings
+
+    try:
+        return int(CompanySettings.get_settings().stale_shipment_days or 0)
+    except Exception:                                            # noqa: BLE001
+        return 0
+
+
+def _stale_shipment_order_ids(days):
+    """
+    Orders holding at least one shipment that has not moved in `days` days.
+
+    Args:
+        days (int): the staleness threshold.
+
+    Returns:
+        QuerySet: order ids, for use with `id__in`.
+
+    Delivered shipments are excluded — a delivered consignment is finished, and
+    it not changing is the correct outcome rather than a neglected one. This is
+    the query behind both the dashboard's "shipments with no movement" item and
+    the `?stale=1` filter, so the count you click always matches the list you
+    land on.
+    """
+    from django.utils import timezone as _tz
+
+    cutoff = _tz.now() - _tz.timedelta(days=days)
+    return (ShipmentStatus.objects
+            .exclude(status=ShipmentStatus.STATUS_DELIVERED)
+            .filter(updated_at__lt=cutoff)
+            .values_list('order_id', flat=True))
+
+
+@module_required('orders')
+def bulk_order_action(request):
+    """
+    Apply one status change to every selected order in a single request.
+
+    Args:
+        request (HttpRequest): POST carrying `order_ids` (repeated), `action`, and
+                               `next` (the list URL to return to, filters intact).
+
+    Returns:
+        HttpResponseRedirect: Back to the order list the action was launched from.
+
+    Business Logic:
+        After a supplier run the admin needs to mark a batch of orders as placed.
+        One at a time that is a click and a round trip per order; on twenty orders
+        it is twenty of each. This applies the change to the whole selection in a
+        single UPDATE.
+
+        Supported actions are deliberately limited to reversible status flags —
+        placed/not placed and paid/unpaid. Nothing here deletes or alters money,
+        because a bulk control that can destroy twenty records on a mis-click is
+        not worth the time it saves. Deletion stays a single-order action with its
+        own confirmation.
+
+        `next` is validated before redirecting: an unvalidated redirect target
+        taken from POST data is an open-redirect vulnerability.
+    """
+    if request.method != 'POST':
+        return redirect('order_list')
+
+    # url_has_allowed_host_and_scheme rejects absolute URLs pointing off-site, so a
+    # crafted `next` cannot bounce a logged-in admin to an attacker's page.
+    next_url = request.POST.get('next', '')
+    if not url_has_allowed_host_and_scheme(
+        next_url, allowed_hosts={request.get_host()}, require_https=request.is_secure()
+    ):
+        next_url = reverse('order_list')
+
+    order_ids = request.POST.getlist('order_ids')
+    if not order_ids:
+        messages.warning(request, 'No orders were selected.')
+        return redirect(next_url)
+
+    action = request.POST.get('action', '')
+
+    # Moving a batch of shipments along the transit timeline. Handled separately
+    # from the flag updates below because it is not a single UPDATE: each order
+    # needs its own ShipmentStatus rows, its own customer notification and its
+    # own audit entry.
+    if action == 'set_shipment_status':
+        return _bulk_set_shipment_status(request, order_ids, next_url)
+
+    updates = {
+        'mark_placed': ({'is_placed': True}, 'marked as placed'),
+        'mark_not_placed': ({'is_placed': False}, 'marked as not placed'),
+        'mark_paid': ({'payment_status': 'paid'}, 'marked as paid'),
+        'mark_unpaid': ({'payment_status': 'unpaid'}, 'marked as unpaid'),
+    }
+    if action not in updates:
+        messages.error(request, 'Unknown bulk action.')
+        return redirect(next_url)
+
+    fields, verb = updates[action]
+    count = Order.objects.filter(id__in=order_ids).update(**fields)
+    messages.success(request, f'{count} order{"" if count == 1 else "s"} {verb}.')
+    return redirect(next_url)
+
+
+def _bulk_set_shipment_status(request, order_ids, next_url):
+    """
+    Move every shipment block of the selected orders to one transit status.
+
+    Args:
+        request (HttpRequest): carries `shipment_status`.
+        order_ids (list[str]): the selected orders.
+        next_url (str): validated return URL.
+
+    Returns:
+        HttpResponseRedirect: back to the order list.
+
+    WHY THIS IS THE BULK ACTION THAT MATTERS
+
+    A container leaves the port with thirty consignments on it, and every one of
+    them moves to "On the Way" on the same day. Per order that was a page load, a
+    dropdown, a submit and a redirect — thirty times, for a single real-world
+    event. Marking orders placed or paid already had a bulk control; the status
+    staff touch most often did not.
+
+    ALREADY-DELIVERED BLOCKS ARE LEFT ALONE
+
+    Bulk is precisely where you cannot see what you are changing, and dragging a
+    delivered shipment backwards into "At Customs" tells a customer their
+    completed order is in transit again. Correcting one of those stays a
+    single-order action, where the current state is on screen. The result message
+    says how many were skipped so it is never silent.
+    """
+    from accounts.services import log_action, notify_customer
+
+    status = request.POST.get('shipment_status', '')
+    if status not in dict(ShipmentStatus.STATUS_CHOICES):
+        messages.error(request, 'Choose a shipment status to apply.')
+        return redirect(next_url)
+
+    label = dict(ShipmentStatus.STATUS_CHOICES)[status]
+    orders = (Order.objects.filter(id__in=order_ids)
+              .select_related('customer').prefetch_related('items', 'shipment_statuses'))
+
+    changed_orders = 0
+    changed_blocks = 0
+    skipped_delivered = 0
+
+    for order in orders:
+        # An order is split into shipment blocks by OrderItem.shipment_no. An
+        # order whose items carry no block number is a single shipment.
+        blocks = sorted({item.shipment_no or 1 for item in order.items.all()}) or [1]
+        existing = {s.shipment_no: s for s in order.shipment_statuses.all()}
+
+        touched = 0
+        for block in blocks:
+            current = existing.get(block)
+            if current is not None and current.status == ShipmentStatus.STATUS_DELIVERED:
+                skipped_delivered += 1
+                continue
+            if current is not None and current.status == status:
+                continue  # already there; not a change worth reporting
+            ShipmentStatus.objects.update_or_create(
+                order=order, shipment_no=block, defaults={'status': status},
+            )
+            touched += 1
+
+        if not touched:
+            continue
+
+        changed_orders += 1
+        changed_blocks += touched
+        log_action(request, 'shipment.status.bulk',
+                   target=f'Order #{order.id}', detail=label)
+        # One notification per ORDER, not per block: a customer whose order ships
+        # in three cartons does not want three identical messages.
+        notify_customer(
+            order.customer,
+            f'Order #{order.id} is now: {label}',
+            notification_type='shipment', order=order,
+        )
+
+    if changed_orders:
+        parts = [f'{changed_blocks} shipment{"" if changed_blocks == 1 else "s"} '
+                 f'across {changed_orders} order{"" if changed_orders == 1 else "s"} '
+                 f'marked "{label}"']
+        if skipped_delivered:
+            parts.append(f'{skipped_delivered} already delivered and left unchanged')
+        messages.success(request, '. '.join(parts) + '.')
+    elif skipped_delivered:
+        messages.warning(
+            request,
+            f'Nothing changed — all {skipped_delivered} selected shipments are already delivered.')
+    else:
+        messages.info(request, f'Nothing to change; those shipments are already "{label}".')
+
+    return redirect(next_url)
 
 
 @module_required('orders')
@@ -432,8 +751,59 @@ def order_list(request):
             order_filter = order_filter | Q(id=int(query.lstrip('#')))
         orders = orders.filter(order_filter).distinct()
 
+    # --- Status filters ---
+    # These back the "Needs Attention" links on the dashboard, so a count there
+    # lands on exactly the rows it counted rather than the unfiltered list.
+    placed_filter = request.GET.get('placed', '')
+    if placed_filter == 'no':
+        orders = orders.filter(is_placed=False)
+    elif placed_filter == 'yes':
+        orders = orders.filter(is_placed=True)
+
+    payment_filter = request.GET.get('payment', '')
+    if payment_filter in ('unpaid', 'partial', 'paid'):
+        orders = orders.filter(payment_status=payment_filter)
+
+    # -------------------------------------------------------------------------
+    # WHERE IS IT? — filtering by position in the transit pipeline
+    # -------------------------------------------------------------------------
+    # The list could be filtered by paid and by placed, but not by the ten-step
+    # status the goods actually move through. "What is sitting at customs?" and
+    # "what is ready to dispatch?" are the two questions asked every morning and
+    # neither could be answered without opening orders one at a time.
+    # -------------------------------------------------------------------------
+    shipment_filter = request.GET.get('shipment', '')
+    if shipment_filter in dict(ShipmentStatus.STATUS_CHOICES):
+        orders = orders.filter(shipment_statuses__status=shipment_filter).distinct()
+
+    # Shipments that have not moved in a while. `stale=1` is what the dashboard's
+    # attention queue links to, so the two always agree on what counts as stuck.
+    stale_days = _stale_shipment_days()
+    if request.GET.get('stale') == '1' and stale_days:
+        orders = orders.filter(
+            id__in=_stale_shipment_order_ids(stale_days)).distinct()
+
     customers = Customer.objects.all()
-    products = Product.objects.prefetch_related('images').all()
+
+    # ---------------------------------------------------------------------
+    # ONLY THE FIRST PAGE OF THE CATALOGUE
+    # ---------------------------------------------------------------------
+    # This page used to embed EVERY product twice - once as a picker row with
+    # an image, once as a JavaScript array - so the quotation box could filter
+    # client-side. The weight of the busiest screen in the back office was
+    # therefore a function of how big the catalogue is: 169 KB at 30 products,
+    # 810 KB at 500, and about 5 MB at 3,000.
+    #
+    # The first 50 are still rendered so the picker is useful the instant it
+    # opens; anything past that comes from /orders/product-lookup/, which
+    # searches the WHOLE catalogue rather than only what was rendered. That is
+    # what staff already assumed the search box did.
+    # ---------------------------------------------------------------------
+    products = (Product.objects
+                .filter(is_draft=False)
+                .prefetch_related('images')
+                .order_by('name')[:ORDER_BUILDER_PAGE_SIZE])
+    product_total = Product.objects.filter(is_draft=False).count()
     shipping_companies = list(ShippingCompany.objects.all())
     settings = CompanySettings.get_settings()
 
@@ -470,10 +840,44 @@ def order_list(request):
         partial_total=Sum('total', filter=Q(payment_status='partial')),
     )
 
+    # -------------------------------------------------------------------------
+    # PAGINATION — must happen BEFORE the shipment tabs are built
+    # -------------------------------------------------------------------------
+    # The By Air / By Sea tabs below used to be built from
+    # `OrderItem.objects.all()` — every line item ever created — with no
+    # pagination and no filtering. Pagination protected the main table only, so
+    # the page grew without limit: measured at 254 KB of HTML for 10 orders,
+    # 2.2 MB at 300, and 7.0 MB at 800. The search box made it worse rather than
+    # better, because filtering the table left the tabs showing everything, which
+    # looked like the search had silently failed.
+    #
+    # Paginating first and scoping the tabs to the orders actually on this page
+    # makes the page a fixed size at any data volume, and makes the tabs agree
+    # with the table and with the search.
+    # -------------------------------------------------------------------------
+    page_number = request.GET.get('page', 1)
+    paginator = Paginator(orders, 25)
+    page_obj = paginator.get_page(page_number)
+    page_order_ids = [o.id for o in page_obj.object_list]
+
     # Build grouped shipment rows for the By Air / By Sea tabs
     air_methods = {'air', 'ksa_air'}
     sea_methods = {'sea', 'ksa_sea', 'ksa'}
-    all_items = OrderItem.objects.select_related('order__customer', 'product', 'shipment_company').all()
+    all_items = (
+        OrderItem.objects
+        .select_related('order__customer', 'product', 'shipment_company')
+        .filter(order_id__in=page_order_ids)
+    )
+
+    # Current transit status per (order, shipment block), so the shipment tabs
+    # can show a status dropdown pre-selected with the latest value. Scoped to the
+    # same page — this used to load every ShipmentStatus row in the database to
+    # populate at most 25 orders' worth of dropdowns.
+    status_map = {
+        (ss.order_id, ss.shipment_no): ss.status
+        for ss in ShipmentStatus.objects.filter(order_id__in=page_order_ids)
+    }
+
     air_items = []
     sea_items = []
     for item in all_items:
@@ -492,26 +896,31 @@ def order_list(request):
             'cbm': item.shipment_cbm if item.shipment_cbm else Decimal('0'),
             'shipping_cost': item.shipment_shipping_cost,
             'method': item.shipment_method,
+            'transit_status': status_map.get((item.order_id, item.shipment_no or 1), ''),
         }
         if item.shipment_method in air_methods:
             air_items.append(row)
         elif item.shipment_method in sea_methods:
             sea_items.append(row)
 
-    # --- Pagination ---
-    # Paginate the queryset to improve performance and UX for large datasets.
-    # The page number comes from the URL query string: ?page=N
-    page_number = request.GET.get('page', 1)
-    paginator = Paginator(orders, 25)
-    page_obj = paginator.get_page(page_number)
-
     return render(request, 'orders/order_list.html', {
-        'orders': orders,
         'page_obj': page_obj,
         'query': query,
+        'placed_filter': placed_filter,
+        'payment_filter': payment_filter,
+        'shipment_filter': shipment_filter,
+        'stale_filter': request.GET.get('stale') == '1',
+        'stale_days': stale_days,
+        # True when any filter is active, so the template can offer a "clear" link.
+        'has_filters': bool(query or placed_filter or payment_filter),
         'total_count': paginator.count,
+        # Lets the shipment tabs say which orders they are showing, instead of
+        # silently presenting a partial list as if it were everything.
+        'page_order_count': len(page_order_ids),
         'customers': customers,
         'products': products,
+        'product_total': product_total,
+        'product_page_size': ORDER_BUILDER_PAGE_SIZE,
         'shipping_companies': shipping_companies,
         'shipping_companies_json': shipping_companies_json,
         'currency': settings.currency,
@@ -528,6 +937,7 @@ def order_list(request):
         'stats': totals,
         'air_items': air_items,
         'sea_items': sea_items,
+        'shipment_status_choices': ShipmentStatus.STATUS_CHOICES,
     })
 
 
@@ -641,7 +1051,6 @@ def amazon_order_list(request):
 
 
 @module_required('orders')
-@csrf_exempt
 def add_order(request):
     """
     AJAX endpoint: Create a new order from POST data.
@@ -658,16 +1067,27 @@ def add_order(request):
         the order total. If the status is 'draft', it's saved as a draft for later editing.
     """
     if request.method == 'POST':
-        order, error = _build_order(request)
-        if error:
-            return JsonResponse({'success': False, 'message': error})
+        # transaction.atomic so a failure part-way through leaves no half-built
+        # order behind. _build_order creates the Order row first and then adds
+        # items one at a time; without this, an exception midway committed an
+        # order with only some of its line items and a total that did not match.
+        try:
+            with transaction.atomic():
+                order, error = _build_order(request)
+                if error:
+                    # Raising rather than returning rolls back the partially
+                    # created order; the message is re-surfaced below.
+                    raise _OrderBuildError(error)
+        except _OrderBuildError as exc:
+            return JsonResponse({'success': False, 'message': str(exc)})
+        except ValueError as exc:
+            return JsonResponse({'success': False, 'message': str(exc)})
         label = 'Draft saved' if order.status == Order.STATUS_DRAFT else f'Order #{order.id} created'
         return JsonResponse({'success': True, 'message': f'{label}! Total: {order.total}'})
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 
 @module_required('orders')
-@csrf_exempt
 def edit_order(request, order_id):
     """
     AJAX endpoint: Get or update an existing order.
@@ -695,8 +1115,11 @@ def edit_order(request, order_id):
         return JsonResponse({'error': 'Order not found'}, status=404)
 
     if request.method == 'GET':
+        # Current transit status per shipment block, so the edit form can
+        # pre-select each shipment's status dropdown.
+        status_map = {ss.shipment_no: ss.status for ss in order.shipment_statuses.all()}
         # Build a list of item dictionaries for the frontend edit form
-        items = [{'product_id': item.product.id, 'quantity': item.quantity, 'shipment_no': item.shipment_no, 'shipment_name': item.shipment_name, 'shipment_method': item.shipment_method, 'cargo_type': item.cargo_type, 'shipment_cbm': str(item.shipment_cbm), 'shipment_weight': str(item.shipment_weight), 'shipment_volumetric_weight': str(item.shipment_volumetric_weight), 'shipment_company_id': item.shipment_company_id or '', 'shipment_shipping_cost': str(item.shipment_shipping_cost), 'is_checked': item.is_checked} for item in order.items.all()]
+        items = [{'product_id': item.product.id, 'quantity': item.quantity, 'shipment_no': item.shipment_no, 'shipment_name': item.shipment_name, 'shipment_method': item.shipment_method, 'cargo_type': item.cargo_type, 'shipment_cbm': str(item.shipment_cbm), 'shipment_weight': str(item.shipment_weight), 'shipment_volumetric_weight': str(item.shipment_volumetric_weight), 'shipment_company_id': item.shipment_company_id or '', 'shipment_shipping_cost': str(item.shipment_shipping_cost), 'is_checked': item.is_checked, 'price': str(item.price), 'shipment_status': status_map.get(item.shipment_no, '')} for item in order.items.all()]
         companies = list(order.shipping_companies.values('id', 'name', 'website'))
         return JsonResponse({
             'id': order.id,
@@ -721,15 +1144,25 @@ def edit_order(request, order_id):
         })
 
     if request.method == 'POST':
-        order, error = _build_order(request, order=order)
-        if error:
-            return JsonResponse({'success': False, 'message': error})
+        # This is the dangerous path: _build_order does `order.items.all().delete()`
+        # before re-creating the items from the submitted form. Without a
+        # transaction, any failure after that delete left the order stripped of
+        # every line item with no way to recover them. The atomic block makes the
+        # edit all-or-nothing — a rejected save leaves the order exactly as it was.
+        try:
+            with transaction.atomic():
+                order, error = _build_order(request, order=order)
+                if error:
+                    raise _OrderBuildError(error)
+        except _OrderBuildError as exc:
+            return JsonResponse({'success': False, 'message': str(exc)})
+        except ValueError as exc:
+            return JsonResponse({'success': False, 'message': str(exc)})
         return JsonResponse({'success': True, 'message': f'Order #{order.id} updated!'})
     return JsonResponse({'success': False, 'message': 'Invalid request'})
 
 
 @module_required('orders')
-@csrf_exempt
 def confirm_order(request, order_id):
     """
     AJAX endpoint: Change an order's status from 'draft' to 'confirmed'.
@@ -884,7 +1317,7 @@ def _compute_invoice_data(order, settings=None):
         shipment_weight_auto = Decimal('0')
         rows = []
         for item in items_in_shipment:
-            first_image = item.product.images.first()
+            first_image = item.product.primary_image
             qty = item.quantity
             product = item.product
             # Auto-calculation of weight from product data is disabled for now.
@@ -898,7 +1331,7 @@ def _compute_invoice_data(order, settings=None):
                 'quantity': qty,
                 'price': item.price,
                 'subtotal': item.price * qty,
-                'image_url': first_image.image.url if first_image else None,
+                'image_url': first_image.src if first_image else None,
                 'item_cbm': None,
                 'is_checked': item.is_checked,
             }
@@ -1021,7 +1454,15 @@ def _compute_invoice_data(order, settings=None):
     # actually displayed in the invoice. This ensures the Grand Total always
     # matches the shipping line-items the customer sees (even when order-level
     # shipping_cost is 0 but rates auto-calculate a per-shipment cost).
-    invoice_shipping_total = _quantize_money(sum(s['est_shipping_cost'] for s in invoice_shipments))
+    # The Decimal('0') start value is required, not cosmetic: a bare sum() over an
+    # empty sequence returns the int 0, and _quantize_money() then blows up with
+    # "'int' object has no attribute 'quantize'". invoice_shipments is empty for any
+    # order with no line items — a draft created from the portal before products are
+    # added, for instance — so both /orders/invoice/<id>/ and /orders/export/<id>/
+    # returned a 500 for those. khata/views.py already uses this idiom.
+    invoice_shipping_total = _quantize_money(
+        sum((s['est_shipping_cost'] for s in invoice_shipments), Decimal('0'))
+    )
     other_cost = Decimal(str(order.other_cost)) if order.other_cost else Decimal('0')
     grand_total = _quantize_money(order.total + invoice_shipping_total + other_cost)
     grand_total_with_commission = _quantize_money(grand_total + Decimal(str(order.commission_amount)))
@@ -1102,6 +1543,11 @@ def order_invoice(request, order_id):
     """
     try:
         order = Order.objects.select_related('customer').prefetch_related('items__product__images', 'shipping_companies').get(id=order_id)
+        # Allocate the invoice reference on first view. Doing it here rather than
+        # at order creation means draft orders that are never invoiced do not
+        # consume numbers and leave gaps in the sequence. Once assigned it is
+        # frozen on the order, so re-opening this page never changes it.
+        order.ensure_invoice_number()
         context = _compute_invoice_data(order)
         return render(request, 'orders/invoice.html', context)
     except Order.DoesNotExist:
@@ -1109,7 +1555,6 @@ def order_invoice(request, order_id):
 
 
 @module_required('orders')
-@csrf_exempt
 def delete_order(request, order_id):
     """
     AJAX endpoint: Delete an order from the system.
@@ -1136,7 +1581,6 @@ def delete_order(request, order_id):
 
 
 @module_required('orders')
-@csrf_exempt
 def duplicate_order(request, order_id):
     """
     AJAX endpoint: Duplicate an existing order as a new draft.
@@ -1217,7 +1661,6 @@ def duplicate_order(request, order_id):
 
 
 @module_required('orders')
-@csrf_exempt
 def toggle_payment_status(request, order_id):
     """
     AJAX endpoint: Update or cycle the payment status of an order.
@@ -1253,7 +1696,6 @@ def toggle_payment_status(request, order_id):
 
 
 @module_required('orders')
-@csrf_exempt
 def toggle_placed(request, order_id):
     """
     AJAX endpoint: Toggle whether an order has been placed with the supplier.
@@ -1330,13 +1772,36 @@ def download_order_labels_zip(request, order_id):
             ))
 
     if not files_to_zip:
-        return HttpResponse('No labels available for this order.', content_type='text/plain')
+        # Was a 200 carrying 'No labels available for this order.' as
+        # text/plain. The browser has been told to expect a download, so a bare
+        # string under a success status either opens a blank-looking tab or
+        # saves a stray text file - and nothing distinguishes it from an export
+        # that broke. The operator belongs back on the order, told why.
+        # Back to the orders list, NOT order_detail: that route is a JSON API
+        # for the page's own fetch() calls, so redirecting a browser there
+        # would land the operator on raw JSON.
+        messages.warning(request, f'Order #{order.id}: no labels have been uploaded yet.')
+        return redirect('order_list')
 
     zip_buffer = BytesIO()
+    written = 0
     with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
         for arcname, fpath in files_to_zip:
             if os.path.exists(fpath):
                 zf.write(fpath, arcname)
+                written += 1
+
+    if not written:
+        # Labels are recorded against the items but no file is on disk - a
+        # restore that skipped MEDIA_ROOT, or storage cleared by hand. This used
+        # to send the empty archive it had just built, which looks exactly like
+        # a working export containing nothing: the hardest kind of failure for
+        # someone to report, and the easiest to miss until a shipment is late.
+        messages.error(
+            request,
+            f'{len(files_to_zip)} label file(s) are recorded for this order but '
+            'are missing from storage, so there is nothing to download.')
+        return redirect('order_list')
 
     zip_buffer.seek(0)
     response = FileResponse(zip_buffer, content_type='application/zip')
@@ -1495,7 +1960,7 @@ def generate_quotation_excel(request):
 
         # Embed product image in column B using PIL to resize first
         has_image = False
-        first_img = product.images.first()
+        first_img = product.primary_image
         if first_img:
             try:
                 img_path = os.path.join(str(djsettings.MEDIA_ROOT), str(first_img.image))
@@ -1730,7 +2195,6 @@ def _resolve_quotation_items(parsed_items):
 
 
 @module_required('orders')
-@csrf_exempt
 def import_quotation_excel(request):
     """
     AJAX endpoint: Import a customer-filled quotation Excel and create a draft order.
@@ -1940,7 +2404,7 @@ def packing_list_print(request, order_id):
 
             # Auto-calculation of weight/CBM from product data is disabled for now.
             first_img = p.images.all()[0] if p.images.all() else None
-            image_url = first_img.image.url if first_img else None
+            image_url = first_img.src if first_img else None
 
             rows.append({
                 'name': p.name,
@@ -2693,32 +3157,88 @@ def reports_export_excel(request):
     # WORKSHEET 3: Top Products
     # -------------------------------------------------------------------------
     ws_prod = wb.create_sheet('Top Products')
-    ws_prod.append(['Product', 'Total Qty', f'Revenue ({currency})'])
-    for col in range(1, 4):
+    ws_prod.append(['Product', 'Category', 'Total Qty', f'Revenue ({currency})'])
+    for col in range(1, 5):
         ws_prod.cell(1, col).font = Font(bold=True, color='FFFFFF')
         ws_prod.cell(1, col).fill = solid(DARK)
         ws_prod.cell(1, col).alignment = center
         ws_prod.cell(1, col).border = border
     ws_prod.column_dimensions['A'].width = 40
-    ws_prod.column_dimensions['B'].width = 14
-    ws_prod.column_dimensions['C'].width = 22
+    ws_prod.column_dimensions['B'].width = 24
+    ws_prod.column_dimensions['C'].width = 14
+    ws_prod.column_dimensions['D'].width = 22
 
+    # A product belongs to exactly one category, so adding it to .values()
+    # widens the GROUP BY without regrouping anything: the same rows, now
+    # saying what kind of thing sold. Matches the PDF export, which reads from
+    # this same query shape.
     top_products = list(
         items_qs
-        .values(product_name=F('product__name'))
+        .values(product_name=F('product__name'),
+                category_name=F('product__category__name'))
         .annotate(total_qty=Sum('quantity'), total_revenue=Sum(F('price') * F('quantity')))
         .order_by('-total_qty')[:50]
     )
     for i, p in enumerate(top_products, 1):
-        row = [p['product_name'], int(p['total_qty'] or 0), float(p['total_revenue'] or 0)]
+        row = [
+            p['product_name'],
+            p['category_name'] or 'Uncategorised',
+            int(p['total_qty'] or 0),
+            float(p['total_revenue'] or 0),
+        ]
         ws_prod.append(row)
-        for col_idx in range(1, 4):
+        for col_idx in range(1, 5):
             ws_prod.cell(ws_prod.max_row, col_idx).border = border
-            ws_prod.cell(ws_prod.max_row, col_idx).alignment = center if col_idx > 1 else left
-        ws_prod.cell(ws_prod.max_row, 3).number_format = '#,##0.00'
+            ws_prod.cell(ws_prod.max_row, col_idx).alignment = left if col_idx <= 2 else center
+        ws_prod.cell(ws_prod.max_row, 4).number_format = '#,##0.00'
 
     # -------------------------------------------------------------------------
-    # WORKSHEET 4: Top Customers
+    # WORKSHEET 4: Revenue by Category
+    # -------------------------------------------------------------------------
+    # The same line items rolled up one level, and the sheet that makes the
+    # workbook say the same thing as the PDF. A report that answers "which part
+    # of the catalogue is carrying the quarter" in one format and not the other
+    # is the kind of difference that gets noticed in a meeting.
+    ws_cat = wb.create_sheet('Revenue by Category')
+    ws_cat.append(['Category', 'Units', f'Revenue ({currency})', 'Share'])
+    for col in range(1, 5):
+        ws_cat.cell(1, col).font = Font(bold=True, color='FFFFFF')
+        ws_cat.cell(1, col).fill = solid(DARK)
+        ws_cat.cell(1, col).alignment = center
+        ws_cat.cell(1, col).border = border
+    ws_cat.column_dimensions['A'].width = 32
+    ws_cat.column_dimensions['B'].width = 14
+    ws_cat.column_dimensions['C'].width = 22
+    ws_cat.column_dimensions['D'].width = 12
+
+    by_category = list(
+        items_qs
+        .values(category_name=F('product__category__name'))
+        .annotate(total_qty=Sum('quantity'), total_revenue=Sum(F('price') * F('quantity')))
+        .order_by('-total_revenue')
+    )
+    category_total = sum(float(c['total_revenue'] or 0) for c in by_category)
+    for c in by_category:
+        revenue = float(c['total_revenue'] or 0)
+        # Guarded: a period with orders but nothing charged - samples, or
+        # everything at zero - would divide by zero here.
+        share = (revenue / category_total) if category_total else 0
+        ws_cat.append([
+            c['category_name'] or 'Uncategorised',
+            int(c['total_qty'] or 0),
+            revenue,
+            share,
+        ])
+        for col_idx in range(1, 5):
+            ws_cat.cell(ws_cat.max_row, col_idx).border = border
+            ws_cat.cell(ws_cat.max_row, col_idx).alignment = left if col_idx == 1 else center
+        ws_cat.cell(ws_cat.max_row, 3).number_format = '#,##0.00'
+        # A real percentage rather than a string, so the column can be summed
+        # and charted in Excel.
+        ws_cat.cell(ws_cat.max_row, 4).number_format = '0.0%'
+
+    # -------------------------------------------------------------------------
+    # WORKSHEET 5: Top Customers
     # -------------------------------------------------------------------------
     ws_cust = wb.create_sheet('Top Customers')
     ws_cust.append(['Customer', f'Total Revenue ({currency})', 'Orders'])
@@ -2746,7 +3266,7 @@ def reports_export_excel(request):
         ws_cust.cell(ws_cust.max_row, 2).number_format = '#,##0.00'
 
     # -------------------------------------------------------------------------
-    # WORKSHEET 5: Shipping Methods
+    # WORKSHEET 6: Shipping Methods
     # -------------------------------------------------------------------------
     ws_ship = wb.create_sheet('Shipping Methods')
     ws_ship.append(['Method', 'Orders'])
@@ -2913,20 +3433,26 @@ def reports_export_pdf(request):
     # Top Products
     elements.append(Paragraph('Top Products', styles['Heading2']))
     elements.append(Spacer(1, 0.3*cm))
+    # Category comes along for the ride. A product belongs to exactly one
+    # category, so adding it to .values() widens the GROUP BY without changing
+    # how the rows group - the totals are the same, they just say what kind of
+    # thing sold.
     top_products = list(
         items_qs
-        .values(product_name=F('product__name'))
+        .values(product_name=F('product__name'),
+                category_name=F('product__category__name'))
         .annotate(total_qty=Sum('quantity'), total_revenue=Sum(F('price') * F('quantity')))
         .order_by('-total_qty')[:20]
     )
-    prod_data = [['Product', 'Total Qty', f'Revenue ({currency})']]
+    prod_data = [['Product', 'Category', 'Qty', f'Revenue ({currency})']]
     for p in top_products:
         prod_data.append([
-            p['product_name'][:45],
+            p['product_name'][:38],
+            (p['category_name'] or 'Uncategorised')[:22],
             str(int(p['total_qty'] or 0)),
             f'{float(p["total_revenue"] or 0):,.2f}',
         ])
-    prod_table = Table(prod_data, colWidths=[9*cm, 3*cm, 4*cm])
+    prod_table = Table(prod_data, colWidths=[6.6*cm, 3.6*cm, 2.2*cm, 3.6*cm])
     prod_table.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1B3A5C')),
         ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
@@ -2943,6 +3469,54 @@ def reports_export_pdf(request):
         ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
     ]))
     elements.append(prod_table)
+    elements.append(Spacer(1, 0.8*cm))
+
+    # Revenue by Category
+    #
+    # The same line items as Top Products, rolled up one level. Twenty product
+    # rows tell you what sold; this tells you which part of the catalogue is
+    # carrying the quarter, which is the question a sourcing business actually
+    # asks before deciding what to go and buy more of.
+    elements.append(Paragraph('Revenue by Category', styles['Heading2']))
+    elements.append(Spacer(1, 0.3*cm))
+    by_category = list(
+        items_qs
+        .values(category_name=F('product__category__name'))
+        .annotate(total_qty=Sum('quantity'), total_revenue=Sum(F('price') * F('quantity')))
+        .order_by('-total_revenue')
+    )
+    cat_total = sum(float(c['total_revenue'] or 0) for c in by_category)
+    cat_data = [['Category', 'Units', f'Revenue ({currency})', 'Share']]
+    for c in by_category:
+        revenue = float(c['total_revenue'] or 0)
+        # Guarded because a period with orders but no revenue - everything
+        # given away, or priced at zero - would divide by zero here.
+        share = f'{revenue / cat_total * 100:.1f}%' if cat_total else '\u2014'
+        cat_data.append([
+            (c['category_name'] or 'Uncategorised')[:30],
+            str(int(c['total_qty'] or 0)),
+            f'{revenue:,.2f}',
+            share,
+        ])
+    if len(cat_data) == 1:
+        cat_data.append(['No sales in this period', '\u2014', '\u2014', '\u2014'])
+    cat_table = Table(cat_data, colWidths=[7*cm, 2.6*cm, 3.6*cm, 2.8*cm])
+    cat_table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1B3A5C')),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('ALIGN', (0, 1), (0, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('GRID', (0, 0), (-1, -1), 1, colors.HexColor('#CCCCCC')),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F7FAFF')),
+        ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 1), (-1, -1), 9),
+        ('TOPPADDING', (0, 1), (-1, -1), 5),
+        ('BOTTOMPADDING', (0, 1), (-1, -1), 5),
+    ]))
+    elements.append(cat_table)
     elements.append(Spacer(1, 0.8*cm))
 
     # Top Customers
@@ -3051,3 +3625,683 @@ def admin_stats(request):
         'pending_orders': Order.objects.filter(is_placed=False).count(),
     })
 
+
+
+# =============================================================================
+# SHIPMENT STATUS TRACKING
+# =============================================================================
+
+@module_required('orders')
+def set_shipment_status(request, order_id):
+    """
+    POST: set the transit status of one shipment block of an order.
+
+    Expects ``shipment_no`` and ``status`` in the POST body. Creates or updates
+    the ShipmentStatus row, notifies the customer in-portal, and audits the
+    change. Returns to the orders list (or the referring page).
+    """
+    from accounts.services import log_action, notify_customer
+
+    order = get_object_or_404(Order, id=order_id)
+    if request.method == 'POST':
+        try:
+            shipment_no = int(request.POST.get('shipment_no', 1))
+        except (TypeError, ValueError):
+            shipment_no = 1
+        status = request.POST.get('status', '')
+        if status in dict(ShipmentStatus.STATUS_CHOICES):
+            note = request.POST.get('note', '').strip()
+            obj, _created = ShipmentStatus.objects.update_or_create(
+                order=order, shipment_no=shipment_no,
+                defaults={'status': status, 'note': note},
+            )
+            log_action(request, 'shipment.status', target=f'Order #{order.id} shipment {shipment_no}',
+                       detail=obj.get_status_display())
+            notify_customer(
+                order.customer,
+                f'Shipment {shipment_no} of order #{order.id} is now: {obj.get_status_display()}',
+                notification_type='shipment', order=order,
+            )
+            messages.success(request, f'Shipment {shipment_no} of order #{order.id} marked "{obj.get_status_display()}".')
+        else:
+            messages.error(request, 'Invalid shipment status.')
+    return redirect(request.META.get('HTTP_REFERER') or '/orders/')
+
+
+# =============================================================================
+# PAYMENT RECORDING
+# =============================================================================
+
+@module_required('orders')
+def record_payment(request, order_id):
+    """
+    Record a payment received against an order.
+
+    Creates a credit LedgerEntry linked to the order, recomputes the order's
+    payment_status from the sum of linked credits vs the order total, notifies
+    the customer, and audits the action. GET shows the small form + history.
+    """
+    from decimal import Decimal, InvalidOperation
+    from khata.models import LedgerEntry
+    from accounts.services import log_action, notify_customer
+
+    order = get_object_or_404(Order.objects.select_related('customer'), id=order_id)
+    company = CompanySettings.get_settings()
+
+    linked = LedgerEntry.objects.filter(order=order, entry_type='credit').order_by('-date')
+    paid_total = linked.aggregate(s=Sum('amount'))['s'] or Decimal('0')
+
+    if request.method == 'POST':
+        raw_amount = request.POST.get('amount', '').strip()
+        currency = request.POST.get('currency', company.currency or 'RMB').strip() or 'RMB'
+        note = request.POST.get('description', '').strip()
+        try:
+            amount = Decimal(raw_amount)
+            if amount <= 0:
+                raise InvalidOperation
+        except (InvalidOperation, TypeError):
+            messages.error(request, 'Please enter a valid positive amount.')
+            return redirect('record_payment', order_id=order.id)
+
+        LedgerEntry.objects.create(
+            customer=order.customer,
+            entry_type='credit',
+            amount=amount,
+            currency=currency,
+            description=note or f'Payment for Order #{order.id}',
+            order=order,
+        )
+
+        # Recompute payment status from everything linked to this order.
+        paid_total = (LedgerEntry.objects.filter(order=order, entry_type='credit')
+                      .aggregate(s=Sum('amount'))['s'] or Decimal('0'))
+        if paid_total >= (order.total or Decimal('0')) and order.total:
+            order.payment_status = 'paid'
+        elif paid_total > 0:
+            order.payment_status = 'partial'
+        else:
+            order.payment_status = 'unpaid'
+        order.save(update_fields=['payment_status'])
+
+        log_action(request, 'payment.recorded', target=f'Order #{order.id} ({order.customer.name})',
+                   detail=f'{currency} {amount}')
+        notify_customer(
+            order.customer,
+            f'Payment of {currency} {amount} recorded for order #{order.id}. Thank you!',
+            notification_type='payment', order=order,
+        )
+        messages.success(request, f'Payment of {currency} {amount} recorded for order #{order.id}.')
+        return redirect('record_payment', order_id=order.id)
+
+    return render(request, 'orders/record_payment.html', {
+        'order': order,
+        'company': company,
+        'linked_payments': linked,
+        'paid_total': paid_total,
+        'outstanding': (order.total or Decimal('0')) - paid_total,
+    })
+
+
+@module_required('orders')
+def manage_shipments(request, order_id):
+    """
+    Per-order shipment management: every shipment block of the order (including
+    'manual' method blocks, which the By Air / By Sea tabs don't show) with a
+    status selector and optional note. Status changes POST to
+    ``set_shipment_status`` and land back here.
+    """
+    order = get_object_or_404(Order.objects.select_related('customer'), id=order_id)
+    items = order.items.select_related('product').all()
+
+    # Group items into shipment blocks (same grouping the customer portal uses).
+    blocks_map = {}
+    for item in items:
+        sno = item.shipment_no or 1
+        blocks_map.setdefault(sno, []).append(item)
+
+    status_by_no = {ss.shipment_no: ss for ss in order.shipment_statuses.all()}
+
+    blocks = []
+    for sno in sorted(blocks_map.keys()):
+        block_items = blocks_map[sno]
+        ss = status_by_no.get(sno)
+        blocks.append({
+            'shipment_no': sno,
+            'name': block_items[0].shipment_name or '',
+            'method': block_items[0].shipment_method or 'manual',
+            'items': block_items,
+            'total_qty': sum(i.quantity for i in block_items),
+            'status': ss.status if ss else '',
+            'note': ss.note if ss else '',
+            'updated_at': ss.updated_at if ss else None,
+        })
+
+    return render(request, 'orders/manage_shipments.html', {
+        'order': order,
+        'blocks': blocks,
+        'status_choices': ShipmentStatus.STATUS_CHOICES,
+    })
+
+
+# =============================================================================
+# PUBLIC SHIPMENT TRACKING  (no login)
+# =============================================================================
+# One page, reachable by anyone holding a tracking number, that answers "where
+# are my goods?".
+#
+# WHAT IT DELIBERATELY DOES NOT SHOW
+#   The number is a bearer credential: whoever has it sees the page, and numbers
+#   get forwarded, screenshotted and pasted into group chats. So the page carries
+#   only what tracking actually needs - what is in each shipment block and where
+#   that block has got to.
+#
+#   Excluded, and each for its own reason:
+#     * customer name, phone, email, address - the explicit requirement, and the
+#       thing that would turn a forwarded number into a data leak
+#     * every price, the order total, shipping cost and commission - a tracking
+#       page has no use for money, and what someone paid is nobody else's
+#       business
+#     * the supplier listing URL - staff-only everywhere else in this project;
+#       it is where the goods are bought and would let a buyer skip us
+#     * the order id and invoice number - sequential, so printing them tells a
+#       reader how many orders exist and lets them guess neighbours
+#     * internal notes - written for staff, by staff
+#
+#   The view builds an explicit dict per row rather than handing the template an
+#   Order. Passing the model and trusting the template not to render
+#   `order.customer.phone` is a rule nobody can enforce; a whitelist is checkable
+#   in one screen and cannot leak a field added to the model later.
+# =============================================================================
+
+def track_shipment(request):
+    """
+    Public tracking page.
+
+    Args:
+        request (HttpRequest): Anonymous. ``?number=`` carries the reference;
+            without it the page is just the search form.
+
+    Returns:
+        HttpResponse: The form, the result, or a not-found message.
+    """
+    raw = (request.GET.get('number') or '').strip()
+
+    context = {
+        'settings': CompanySettings.get_settings(),
+        'query': raw,
+        'searched': bool(raw),
+        'result': None,
+    }
+    if not raw:
+        return render(request, 'orders/track.html', context)
+
+    # Case- and separator-insensitive. The number is read off a phone screen and
+    # typed back by hand: "mlk 7f3k9qx2vb4t" is the same reference as
+    # "MLK-7F3K-9QX2-VB4T" and refusing it teaches nobody anything.
+    normalised = re.sub(r'[^A-Z0-9]', '', raw.upper())
+
+    # Two indexed lookups, never a scan. This endpoint is public and
+    # unauthenticated, so walking every order per request would hand anyone a
+    # cheap way to load the database by holding down a key.
+    #
+    # First the reference exactly as stored, then the canonical form rebuilt from
+    # the stripped input, which is what turns "mlk 7f3k9qx2vb4t" into a hit.
+    candidates = [raw.upper()]
+    if normalised.startswith(Order.TRACKING_PREFIX):
+        body = normalised[len(Order.TRACKING_PREFIX):]
+        if len(body) == 12:
+            grouped = '-'.join(body[i:i + 4] for i in range(0, 12, 4))
+            candidates.append(f'{Order.TRACKING_PREFIX}-{grouped}')
+
+    order = (
+        Order.objects.filter(tracking_number__in=candidates).first()
+        if normalised else None
+    )
+
+    # A freight-only job carries the same kind of reference, so the customer
+    # should not have to know which sort of job theirs is before they can track
+    # it. Checked second because product orders are the common case.
+    if order is None and normalised:
+        from .models import LogisticsOrder
+        job = LogisticsOrder.objects.filter(tracking_number__in=candidates).first()
+        if job is not None:
+            context['result'] = _build_logistics_tracking_view(job)
+            return render(request, 'orders/track.html', context)
+
+    if order is None:
+        # Same message whether the number never existed or belongs to an order
+        # this visitor should not see. Distinguishing them would confirm which
+        # references are real and make guessing worthwhile.
+        context['not_found'] = True
+        return render(request, 'orders/track.html', context)
+
+    context['result'] = _build_tracking_view(order)
+    return render(request, 'orders/track.html', context)
+
+
+def _tracking_timeline(status_value, note='', updated_at=None, confirmed=False):
+    """
+    Build the status block that track.html renders, for either kind of job.
+
+    Args:
+        status_value (str): A ShipmentStatus.STATUS_* value.
+        note (str): Optional free text from the office.
+        updated_at (datetime|None): When somebody last set the status.
+        confirmed (bool): True only when a human actually set it. The template
+            uses this to avoid printing a confident "Last update" for a stage
+            that was inferred rather than recorded.
+
+    Returns:
+        dict: label, note, updated_at, step_index, is_delivered, confirmed, steps.
+
+    WHY THIS IS SHARED
+
+    Both tracking builders used to assemble this dict themselves, and the
+    freight one quietly stopped: it passed a bare status string where the
+    template expected an object, so {{ block.status.label }} and
+    {% for step in block.status.steps %} rendered nothing at all. A customer
+    tracking a freight job saw an empty badge over an empty timeline.
+
+    Two copies of a shape that a template reads by attribute name will drift,
+    and nothing fails loudly when they do — Django templates resolve a missing
+    attribute to the empty string. One builder is the fix.
+    """
+    choices = list(ShipmentStatus.STATUS_CHOICES)
+    try:
+        step_index = ShipmentStatus.STATUS_ORDER.index(status_value)
+    except ValueError:
+        # An unrecognised value pins to the first rung rather than raising. The
+        # page is public and unauthenticated; a stray status in the database
+        # should degrade to "Preparing", not to a 500.
+        step_index = 0
+        status_value = ShipmentStatus.STATUS_PREPARING
+
+    return {
+        'label': dict(choices).get(status_value, ''),
+        'note': note,
+        'updated_at': updated_at,
+        'step_index': step_index,
+        'is_delivered': status_value == ShipmentStatus.STATUS_DELIVERED,
+        'confirmed': confirmed,
+        # The whole ladder, so the template draws a timeline rather than one
+        # word with no sense of how far along it is.
+        'steps': [
+            {'label': label, 'done': index <= step_index}
+            for index, (_value, label) in enumerate(choices)
+        ],
+    }
+
+
+def _build_logistics_tracking_view(job):
+    """
+    Shape a freight-only job into what the public page renders.
+
+    Deliberately the SAME contract as _build_tracking_view, so track.html does
+    not need to know which kind of job it is showing - and deliberately just as
+    sparse. The customer's name, phone and what they paid are not on this page:
+    the reference is shareable, so anyone holding it can see it, and it must
+    therefore carry only what a courier's tracking page would.
+    """
+    # A freight job's status IS set by hand — there is no separate
+    # ShipmentStatus row that may or may not exist — so it is always confirmed.
+    status = _tracking_timeline(
+        job.status,
+        note=job.notes,
+        updated_at=job.updated_at,
+        confirmed=True,
+    )
+
+    # The photo the office uploaded when the job was booked. It is the only
+    # picture a freight job has: these are the customer's own goods, so there is
+    # no catalogue product behind them to borrow an image from.
+    photo = job.photo.url if job.photo else ''
+
+    return {
+        'tracking_number': job.tracking_number,
+        'placed_on': job.created_at,
+        'status_label': job.status_label,
+        'progress': job.progress_percent,
+        'total_items': job.carton_qty or 0,
+        'all_delivered': job.status == ShipmentStatus.STATUS_DELIVERED,
+        'is_logistics': True,
+        'blocks': [{
+            'number': 1,
+            'name': job.description,
+            'image': photo,
+            'cartons': job.carton_qty or 0,
+            'weight': job.weight_kg,
+            'cbm': job.cbm,
+            'status': status,
+            'items': [{
+                'name': job.description,
+                'variant': '',
+                'quantity': job.carton_qty or 1,
+                'image': photo,
+            }],
+        }],
+    }
+
+
+def _build_tracking_view(order):
+    """
+    Shape one order into exactly what the public page may render.
+
+    Args:
+        order (Order): The matched order.
+
+    Returns:
+        dict: Only whitelisted, non-identifying fields. See the section header
+        above for what is excluded and why.
+    """
+    statuses = {s.shipment_no: s for s in order.shipment_statuses.all()}
+
+    # 'product__images' is prefetched because every item now asks its product
+    # for a picture. Without it that is one query per line on a public,
+    # unauthenticated page.
+    items = (
+        order.items.select_related('product', 'variant')
+        .prefetch_related('product__images')
+        .order_by('shipment_no', 'id')
+    )
+
+    blocks = {}
+    for item in items:
+        block = blocks.setdefault(item.shipment_no, {
+            'number': item.shipment_no,
+            'name': item.shipment_name or f'Shipment {item.shipment_no}',
+            'method': item.get_shipment_method_display(),
+            'cargo_type': item.get_cargo_type_display(),
+            # Weight and CBM describe the goods, not the buyer, and are what a
+            # customer checks against their own freight expectations.
+            'weight': item.shipment_weight,
+            'cbm': item.shipment_cbm,
+            'cartons': 0,
+            'items': [],
+            'status': None,
+            # Filled from the first item that has a picture, below.
+            'image': '',
+        })
+        block['cartons'] += item.carton_quantity or 0
+
+        # A variation's own photo when it has one, otherwise the product's.
+        # A customer who ordered the blue one should see the blue one.
+        #
+        # .src rather than .image.url throughout: src returns '' when the file is
+        # missing and NEVER the supplier's CDN, so a failed import renders a
+        # clean placeholder here instead of a broken frame. See ProductImage.src.
+        image = ''
+        if item.variant_id and getattr(item.variant, 'src', ''):
+            image = item.variant.src
+        else:
+            primary = item.product.primary_image
+            if primary is not None:
+                image = primary.src
+
+        if image and not block['image']:
+            block['image'] = image
+
+        block['items'].append({
+            'name': item.product.name,
+            'variant': item.variant.name if item.variant_id else '',
+            'quantity': item.quantity,
+            'image': image,
+            # NO price. See the section header.
+        })
+
+    for number, block in blocks.items():
+        status = statuses.get(number)
+
+        # A shipment with no ShipmentStatus row still gets a timeline, pinned to
+        # the first rung.
+        #
+        # This used to `continue`, which meant the template's `{% if block.status %}`
+        # skipped the timeline entirely — so a customer who tracked a real order
+        # saw its contents and weight and no progress whatsoever, until somebody
+        # in the office happened to set a status by hand. "Where is my shipment"
+        # is the only question the page exists to answer, and for every
+        # not-yet-touched order it answered nothing.
+        #
+        # Defaulting to Preparing is honest rather than optimistic: an order that
+        # exists and has not been dispatched IS being prepared, and it is the
+        # same value ShipmentStatus.status defaults to.
+        block['status'] = _tracking_timeline(
+            status.status if status else ShipmentStatus.STATUS_PREPARING,
+            note=status.note if status else '',
+            updated_at=status.updated_at if status else None,
+            # True only when the office has actually set a status.
+            confirmed=status is not None,
+        )
+
+    ordered_blocks = [blocks[key] for key in sorted(blocks)]
+
+    return {
+        'tracking_number': order.tracking_number,
+        'placed_on': order.date,
+        'status_label': order.get_status_display(),
+        'blocks': ordered_blocks,
+        'total_items': sum(len(b['items']) for b in ordered_blocks),
+        # True when every block that has a status has reached Delivered, so the
+        # page can say so at the top instead of making the reader check each one.
+        'all_delivered': bool(ordered_blocks) and all(
+            b['status'] and b['status']['is_delivered'] for b in ordered_blocks
+        ),
+    }
+
+
+# =============================================================================
+# LOGISTICS ORDERS (freight-only jobs)
+# =============================================================================
+
+@module_required('orders')
+def logistics_order_list(request):
+    """Every freight-only job, newest first."""
+    from .models import LogisticsOrder
+
+    jobs = LogisticsOrder.objects.select_related('customer')
+    query = (request.GET.get('q') or '').strip()
+    if query:
+        jobs = jobs.filter(
+            Q(tracking_number__icontains=query)
+            | Q(description__icontains=query)
+            | Q(customer__name__icontains=query)
+            | Q(contact_name__icontains=query)
+        )
+    status = (request.GET.get('status') or '').strip()
+    if status:
+        jobs = jobs.filter(status=status)
+
+    return render(request, 'orders/logistics_list.html', {
+        'jobs': jobs,
+        'customers': Customer.objects.filter(is_active=True).order_by('name'),
+        'status_choices': LogisticsOrder.STATUS_CHOICES,
+        'query': query,
+        'active_status': status,
+        'settings': CompanySettings.get_settings(),
+    })
+
+
+@module_required('orders')
+def logistics_order_save(request, job_id=None):
+    """
+    Create or update a freight-only job.
+
+    The tracking number is never taken from the form - it is assigned by the
+    model on first save and then immutable. Letting staff type one would allow
+    two jobs to collide, and the reference is already printed on the customer's
+    paperwork by the time anyone thinks to edit it.
+    """
+    from .models import LogisticsOrder
+
+    if request.method != 'POST':
+        return redirect('logistics_order_list')
+
+    job = get_object_or_404(LogisticsOrder, id=job_id) if job_id else LogisticsOrder()
+
+    raw_customer = (request.POST.get('customer_id') or '').strip()
+    job.customer = Customer.objects.filter(id=raw_customer).first() if raw_customer else None
+    job.contact_name = (request.POST.get('contact_name') or '').strip()[:200]
+    job.contact_phone = (request.POST.get('contact_phone') or '').strip()[:50]
+    job.description = (request.POST.get('description') or '').strip()[:255]
+    job.notes = (request.POST.get('notes') or '').strip()
+
+    job.weight_kg = _to_decimal(request.POST.get('weight_kg'), '0')
+    job.shipping_price = _to_decimal(request.POST.get('shipping_price'), '0')
+
+    raw_cartons = (request.POST.get('carton_qty') or '').strip()
+    job.carton_qty = int(raw_cartons) if raw_cartons.isdigit() else None
+    raw_cbm = (request.POST.get('cbm') or '').strip()
+    job.cbm = _to_decimal(raw_cbm, '0') if raw_cbm else None
+
+    status = (request.POST.get('status') or '').strip()
+    if status in dict(LogisticsOrder.STATUS_CHOICES):
+        job.status = status
+
+    if not job.description:
+        messages.error(request, 'Describe what is being shipped.')
+        return redirect('logistics_order_list')
+
+    photo = request.FILES.get('photo')
+    if photo:
+        job.photo = photo
+
+    job.save()
+    messages.success(
+        request,
+        f'Logistics order {job.tracking_number} saved.' if job_id is None
+        else f'{job.tracking_number} updated.'
+    )
+    return redirect('logistics_order_list')
+
+
+@module_required('orders')
+def logistics_order_status(request, job_id):
+    """Move one job along the status ladder, from the list screen."""
+    from .models import LogisticsOrder
+
+    job = get_object_or_404(LogisticsOrder, id=job_id)
+    status = (request.POST.get('status') or '').strip()
+    if status not in dict(LogisticsOrder.STATUS_CHOICES):
+        return JsonResponse({'success': False, 'message': 'Unknown status.'}, status=400)
+    job.status = status
+    job.save(update_fields=['status', 'updated_at'])
+    return JsonResponse({
+        'success': True,
+        'status': job.status,
+        'label': job.status_label,
+        'progress': job.progress_percent,
+    })
+
+
+@module_required('orders')
+def logistics_order_delete(request, job_id):
+    from .models import LogisticsOrder
+    if request.method == 'POST':
+        job = get_object_or_404(LogisticsOrder, id=job_id)
+        ref = job.tracking_number
+        job.delete()
+        messages.success(request, f'Logistics order {ref} deleted.')
+    return redirect('logistics_order_list')
+
+
+# =============================================================================
+# PRODUCT LOOKUP (order builder + quotation picker)
+# =============================================================================
+
+# How many products the order list renders without being asked. Enough that the
+# picker is useful the moment it opens, small enough that the page weight no
+# longer tracks the size of the catalogue.
+ORDER_BUILDER_PAGE_SIZE = 50
+
+
+def _product_lookup_payload(products):
+    """
+    The fields the order builder and the quotation picker actually use.
+
+    Deliberately NOT the whole model: this is read by two bits of JavaScript
+    that need a price, a weight and the carton dimensions to compute freight.
+    Serialising everything would put cost prices and supplier notes into a
+    response the browser can read.
+    """
+    rows = []
+    for product in products:
+        image = ''
+        first_image = next(iter(product.images.all()), None)
+        if first_image is not None and getattr(first_image, 'image', None):
+            try:
+                image = first_image.image.url
+            except ValueError:
+                image = ''
+        rows.append({
+            'id': product.id,
+            'name': product.name,
+            'sku': product.sku or '',
+            'price': str(product.price or 0),
+            'weight': str(product.weight or ''),
+            'carton_qty': str(product.carton_qty or ''),
+            'carton_length': str(product.carton_length or ''),
+            'carton_width': str(product.carton_width or ''),
+            'carton_height': str(product.carton_height or ''),
+            'image': image,
+        })
+    return rows
+
+
+@module_required('orders')
+def product_lookup(request):
+    """
+    Search the catalogue for the order builder, as JSON.
+
+    Args:
+        request (HttpRequest): ``?q=`` search text, ``?ids=`` comma-separated
+            ids to fetch regardless of the search.
+
+    Returns:
+        JsonResponse: {'products': [...], 'total': n, 'truncated': bool}
+
+    WHY THIS EXISTS
+
+    The order list used to render the ENTIRE catalogue into its HTML twice over
+    — once as a picker row per product and once as a JavaScript array — so that
+    the quotation picker could filter client-side. That made the weight of the
+    busiest page in the back office a function of how many products exist:
+    169 KB at 30 products, 810 KB at 500, and roughly 5 MB at 3,000.
+
+    Searching on the server keeps that page a constant size. It also searches
+    the whole catalogue rather than only what happened to be rendered, which is
+    what staff assumed the box did already.
+
+    ``ids`` exists so a selection survives a new search: the picker re-asks for
+    the products the user has already ticked and re-renders them as checked,
+    instead of losing them the moment the result list is replaced.
+    """
+    query = (request.GET.get('q') or '').strip()
+    raw_ids = (request.GET.get('ids') or '').strip()
+
+    base = (Product.objects
+            .filter(is_draft=False)
+            .prefetch_related('images')
+            .order_by('name'))
+
+    if raw_ids:
+        wanted = [int(i) for i in raw_ids.split(',') if i.strip().isdigit()][:200]
+        selected = base.filter(id__in=wanted)
+        return JsonResponse({'products': _product_lookup_payload(selected),
+                             'total': len(wanted), 'truncated': False})
+
+    # Every word must appear in the name or the SKU, in any order. Matching the
+    # whole query as one substring missed real products: "red bag" found
+    # nothing for "Red Leather Bag", and names imported from supplier pages
+    # often carry doubled or odd spacing that a typed query never reproduces.
+    for word in query.split():
+        base = base.filter(Q(name__icontains=word) | Q(sku__icontains=word))
+
+    total = base.count()
+    page = base[:ORDER_BUILDER_PAGE_SIZE]
+    return JsonResponse({
+        'products': _product_lookup_payload(page),
+        'total': total,
+        # The picker says so rather than quietly showing a partial list — a
+        # truncated result the user believes is complete is how a product gets
+        # left off a quotation.
+        'truncated': total > ORDER_BUILDER_PAGE_SIZE,
+    })

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load script_json %}
 {% load humanize %}
 
 {% block title %}Dashboard — Logistic Manager{% endblock %}
@@ -8,6 +9,49 @@
 {% block page_title %}Dashboard{% endblock %}
 
 {% block content %}
+
+{% comment %}--------------------------------------------------------------------
+   NEEDS ATTENTION — the work queue
+   ---------------------------------------------------------------------------
+   This replaces the single open-tickets banner that used to sit here.
+
+   Everything else on this page reports what has already happened. None of it
+   answered "what should I do now", so outstanding work lived across five
+   different pages and you had to remember to visit each one. This panel is the
+   queue: every row is a real count with a link straight to the filtered list
+   that clears it.
+
+   Rows with nothing outstanding are omitted entirely by the view rather than
+   rendered as zeros — a panel showing five zeros teaches you to stop looking at
+   it, which defeats the point.
+-----------------------------------------------------------------------{% endcomment %}
+<div class="glass-card mb-4 attention-panel">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+        <h2 class="h5 mb-0" style="font-weight:700">
+            <i class="bi bi-list-check me-2" style="color:var(--accent-3)"></i>Needs Attention
+        </h2>
+        {% if attention_total %}
+        <span class="attention-total">{{ attention_total }} item{{ attention_total|pluralize }}</span>
+        {% endif %}
+    </div>
+
+    {% if attention_items %}
+    <div class="attention-grid">
+        {% for item in attention_items %}
+        <a href="{{ item.url }}" class="attention-item attention-{{ item.tone }}">
+            <i class="bi {{ item.icon }} attention-icon"></i>
+            <span class="attention-count">{{ item.count }}</span>
+            <span class="attention-label">{{ item.label }}</span>
+            <i class="bi bi-arrow-right attention-go"></i>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="attention-clear">
+        <i class="bi bi-check2-circle me-2"></i>Nothing outstanding — every queue is clear.
+    </div>
+    {% endif %}
+</div>
 
 {% comment %} The Products / Customers / Orders / Ledger counters used to be repeated here as
    four large cards. They are already shown in the compact stats bar at the top of
@@ -26,8 +70,8 @@
         <div class="col-6 col-lg">
             <div class="metric-tile emerald">
                 <div class="metric-label">Revenue</div>
-                <div class="metric-value">{{ currency }} {{ monthly_revenue|floatformat:0|intcomma }}</div>
-                <div class="metric-compare">vs {{ currency }} {{ prev_revenue|floatformat:0|intcomma }} in {{ prev_month_label }}</div>
+                <div class="metric-value">{{ settings.currency_symbol }} {{ monthly_revenue|floatformat:0|intcomma }}</div>
+                <div class="metric-compare">vs {{ settings.currency_symbol }} {{ prev_revenue|floatformat:0|intcomma }} in {{ prev_month_label }}</div>
             </div>
         </div>
         <div class="col-6 col-lg">
@@ -64,12 +108,12 @@
         <div>
             <strong>No activity recorded yet in {{ current_month }}.</strong>
             <div class="u-muted-sm">{{ prev_month_label }} closed with {{ prev_orders }} order{{ prev_orders|pluralize }}
-                and {{ currency }} {{ prev_revenue|floatformat:0|intcomma }} in revenue.</div>
+                and {{ settings.currency_symbol }} {{ prev_revenue|floatformat:0|intcomma }} in revenue.</div>
         </div>
     </div>
     {% endif %}
 
-    <div style="position:relative;height:240px;">
+    <div class="chart-box" style="position:relative;height:240px;">
         <canvas id="monthlyChart"></canvas>
     </div>
 </div>
@@ -78,7 +122,7 @@
     <div class="col-lg-4">
         <div class="glass-card">
             <h5 class="mb-3" style="font-weight:700"><i class="bi bi-graph-up-arrow me-2" style="color:var(--accent-3)"></i>Revenue Trend</h5>
-            <div style="position:relative;height:220px;">
+            <div class="chart-box" style="position:relative;height:220px;">
                 <canvas id="revenueTrendChart"></canvas>
             </div>
         </div>
@@ -112,7 +156,7 @@
     <div class="col-lg-4">
         <div class="glass-card">
             <h5 class="mb-3" style="font-weight:700"><i class="bi bi-truck me-2" style="color:var(--accent-3)"></i>Shipping Methods</h5>
-            <div style="position:relative;height:220px;">
+            <div class="chart-box" style="position:relative;height:220px;">
                 <canvas id="shippingMethodChart"></canvas>
             </div>
         </div>
@@ -149,13 +193,17 @@
             <h5 class="mb-3" style="font-weight:700">Recent Orders</h5>
             
             {% if recent_orders %}
-            <table class="table-glass">
+            {% comment %}table-stack turns each row into a labelled card below 768px.
+               The cells already carry the data-label attributes it needs — the class
+               was simply missing, so this table alone forced the dashboard to scroll
+               sideways on a phone.{% endcomment %}
+            <table class="table-glass table-stack">
                 <thead>
                     <tr>
                         <th>Order #</th>
                         <th>Customer</th>
                         <th>Date</th>
-                        <th class="text-end">Total ({{ currency }})</th>
+                        <th class="text-end">Total ({{ settings.currency_symbol }})</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -193,7 +241,15 @@
                 </div>
             </div>
             {% if all_orders %}
-            
+            {% comment %}Capped at 50 rows by the view. The scroll box below hides how
+               much is actually in the HTML, so the count and link make the limit
+               explicit rather than letting it look like the complete list.{% endcomment %}
+            {% if recent_order_total > 50 %}
+            <p class="u-muted-sm mb-2">
+                Showing the 50 most recent of {{ recent_order_total }} orders.
+                <a href="/orders/">Open the full order list</a> to search and filter.
+            </p>
+            {% endif %}
             <div style="max-height:420px;overflow-y:auto;">
                 <table class="table-glass table-stack" id="dashboardOrdersTable">
                     <thead>
@@ -202,7 +258,7 @@
                             <th>Customer</th>
                             <th>Date</th>
                             <th>Status</th>
-                            <th class="text-end">Total ({{ currency }})</th>
+                            <th class="text-end">Total ({{ settings.currency_symbol }})</th>
                             <th>Placed with Supplier</th>
                         </tr>
                     </thead>
@@ -300,10 +356,10 @@ function dashboardTogglePlaced(orderId) {
 // content as HTML". Without it, the JSON array would have &quot; entities instead
 // of real quotes, breaking the JavaScript.
 (function() {
-    var labels = {{ chart_labels|safe }};
-    var orders = {{ chart_orders|safe }};
-    var cbm    = {{ chart_cbm|safe }};
-    var ships  = {{ chart_shipments|safe }};
+    var labels = {{ chart_labels|script_json }};
+    var orders = {{ chart_orders|script_json }};
+    var cbm    = {{ chart_cbm|script_json }};
+    var ships  = {{ chart_shipments|script_json }};
     var ctx = document.getElementById('monthlyChart').getContext('2d');
     new Chart(ctx, {
         type: 'bar',  // Primary chart type: bars for orders and shipments
@@ -313,8 +369,8 @@ function dashboardTogglePlaced(orderId) {
                 {
                     label: 'Shipment Blocks',
                     data: ships,
-                    backgroundColor: 'rgba(22,163,74,0.7)',
-                    borderColor: '#16A34A',
+                    backgroundColor: 'rgba(42, 120, 214, 0.75)',
+                    borderColor: BRAND.series[1],
                     borderWidth: 1,
                     borderRadius: 5,
                     yAxisID: 'y',
@@ -322,8 +378,8 @@ function dashboardTogglePlaced(orderId) {
                 {
                     label: 'Orders',
                     data: orders,
-                    backgroundColor: 'rgba(200,75,49,0.7)',
-                    borderColor: '#C84B31',
+                    backgroundColor: 'rgba(176, 132, 33, 0.75)',
+                    borderColor: BRAND.series[0],
                     borderWidth: 1,
                     borderRadius: 5,
                     yAxisID: 'y',
@@ -332,11 +388,11 @@ function dashboardTogglePlaced(orderId) {
                     label: 'CBM',
                     data: cbm,
                     type: 'line',
-                    borderColor: '#D97706',
-                    backgroundColor: 'rgba(217,119,6,0.12)',
+                    borderColor: BRAND.series[2],
+                    backgroundColor: 'rgba(235, 104, 52, 0.12)',
                     borderWidth: 2,
                     pointRadius: 4,
-                    pointBackgroundColor: '#D97706',
+                    pointBackgroundColor: BRAND.series[2],
                     fill: true,
                     tension: 0.3,
                     yAxisID: 'yCbm',
@@ -348,22 +404,22 @@ function dashboardTogglePlaced(orderId) {
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false },
             plugins: {
-                legend: { labels: { color: '#475569', font: { size: 12 } } },
-                tooltip: { backgroundColor: '#ffffff', borderColor: '#E2E8F0', borderWidth: 1, titleColor: '#0F172A', bodyColor: '#475569' },
+                legend: { labels: { color: '#3F3F42', font: { size: 12 } } },
+                tooltip: { backgroundColor: '#ffffff', borderColor: '#DFE1E6', borderWidth: 1, titleColor: '#0A0A0A', bodyColor: '#3F3F42' },
             },
             scales: {
-                x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(15,23,42,0.05)' } },
+                x: { ticks: { color: '#6A6A6C' }, grid: { color: 'rgba(10,10,10,0.06)' } },
                 y: {
                     position: 'left',
-                    ticks: { color: '#64748B', stepSize: 1, precision: 0 },
-                    grid: { color: 'rgba(15,23,42,0.05)' },
-                    title: { display: true, text: 'Count', color: '#64748B', font: { size: 11 } },
+                    ticks: { color: '#6A6A6C', stepSize: 1, precision: 0 },
+                    grid: { color: 'rgba(10,10,10,0.06)' },
+                    title: { display: true, text: 'Count', color: '#6A6A6C', font: { size: 11 } },
                 },
                 yCbm: {
                     position: 'right',
-                    ticks: { color: '#D97706' },
+                    ticks: { color: BRAND.series[2] },
                     grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'CBM', color: '#D97706', font: { size: 11 } },
+                    title: { display: true, text: 'CBM', color: BRAND.series[2], font: { size: 11 } },
                 },
             }
         }
@@ -373,11 +429,14 @@ function dashboardTogglePlaced(orderId) {
 <script>
 // Dashboard Analytics Charts — Revenue Trend, Payment Status, Shipping Methods
 (function() {
-    var labels = {{ chart_labels|safe }};
-    var revenueData = {{ chart_revenue|safe }};
-    var shippingLabels = {{ chart_shipping_labels|safe }};
-    var shippingCounts = {{ chart_shipping_counts|safe }};
-    var CURRENCY = '{{ currency|escapejs }}';
+    var labels = {{ chart_labels|script_json }};
+    var revenueData = {{ chart_revenue|script_json }};
+    var shippingLabels = {{ chart_shipping_labels|script_json }};
+    var shippingCounts = {{ chart_shipping_counts|script_json }};
+    {% comment %}The symbol, matching the tiles above — a chart tooltip reading
+       'RMB 12,345' beside a tile reading '¥12,345' looks like two different
+       figures at a glance.{% endcomment %}
+    var CURRENCY = '{{ settings.currency_symbol|escapejs }}';
 
     // Thousands-separated money, matching the intcomma formatting used in the tables.
     function fmtMoney(v) {
@@ -395,8 +454,8 @@ function dashboardTogglePlaced(orderId) {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-            legend: { labels: { color: '#475569', font: { size: 12 } } },
-            tooltip: { backgroundColor: '#ffffff', borderColor: '#E2E8F0', borderWidth: 1, titleColor: '#0F172A', bodyColor: '#475569' },
+            legend: { labels: { color: '#3F3F42', font: { size: 12 } } },
+            tooltip: { backgroundColor: '#ffffff', borderColor: '#DFE1E6', borderWidth: 1, titleColor: '#0A0A0A', bodyColor: '#3F3F42' },
         },
     };
 
@@ -411,11 +470,11 @@ function dashboardTogglePlaced(orderId) {
             datasets: [{
                 label: 'Revenue',
                 data: revenueData,
-                borderColor: '#16A34A',
-                backgroundColor: 'rgba(22, 163, 74, 0.12)',
+                borderColor: BRAND.series[0],
+                backgroundColor: 'rgba(176, 132, 33, 0.12)',
                 borderWidth: 2,
                 pointRadius: 4,
-                pointBackgroundColor: '#16A34A',
+                pointBackgroundColor: BRAND.series[0],
                 fill: true,
                 tension: 0.3,
             }]
@@ -430,15 +489,15 @@ function dashboardTogglePlaced(orderId) {
                     ...chartOptions.plugins.tooltip,
                     callbacks: {
                         // Always show the currency so the number is unambiguous.
-                        label: function (c) { return CURRENCY + ' ' + fmtMoney(c.parsed.y); }
+                        label: function (c) { return CURRENCY + fmtMoney(c.parsed.y); }
                     }
                 }
             },
             scales: {
-                x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(15,23,42,0.05)' } },
+                x: { ticks: { color: '#6A6A6C' }, grid: { color: 'rgba(10,10,10,0.06)' } },
                 y: {
-                    ticks: { color: '#64748B', callback: function (v) { return fmtCompact(v); } },
-                    grid: { color: 'rgba(15,23,42,0.05)' },
+                    ticks: { color: '#6A6A6C', callback: function (v) { return fmtCompact(v); } },
+                    grid: { color: 'rgba(10,10,10,0.06)' },
                 },
             }
         }
@@ -450,7 +509,9 @@ function dashboardTogglePlaced(orderId) {
     // ---------------------------------------------------------------
     // Shipping Method Doughnut Chart
     // ---------------------------------------------------------------
-    var shipColors = ['#C84B31', '#2D5A27', '#F5A623', '#16A34A', '#D97706', '#DC2626'];
+    // Pie/doughnut slices all touch each other, so this uses the all-pairs
+    // verified slice order rather than the bar/line series order.
+    var shipColors = BRAND.slices;
     var shipCtx = document.getElementById('shippingMethodChart').getContext('2d');
     new Chart(shipCtx, {
         type: 'doughnut',
@@ -468,7 +529,7 @@ function dashboardTogglePlaced(orderId) {
             cutout: '60%',
             plugins: {
                 ...chartOptions.plugins,
-                legend: { position: 'bottom', labels: { color: '#475569', font: { size: 11 }, padding: 16 } },
+                legend: { position: 'bottom', labels: { color: '#3F3F42', font: { size: 11 }, padding: 16 } },
             }
         }
     });

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load script_json %}
 
 {% block title %}{% if is_amazon_orders %}Amazon Orders{% else %}Orders{% endif %} — Logistic Manager{% endblock %}
 {% block nav_orders %}active{% endblock %}
@@ -27,20 +28,20 @@
     </div>
     <div class="col-6 col-md-3">
         <div class="glass-card py-3 px-3 text-center">
-            <div style="font-size:22px;font-weight:800;color:#f59e0b">{{ stats.draft_count }}</div>
+            <div style="font-size:22px;font-weight:800;color:#C2410C">{{ stats.draft_count }}</div>
             <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Drafts</div>
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="glass-card py-3 px-3 text-center">
-            <div style="font-size:22px;font-weight:800;color:#f87171">{{ stats.unpaid_count }}</div>
+            <div style="font-size:22px;font-weight:800;color:#B3261E">{{ stats.unpaid_count }}</div>
             <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Unpaid</div>
-            {% if stats.unpaid_total %}<div style="font-size:11px;color:#f87171;margin-top:2px;">{{ currency }} {{ stats.unpaid_total|floatformat:0 }}</div>{% endif %}
+            {% if stats.unpaid_total %}<div style="font-size:11px;color:#B3261E;margin-top:2px;">{{ settings.currency_symbol }} {{ stats.unpaid_total|floatformat:0 }}</div>{% endif %}
         </div>
     </div>
     <div class="col-6 col-md-3">
         <div class="glass-card py-3 px-3 text-center">
-            <div style="font-size:22px;font-weight:800;color:#4ade80">{{ stats.paid_count }}</div>
+            <div style="font-size:22px;font-weight:800;color:#157F4A">{{ stats.paid_count }}</div>
             <div style="font-size:11px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Paid</div>
         </div>
     </div>
@@ -60,6 +61,39 @@
                 <a href="?" class="search-clear" title="Clear search" aria-label="Clear search"><i class="bi bi-x-lg"></i></a>
                 {% endif %}
             </div>
+
+            {% comment %}Where is it? — a SERVER-side filter, unlike the chips
+               opposite which narrow the page already loaded. The ten-step transit
+               status could not be filtered on at all, so "what is sitting at
+               customs this morning?" meant opening orders one at a time.
+
+               Submits on change; the search box keeps its value because both
+               inputs are in this one form.{% endcomment %}
+            <div class="d-flex gap-2 mt-2">
+                <label class="visually-hidden" for="shipmentFilter">Filter by shipment status</label>
+                <select name="shipment" id="shipmentFilter" class="form-select form-select-sm"
+                        onchange="this.form.submit()"
+                        style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
+                    <option value="">Any shipment status</option>
+                    {% for value, label in shipment_status_choices %}
+                    <option value="{{ value }}"{% if shipment_filter == value %} selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+
+                {% if stale_days %}
+                {% comment %}The same query the dashboard's "no movement" item
+                   links to, so the count there always matches this list.{% endcomment %}
+                <a href="?stale=1" class="btn btn-sm {% if stale_filter %}btn-warning{% else %}btn-outline-secondary{% endif %}"
+                   title="Shipments that have not moved in {{ stale_days }} days"
+                   style="white-space:nowrap;">
+                    <i class="bi bi-hourglass-split me-1"></i>Stuck
+                </a>
+                {% endif %}
+
+                {% if shipment_filter or stale_filter %}
+                <a href="{% url 'order_list' %}" class="btn btn-sm btn-ghost" style="white-space:nowrap;">Reset</a>
+                {% endif %}
+            </div>
         </form>
     </div>
     <div class="col-md-8">
@@ -68,99 +102,207 @@
             <button class="filter-chip" data-filter-type="status" data-filter-val="draft" onclick="setOrderFilter('status:draft',this)"><i class="bi bi-pencil-square me-1"></i>Draft <span class="filter-chip-count">{{ stats.draft_count }}</span></button>
             <button class="filter-chip" data-filter-type="status" data-filter-val="confirmed" onclick="setOrderFilter('status:confirmed',this)"><i class="bi bi-check-circle me-1"></i>Confirmed <span class="filter-chip-count">{{ stats.confirmed_count }}</span></button>
             <span style="width:1px;background:var(--border-color);margin:0 4px;"></span>
-            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="unpaid" onclick="setOrderFilter('payment:unpaid',this)" style="color:#f87171"><i class="bi bi-x-circle-fill me-1"></i>Unpaid <span class="filter-chip-count">{{ stats.unpaid_count }}</span></button>
-            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="partial" onclick="setOrderFilter('payment:partial',this)" style="color:#f59e0b"><i class="bi bi-dash-circle-fill me-1"></i>Partial <span class="filter-chip-count">{{ stats.partial_count }}</span></button>
-            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="paid" onclick="setOrderFilter('payment:paid',this)" style="color:#4ade80"><i class="bi bi-check-circle-fill me-1"></i>Paid <span class="filter-chip-count">{{ stats.paid_count }}</span></button>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="unpaid" onclick="setOrderFilter('payment:unpaid',this)" style="color:#B3261E"><i class="bi bi-x-circle-fill me-1"></i>Unpaid <span class="filter-chip-count">{{ stats.unpaid_count }}</span></button>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="partial" onclick="setOrderFilter('payment:partial',this)" style="color:#C2410C"><i class="bi bi-dash-circle-fill me-1"></i>Partial <span class="filter-chip-count">{{ stats.partial_count }}</span></button>
+            <button class="filter-chip pay-chip" data-filter-type="payment" data-filter-val="paid" onclick="setOrderFilter('payment:paid',this)" style="color:#157F4A"><i class="bi bi-check-circle-fill me-1"></i>Paid <span class="filter-chip-count">{{ stats.paid_count }}</span></button>
         </div>
     </div>
 </div>
 
 <div class="glass-card">
-    <table class="table-glass" id="ordersTable">
+    {% comment %}--------------------------------------------------------------------
+       BULK ACTION BAR
+       ---------------------------------------------------------------------------
+       Hidden until at least one row is selected, so it costs nothing visually when
+       unused. Marking twenty orders as placed after a supplier run used to be twenty
+       separate clicks and twenty page updates.
+       -----------------------------------------------------------------{% endcomment %}
+    <form method="post" action="{% url 'bulk_order_action' %}" id="bulkOrderForm">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="bulk-bar" id="bulkBar" hidden>
+            <span class="bulk-count"><strong id="bulkCount">0</strong> selected</span>
+            <div class="bulk-actions">
+                <button type="submit" name="action" value="mark_placed" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-check-square me-1"></i>Mark placed
+                </button>
+                <button type="submit" name="action" value="mark_not_placed" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-square me-1"></i>Mark not placed
+                </button>
+                <button type="submit" name="action" value="mark_paid" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-cash-coin me-1"></i>Mark paid
+                </button>
+                <button type="submit" name="action" value="mark_unpaid" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-circle me-1"></i>Mark unpaid
+                </button>
+                {% comment %}The bulk action staff reach for most. A container
+                   leaves port with thirty consignments on it and every one moves
+                   to the same status on the same day; before this that was thirty
+                   page loads for one real-world event.
+
+                   Shipments already marked Delivered are skipped by the view —
+                   bulk is where you cannot see what you are changing, and pulling
+                   a delivered order back into "At Customs" tells a customer their
+                   finished shipment is moving again.{% endcomment %}
+                <span class="bulk-divider" aria-hidden="true"></span>
+                <label class="visually-hidden" for="bulkShipmentStatus">Shipment status to apply</label>
+                <select name="shipment_status" id="bulkShipmentStatus" class="form-select form-select-sm bulk-select">
+                    <option value="">Set shipment status…</option>
+                    {% for value, label in shipment_status_choices %}
+                    <option value="{{ value }}">{{ label }}</option>
+                    {% endfor %}
+                </select>
+                <button type="submit" name="action" value="set_shipment_status"
+                        class="btn btn-sm btn-outline-secondary" id="bulkShipmentBtn" disabled>
+                    <i class="bi bi-truck me-1"></i>Apply
+                </button>
+
+                <button type="button" class="btn btn-sm btn-ghost" onclick="clearOrderSelection()">Clear</button>
+            </div>
+        </div>
+
+    {% comment %}table-stack, not a horizontal scroller: below 768px each row
+       collapses into its own labelled card. Without it this table rendered 941px
+       of content inside a 315px column on a phone, and because body has
+       overflow-x:hidden the extra columns were clipped away entirely — the rows
+       looked blank rather than cut off, which is why it read as a data bug.
+       The data-label on each cell supplies the column name the collapsed layout
+       shows in place of the hidden <thead>.{% endcomment %}
+    <table class="table-glass table-stack" id="ordersTable">
         <thead>
             <tr>
-                <th>Order #</th>
+                <th style="width:34px;">
+                    <input type="checkbox" id="orderSelectAll" onchange="toggleAllOrders(this.checked)"
+                           title="Select all on this page" aria-label="Select all orders on this page"
+                           style="width:16px;height:16px;cursor:pointer;">
+                </th>
+                <th>Order # / Tracking</th>
                 <th>Customer</th>
                 <th>Date</th>
                 <th>Status</th>
                 <th>Payment</th>
                 <th>Placed</th>
                 <th>Items</th>
-                <th>Total ({{ currency }})</th>
+                <th>Total ({{ settings.currency_symbol }})</th>
                 <th style="width:200px">Actions</th>
             </tr>
         </thead>
         <tbody>
             {% for order in page_obj %}
             <tr data-order-status="{{ order.status }}" data-payment-status="{{ order.payment_status }}" data-customer="{{ order.customer.name|lower }}" data-order-id="{{ order.id }}">
-                <td style="font-weight:700;color:var(--accent-3)">#{{ order.id }}</td>
-                <td style="font-weight:600">{{ order.customer.name }}</td>
-                <td style="color:var(--text-secondary)">{{ order.date|date:"M d, Y" }}</td>
                 <td>
+                    <input type="checkbox" name="order_ids" value="{{ order.id }}" class="order-select"
+                           onchange="updateOrderSelection()" aria-label="Select order {{ order.id }}"
+                           style="width:16px;height:16px;cursor:pointer;">
+                </td>
+                {% comment %}Order id AND tracking reference.
+
+                   Every order gets a tracking number on save, and the customer
+                   sees it on their order page and in the shipped email — but it
+                   appeared nowhere in the back office, so a customer phoning to
+                   ask "what is my tracking number" could not be answered from
+                   the screen staff actually work on.
+
+                   The id is the internal handle; the tracking reference is the
+                   one safe to read out, which is why it is random rather than
+                   sequential. Click to copy: reading MLK-NFJ5-7WDZ-UMDM down a
+                   phone line is where transcription errors come from.
+                {% endcomment %}
+                <td data-label="Order #" style="font-weight:700;color:var(--accent-3)">
+                    #{{ order.id }}
+                    {% if order.tracking_number %}
+                    <button type="button" class="order-track-ref"
+                            data-track="{{ order.tracking_number }}"
+                            title="Copy tracking number">{{ order.tracking_number }}</button>
+                    {% endif %}
+                </td>
+                <td data-label="Customer" style="font-weight:600">{{ order.customer.name }}</td>
+                <td data-label="Date" style="color:var(--text-secondary)">{{ order.date|date:"M d, Y" }}</td>
+                <td data-label="Status">
                     {% if order.status == 'draft' %}
                     <span class="badge-glass badge-warning" style="font-size:11px;"><i class="bi bi-pencil-square me-1"></i>Draft</span>
                     {% else %}
                     <span class="badge-glass badge-success" style="font-size:11px;"><i class="bi bi-check-circle me-1"></i>Confirmed</span>
                     {% endif %}
                 </td>
-                <td>
+                <td data-label="Payment">
                     <div class="dropdown" id="pay-drop-{{ order.id }}">
-                        <button class="btn-payment-toggle dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
+                        {% comment %}Every button in this column sits inside #bulkOrderForm, which
+                           wraps the whole table so the row checkboxes can post as one selection.
+                           A button element with no type attribute defaults to type="submit", so each of
+                           these used to fire its onclick AND post the bulk form — the row action
+                           ran, then the page immediately navigated to bulk_order_action, which
+                           found no order_ids and bounced back with "No orders were selected."
+                           For editOrder that read as the modal opening and vanishing instantly.
+                           type="button" is required on every one of them.{% endcomment %}
+                        <button type="button" class="btn-payment-toggle dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false"
                             data-status="{{ order.payment_status }}" style="display:flex;align-items:center;gap:4px;background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;">
                             {% if order.payment_status == 'paid' %}
-                            <span style="color:#4ade80"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
+                            <span style="color:#157F4A"><i class="bi bi-check-circle-fill me-1"></i>Paid</span>
                             {% elif order.payment_status == 'partial' %}
-                            <span style="color:#f59e0b"><i class="bi bi-dash-circle-fill me-1"></i>Partial</span>
+                            <span style="color:#C2410C"><i class="bi bi-dash-circle-fill me-1"></i>Partial</span>
                             {% else %}
-                            <span style="color:#f87171"><i class="bi bi-x-circle-fill me-1"></i>Unpaid</span>
+                            <span style="color:#B3261E"><i class="bi bi-x-circle-fill me-1"></i>Unpaid</span>
                             {% endif %}
                         </button>
                         <ul class="dropdown-menu dropdown-menu-dark" style="min-width:130px;font-size:13px;">
-                            <li><a class="dropdown-item {% if order.payment_status == 'unpaid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'unpaid');return false;"><i class="bi bi-x-circle-fill me-2" style="color:#f87171"></i>Unpaid</a></li>
-                            <li><a class="dropdown-item {% if order.payment_status == 'partial' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'partial');return false;"><i class="bi bi-dash-circle-fill me-2" style="color:#f59e0b"></i>Partial</a></li>
-                            <li><a class="dropdown-item {% if order.payment_status == 'paid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'paid');return false;"><i class="bi bi-check-circle-fill me-2" style="color:#4ade80"></i>Paid</a></li>
+                            <li><a class="dropdown-item {% if order.payment_status == 'unpaid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'unpaid');return false;"><i class="bi bi-x-circle-fill me-2" style="color:#B3261E"></i>Unpaid</a></li>
+                            <li><a class="dropdown-item {% if order.payment_status == 'partial' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'partial');return false;"><i class="bi bi-dash-circle-fill me-2" style="color:#C2410C"></i>Partial</a></li>
+                            <li><a class="dropdown-item {% if order.payment_status == 'paid' %}active{% endif %}" href="#" onclick="setPaymentStatus({{ order.id }},'paid');return false;"><i class="bi bi-check-circle-fill me-2" style="color:#157F4A"></i>Paid</a></li>
                         </ul>
                     </div>
                 </td>
-                <td>
-                    <button class="btn-payment-toggle" id="placed-btn-{{ order.id }}" onclick="togglePlaced({{ order.id }})" title="{% if order.is_placed %}Order placed with supplier{% else %}Not yet placed{% endif %}" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;">
+                <td data-label="Placed">
+                    <button type="button" class="btn-payment-toggle" id="placed-btn-{{ order.id }}" onclick="togglePlaced({{ order.id }})" title="{% if order.is_placed %}Order placed with supplier{% else %}Not yet placed{% endif %}" style="background:none;border:none;cursor:pointer;padding:4px 8px;border-radius:6px;">
                         {% if order.is_placed %}
-                        <span style="color:#4ade80"><i class="bi bi-check-square-fill me-1"></i>Placed</span>
+                        <span style="color:#157F4A"><i class="bi bi-check-square-fill me-1"></i>Placed</span>
                         {% else %}
                         <span style="color:var(--text-secondary)"><i class="bi bi-square me-1"></i>Not Placed</span>
                         {% endif %}
                     </button>
                 </td>
-                <td>
-                    <span class="badge-glass badge-info">{{ order.items.count }} item{{ order.items.count|pluralize }}</span>
+                <td data-label="Items">
+                    {% comment %}`items.all|length` uses the queryset the view already
+                       prefetched. `items.count` would issue a separate COUNT query per
+                       row — and it was called twice per row, so 50 extra queries on a
+                       25-row page for a number we had in memory.{% endcomment %}
+                    {% with item_count=order.items.all|length %}
+                    <span class="badge-glass badge-info">{{ item_count }} item{{ item_count|pluralize }}</span>
+                    {% endwith %}
                     {% if order.has_ready_to_ship_labels %}
                     <br><a href="{% url 'download_order_labels_zip' order.id %}" class="badge bg-success text-decoration-none mt-1" style="font-size:10px;"><i class="bi bi-file-zip me-1"></i>Labels</a>
                     {% endif %}
                 </td>
-                <td style="font-weight:700;font-size:16px">{{ order.total }}</td>
+                <td data-label="Total" style="font-weight:700;font-size:16px">{{ order.total }}</td>
                 <td>
                     <div class="action-btns">
-                        <button class="btn-ghost btn-sm" onclick="viewOrder({{ order.id }})" title="View">
+                        <button type="button" class="btn-ghost btn-sm" onclick="viewOrder({{ order.id }})" title="View">
                             <i class="bi bi-eye"></i>
                         </button>
-                        <button class="btn-ghost btn-sm" onclick="editOrder({{ order.id }})" title="Edit">
+                        <button type="button" class="btn-ghost btn-sm" onclick="editOrder({{ order.id }})" title="Edit">
                             <i class="bi bi-pencil"></i>
                         </button>
                         {% if order.status == 'draft' %}
-                        <button class="btn-ghost btn-sm" style="color:var(--success)" onclick="confirmOrder({{ order.id }})" title="Confirm Order">
+                        <button type="button" class="btn-ghost btn-sm" style="color:var(--success)" onclick="confirmOrder({{ order.id }})" title="Confirm Order">
                             <i class="bi bi-check-lg"></i>
                         </button>
                         {% endif %}
                         <a class="btn-ghost btn-sm" href="/orders/invoice/{{ order.id }}/" target="_blank" title="Print Invoice">
                             <i class="bi bi-printer"></i>
                         </a>
-                        <a class="btn-ghost btn-sm" href="/orders/export/{{ order.id }}/" title="Export Excel" style="color:#4ade80;">
+                        <a class="btn-ghost btn-sm" href="/orders/export/{{ order.id }}/" title="Export Excel" style="color:#157F4A;">
                             <i class="bi bi-file-earmark-excel"></i>
                         </a>
-                        <button class="btn-ghost btn-sm" onclick="duplicateOrder({{ order.id }})" title="Duplicate as Draft">
+                        <a class="btn-ghost btn-sm" href="/orders/{{ order.id }}/record-payment/" title="Record Payment" style="color:var(--success);">
+                            <i class="bi bi-cash-coin"></i>
+                        </a>
+                        <a class="btn-ghost btn-sm" href="/orders/{{ order.id }}/shipments/" title="Manage Shipments (transit status)" style="color:var(--accent-1);">
+                            <i class="bi bi-truck"></i>
+                        </a>
+                        <button type="button" class="btn-ghost btn-sm" onclick="duplicateOrder({{ order.id }})" title="Duplicate as Draft">
                             <i class="bi bi-copy"></i>
                         </button>
-                        <button class="btn-danger-ghost btn-sm" onclick="confirmDelete('/orders/delete/{{ order.id }}/', 'Order #{{ order.id }}')">
+                        <button type="button" class="btn-danger-ghost btn-sm" onclick="confirmDelete('/orders/delete/{{ order.id }}/', 'Order #{{ order.id }}')">
                             <i class="bi bi-trash"></i>
                         </button>
                     </div>
@@ -168,19 +310,41 @@
             </tr>
             {% empty %}
             <tr>
-                <td colspan="9">
+                {% comment %}colspan is 10 now that a selection column has been added.{% endcomment %}
+                <td colspan="10">
                     <div class="empty-state">
                         <i class="bi bi-cart-x"></i>
+                        {% if has_filters %}
+                        <p>No orders match this filter.</p>
+                        <a href="{% url 'order_list' %}" class="btn btn-sm btn-outline-secondary mt-2">Clear filters</a>
+                        {% else %}
                         <p>No orders yet. Create your first order!</p>
+                        {% endif %}
                     </div>
                 </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
+    </form>
+
+    {% include 'includes/pagination.html' %}
 </div>
 
 <div class="mt-4">
+    {% comment %}These tabs show the shipment blocks belonging to the orders on the
+       CURRENT page only. They used to render every line item in the database,
+       unpaginated and unaffected by the search box — which made the page grow
+       without limit (7 MB of HTML at 800 orders) and made a filtered search look
+       broken, because the table narrowed while the tabs did not.
+
+       The scope is stated in the caption below rather than left implicit: a
+       partial list presented as a complete one is worse than no list.{% endcomment %}
+    <p class="u-muted-sm mb-2">
+        <i class="bi bi-info-circle me-1"></i>
+        Shipments for the {{ page_order_count }} order{{ page_order_count|pluralize }} shown above{% if has_filters %} (filtered){% endif %}.
+        {% if page_obj.paginator.num_pages > 1 %}Use the pager to see the rest.{% endif %}
+    </p>
     <ul class="nav nav-tabs" id="shipmentTabs" role="tablist" style="border-bottom:1px solid var(--border-color);">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="by-air-tab" data-bs-toggle="tab" data-bs-target="#by-air" type="button" role="tab" style="background:transparent;border-color:var(--border-color);color:var(--text-primary);font-size:13px;font-weight:600;">
@@ -196,7 +360,7 @@
     <div class="tab-content" id="shipmentTabsContent">
         <div class="tab-pane fade show active" id="by-air" role="tabpanel">
             <div class="glass-card" style="border-top-left-radius:0;border-top-right-radius:0;">
-                <table class="table-glass">
+                <div class="table-responsive"><table class="table-glass ">
                     <thead>
                         <tr>
                             <th>Order</th>
@@ -208,6 +372,7 @@
                             <th>Vol. Wt</th>
                             <th>CBM</th>
                             <th>Shipping</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -221,18 +386,31 @@
                             <td>{{ row.actual_weight }} KG</td>
                             <td>{{ row.volumetric_weight }} KG</td>
                             <td>{{ row.cbm }}</td>
-                            <td>{% if row.shipping_cost %}{{ currency }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                            <td>{% if row.shipping_cost %}{{ settings.currency_symbol }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                            <td>
+                                <form method="post" action="/orders/{{ row.order_id }}/shipment-status/" class="d-flex gap-1 align-items-center m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="shipment_no" value="{{ row.shipment_no|default:1 }}">
+                                    <select name="status" class="form-select form-select-sm" style="min-width:130px;font-size:12px;"
+                                            onchange="this.form.submit()">
+                                        <option value="">— status —</option>
+                                        {% for value, label in shipment_status_choices %}
+                                        <option value="{{ value }}" {% if row.transit_status == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            </td>
                         </tr>
                         {% empty %}
-                        <tr><td colspan="9"><div class="empty-state"><i class="bi bi-airplane"></i><p>No air shipments yet.</p></div></td></tr>
+                        <tr><td colspan="10"><div class="empty-state"><i class="bi bi-airplane"></i><p>No air shipments yet.</p></div></td></tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
         <div class="tab-pane fade" id="by-sea" role="tabpanel">
             <div class="glass-card" style="border-top-left-radius:0;border-top-right-radius:0;">
-                <table class="table-glass">
+                <div class="table-responsive"><table class="table-glass ">
                     <thead>
                         <tr>
                             <th>Order</th>
@@ -243,6 +421,7 @@
                             <th>Weight</th>
                             <th>CBM</th>
                             <th>Shipping</th>
+                            <th>Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -255,13 +434,26 @@
                             <td>{{ row.quantity }}</td>
                             <td>{{ row.actual_weight }} KG</td>
                             <td>{{ row.cbm }}</td>
-                            <td>{% if row.shipping_cost %}{{ currency }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                            <td>{% if row.shipping_cost %}{{ settings.currency_symbol }} {{ row.shipping_cost }}{% else %}—{% endif %}</td>
+                            <td>
+                                <form method="post" action="/orders/{{ row.order_id }}/shipment-status/" class="d-flex gap-1 align-items-center m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="shipment_no" value="{{ row.shipment_no|default:1 }}">
+                                    <select name="status" class="form-select form-select-sm" style="min-width:130px;font-size:12px;"
+                                            onchange="this.form.submit()">
+                                        <option value="">— status —</option>
+                                        {% for value, label in shipment_status_choices %}
+                                        <option value="{{ value }}" {% if row.transit_status == value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr><td colspan="8"><div class="empty-state"><i class="bi bi-ship"></i><p>No sea shipments yet.</p></div></td></tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                </table></div>
             </div>
         </div>
     </div>
@@ -281,6 +473,13 @@
           
           <div class="mb-3">
             <label class="form-label">Customer <span style="color:var(--text-secondary);font-size:11px">(optional)</span></label>
+            {% comment %}Filters the select below it. The customer list grows with
+               the business and a native dropdown has no way to search — by a few
+               dozen accounts, picking the right one means scrolling a list sorted
+               by nothing the operator can predict.{% endcomment %}
+            <input type="text" class="form-control form-control-sm mb-2 customer-search"
+                   placeholder="Search customers…" autocomplete="off"
+                   oninput="filterCustomerSelect(this)">
             <select name="customer_id" class="form-select" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
               <option value="">— No specific customer —</option>
               {% for customer in customers %}
@@ -294,7 +493,7 @@
             <label class="form-label mb-0" style="flex-shrink:0">Products</label>
             <input type="text" id="quotationProductSearch" class="form-control form-control-sm" placeholder="Search products…"
               style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);max-width:260px;"
-              oninput="filterQuotationProducts(this.value)">
+              oninput="queueQuotationSearch(this.value)">
             <div class="ms-auto d-flex gap-2">
               <button type="button" class="btn-ghost btn-sm" onclick="selectAllQuotationProducts(true)"><i class="bi bi-check2-all me-1"></i>All</button>
               <button type="button" class="btn-ghost btn-sm" onclick="selectAllQuotationProducts(false)"><i class="bi bi-x-lg me-1"></i>None</button>
@@ -309,14 +508,19 @@
               style="cursor:pointer;border-bottom:1px solid var(--border-color);transition:background .15s;"
               onmouseover="this.style.background='var(--bg-input)'" onmouseout="this.style.background=''"
               data-name="{{ product.name|lower }}">
-              <input type="checkbox" name="product_ids" value="{{ product.id }}" class="quotation-product-cb form-check-input" style="width:16px;height:16px;flex-shrink:0;">
-              {% with img=product.images.first %}
+              <input type="checkbox" name="product_ids" value="{{ product.id }}" class="quotation-product-cb form-check-input" style="width:16px;height:16px;flex-shrink:0;" onchange="rememberQuotationSelection(this)">
+              {% comment %}`images.all|first` rather than `images.first`: the view
+                 prefetches images, but calling .first() on a related manager issues a
+                 fresh LIMIT 1 query and ignores the prefetched cache — one extra query
+                 per product, which was ~75 of this page's queries on its own. Piping
+                 the already-fetched .all through |first reads from the cache.{% endcomment %}
+              {% with img=product.images.all|first %}
               <div style="width:38px;height:38px;flex-shrink:0;border-radius:4px;overflow:hidden;background:var(--bg-input);display:flex;align-items:center;justify-content:center;">
-                {% if img %}<img src="{{ img.image.url }}" style="width:38px;height:38px;object-fit:cover;" alt="">{% else %}<i class="bi bi-image" style="color:var(--text-secondary);font-size:14px;"></i>{% endif %}
+                {% if img %}<img src="{{ img.src }}" style="width:38px;height:38px;object-fit:cover;" alt="" onerror="this.style.visibility='hidden'">{% else %}<i class="bi bi-image" style="color:var(--text-secondary);font-size:14px;"></i>{% endif %}
               </div>
               {% endwith %}
-              <span style="flex:1;font-weight:600;font-size:13px">{{ product.name }}{% if product.is_private %} <span style="font-size:10px;color:#a78bfa;font-weight:700;margin-left:4px;">PRIVATE</span>{% endif %}</span>
-              <span style="font-size:12px;color:var(--text-secondary);">{{ currency }} {{ product.price }}</span>
+              <span style="flex:1;font-weight:600;font-size:13px">{{ product.name }}{% if product.is_private %} <span style="font-size:10px;color:#8A661A;font-weight:700;margin-left:4px;">PRIVATE</span>{% endif %}</span>
+              <span style="font-size:12px;color:var(--text-secondary);">{{ settings.currency_symbol }} {{ product.price }}</span>
               <span style="font-size:11px;color:var(--text-secondary);min-width:64px;text-align:right">MOQ: {{ product.moq }}</span>
             </label>
             {% endif %}
@@ -325,6 +529,24 @@
           <div id="quotationNoProducts" style="display:none;text-align:center;padding:24px;color:var(--text-secondary);">
             <i class="bi bi-search" style="font-size:20px;"></i><br>No products match your search.
           </div>
+          <div id="quotationSearching" style="display:none;text-align:center;padding:24px;color:var(--text-secondary);">
+            <span class="spinner-border spinner-border-sm me-2"></span>Searching the catalogue…
+          </div>
+          {% comment %}Only the first page is rendered; the rest is searched on the
+             server. Saying so matters — a truncated list the user believes is
+             complete is how a product gets left off a quotation.{% endcomment %}
+          {% if product_total > product_page_size %}
+          <div id="quotationTruncatedNote" style="font-size:11px;color:var(--text-secondary);margin-top:6px;">
+            Showing {{ product_page_size }} of {{ product_total }} products — type above to search all of them.
+          </div>
+          {% endif %}
+
+          {% comment %}Ticked products that the current search has scrolled out of the
+             list live here as hidden inputs, so a quotation built across
+             several searches submits everything that was chosen rather than
+             only the last result set.{% endcomment %}
+          <div id="quotationHiddenSelections"></div>
+          <input type="hidden" id="quotationCurrencySymbol" value="{{ settings.currency_symbol }}">
 
           <div id="quotationSelectionCount" style="font-size:12px;color:var(--text-secondary);margin-top:8px;"></div>
 
@@ -353,7 +575,7 @@
           or <strong>Customers → Export Quotation</strong>. A new <strong>Draft order</strong> will be created automatically.
         </p>
         <div class="mb-3">
-          <label class="form-label">Customer <span style="color:#f87171">*</span></label>
+          <label class="form-label">Customer <span style="color:#B3261E">*</span></label>
           <select id="importCustomerId" class="form-select" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
             <option value="">— Select customer —</option>
             {% for customer in customers %}
@@ -362,7 +584,7 @@
           </select>
         </div>
         <div class="mb-2">
-          <label class="form-label">Excel File (.xlsx) <span style="color:#f87171">*</span></label>
+          <label class="form-label">Excel File (.xlsx) <span style="color:#B3261E">*</span></label>
           <input type="file" id="importExcelFile" class="form-control" accept=".xlsx"
             style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-primary);">
           <div style="font-size:11px;color:var(--text-secondary);margin-top:5px;">
@@ -380,8 +602,8 @@
   </div>
 </div>
 
-<div class="modal fade" id="addOrderModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+<div class="modal fade order-modal" id="addOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-cart-plus me-2"></i>New Order</h5>
@@ -392,6 +614,13 @@
           {% csrf_token %}
           <div class="mb-3">
             <label class="form-label">Customer</label>
+            {% comment %}Filters the select below it. The customer list grows with
+               the business and a native dropdown has no way to search — by a few
+               dozen accounts, picking the right one means scrolling a list sorted
+               by nothing the operator can predict.{% endcomment %}
+            <input type="text" class="form-control form-control-sm mb-2 customer-search"
+                   placeholder="Search customers…" autocomplete="off"
+                   oninput="filterCustomerSelect(this)">
             <select name="customer_id" class="form-select" required>
               <option value="">Select a customer...</option>
               {% for customer in customers %}
@@ -413,7 +642,7 @@
 
           <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ currency }})</label>
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ settings.currency_symbol }})</label>
                             <input type="number" id="addShippingCost" class="form-control" step="0.01" min="0" value="0" placeholder="0.00" readonly style="background:var(--bg-input);opacity:0.8;">
                             <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Auto-summed from per-shipment costs</div>
                         </div>
@@ -421,7 +650,7 @@
                             <label class="form-label" style="font-size:12px"><i class="bi bi-plus-circle me-1"></i>Other Costs</label>
                             <div id="addExtraCostsContainer"></div>
                             <button type="button" class="btn btn-sm mt-1" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:6px;font-size:12px;" onclick="addExtraCostRow('add')"><i class="bi bi-plus"></i> Add Cost</button>
-                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="addExtraCostTotal">0.00</strong> {{ currency }}</span>
+                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="addExtraCostTotal">0.00</strong> {{ settings.currency_symbol }}</span>
                         </div>
                     </div>
 
@@ -479,11 +708,14 @@
             {% endif %}
           </div>
 
-          <button type="submit" class="btn-glow w-100"><i class="bi bi-check-lg"></i> Create Order</button>
-          <button type="button" class="btn-ghost w-100 mt-2" onclick="document.getElementById('orderStatus').value='draft';document.getElementById('addOrderForm').requestSubmit()">
-              <i class="bi bi-pencil-square"></i> Save as Draft
-          </button>
         </form>
+      </div>
+      <div class="modal-footer order-modal-footer">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('orderStatus').value='draft';document.getElementById('addOrderForm').requestSubmit()">
+            <i class="bi bi-pencil-square me-1"></i>Save as Draft
+        </button>
+        <button type="submit" form="addOrderForm" class="btn-glow"><i class="bi bi-check-lg me-1"></i>Create Order</button>
       </div>
     </div>
   </div>
@@ -503,8 +735,8 @@
   </div>
 </div>
 
-<div class="modal fade" id="editOrderModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+<div class="modal fade order-modal" id="editOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title"><i class="bi bi-pencil me-2"></i>Edit Order <span id="editOrderTitle"></span></h5>
@@ -516,6 +748,13 @@
           <input type="hidden" name="status" id="editOrderStatus" value="confirmed">
           <div class="mb-3">
             <label class="form-label">Customer</label>
+            {% comment %}Filters the select below it. The customer list grows with
+               the business and a native dropdown has no way to search — by a few
+               dozen accounts, picking the right one means scrolling a list sorted
+               by nothing the operator can predict.{% endcomment %}
+            <input type="text" class="form-control form-control-sm mb-2 customer-search"
+                   placeholder="Search customers…" autocomplete="off"
+                   oninput="filterCustomerSelect(this)">
             <select name="customer_id" id="editCustomerSelect" class="form-select" required>
               <option value="">Select a customer...</option>
               {% for customer in customers %}
@@ -531,7 +770,7 @@
           <hr style="border-color:var(--border-color);margin:8px 0 16px;">
           <div class="row g-3 mb-3">
                         <div class="col-md-4">
-                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ currency }})</label>
+                            <label class="form-label" style="font-size:12px"><i class="bi bi-truck me-1"></i>Total Shipping Cost ({{ settings.currency_symbol }})</label>
                             <input type="number" id="editShipping" class="form-control" step="0.01" min="0" value="0" placeholder="0.00" readonly style="background:var(--bg-input);opacity:0.8;">
                             <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">Auto-summed from per-shipment costs</div>
                         </div>
@@ -539,7 +778,7 @@
                             <label class="form-label" style="font-size:12px"><i class="bi bi-plus-circle me-1"></i>Other Costs</label>
                             <div id="editExtraCostsContainer"></div>
                             <button type="button" class="btn btn-sm mt-1" style="background:var(--bg-input);border:1px solid var(--border-color);color:var(--text-secondary);border-radius:6px;font-size:12px;" onclick="addExtraCostRow('edit')"><i class="bi bi-plus"></i> Add Cost</button>
-                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="editExtraCostTotal">0.00</strong> {{ currency }}</span>
+                            <span class="ms-3" style="font-size:12px;color:var(--accent-3);">Total extra: <strong id="editExtraCostTotal">0.00</strong> {{ settings.currency_symbol }}</span>
                         </div>
                     </div>
                     <div class="row g-3 mb-3">
@@ -592,10 +831,14 @@
             <div style="font-size:11px;color:var(--text-secondary);margin-left:1.5rem;">When unchecked, customer only sees subtotal and grand total.</div>
           </div>
 
-          <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Changes</button>
-          <button type="button" class="btn-ghost w-100 mt-2" onclick="document.getElementById('editOrderStatus').value='draft';document.getElementById('editOrderForm').requestSubmit()">
-              <i class="bi bi-pencil-square"></i> Save as Draft
-          </button>
+        </form>
+      </div>
+      <div class="modal-footer order-modal-footer">
+        <button type="button" class="btn-ghost" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn-ghost" onclick="document.getElementById('editOrderStatus').value='draft';document.getElementById('editOrderForm').requestSubmit()">
+            <i class="bi bi-pencil-square me-1"></i>Save as Draft
+        </button>
+        <button type="submit" form="editOrderForm" class="btn-glow"><i class="bi bi-floppy-fill me-1"></i>Save Changes</button>
       </div>
     </div>
   </div>
@@ -604,6 +847,106 @@
 {% endblock %}
 
 {% block extra_js %}
+<style>
+  /* The tracking reference sits under the order id: quieter than the id, but
+     selectable and copyable, because this is the string staff read out. */
+  .order-track-ref {
+    display: block; margin-top: 3px; padding: 1px 6px;
+    font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
+    font-size: 11px; font-weight: 600; letter-spacing: .02em;
+    color: var(--text-secondary); background: rgba(0,0,0,.05);
+    border: 1px solid var(--border-color); border-radius: 5px;
+    cursor: pointer; white-space: nowrap;
+  }
+  .order-track-ref:hover { color: var(--accent-3); border-color: var(--accent-3); }
+  .order-track-ref.copied { color: #157f4a; border-color: #157f4a; }
+</style>
+<script>
+  // Click to copy. Transcription errors on a 16-character reference are the
+  // whole reason it is a button rather than plain text.
+  document.addEventListener('click', function (event) {
+    var btn = event.target.closest('.order-track-ref');
+    if (!btn) return;
+    var ref = btn.dataset.track;
+    var done = function () {
+      var original = btn.textContent;
+      btn.textContent = 'Copied';
+      btn.classList.add('copied');
+      setTimeout(function () { btn.textContent = original; btn.classList.remove('copied'); }, 1400);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ref).then(done).catch(function () {});
+    } else {
+      // execCommand is deprecated but is the only fallback on a page served
+      // over plain http, where the async clipboard API is unavailable.
+      var ta = document.createElement('textarea');
+      ta.value = ref; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  });
+</script>
+{% comment %}The single source of truth for transit-status options in this page's
+   JavaScript. json_script emits ShipmentStatus.STATUS_CHOICES as properly escaped
+   JSON inside a <script type="application/json"> tag, so the values cannot break
+   out of the script context the way a hand-written literal could.{% endcomment %}
+{{ shipment_status_choices|json_script:"shipment-status-options" }}
+<script>
+// =============================================================================
+// BULK ORDER SELECTION
+// =============================================================================
+// Selection is per-page and intentionally not persisted across pagination: a
+// hidden selection on a page you can no longer see is how people accidentally
+// apply an action to the wrong records.
+// =============================================================================
+
+function orderCheckboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.order-select'));
+}
+
+function updateOrderSelection() {
+    var boxes = orderCheckboxes();
+    var selected = boxes.filter(function (b) { return b.checked; });
+    var shipSelect = document.getElementById('bulkShipmentStatus');
+    var shipBtn = document.getElementById('bulkShipmentBtn');
+    if (shipSelect && shipBtn) {
+        shipSelect.addEventListener('change', function () {
+            shipBtn.disabled = !this.value;
+        });
+    }
+
+    var bar = document.getElementById('bulkBar');
+    var count = document.getElementById('bulkCount');
+    var all = document.getElementById('orderSelectAll');
+
+    if (count) { count.textContent = selected.length; }
+    if (bar) { bar.hidden = selected.length === 0; }
+
+    // Indeterminate state on the header checkbox communicates "some but not all"
+    // — without it a partial selection looks identical to none.
+    if (all) {
+        all.checked = selected.length > 0 && selected.length === boxes.length;
+        all.indeterminate = selected.length > 0 && selected.length < boxes.length;
+    }
+
+    boxes.forEach(function (b) {
+        var row = b.closest('tr');
+        if (row) { row.classList.toggle('row-selected', b.checked); }
+    });
+}
+
+function toggleAllOrders(checked) {
+    orderCheckboxes().forEach(function (b) { b.checked = checked; });
+    updateOrderSelection();
+}
+
+function clearOrderSelection() {
+    toggleAllOrders(false);
+}
+
+document.addEventListener('DOMContentLoaded', updateOrderSelection);
+</script>
+
 <style>
 .product-dropdown-item:hover { background: var(--accent-3) !important; color: #fff !important; }
 .product-search-input { cursor: text; }
@@ -615,8 +958,69 @@
 .filter-chip-count { background: rgba(0,0,0,.25); border-radius: 10px; padding: 0 6px; font-size: 11px; margin-left: 3px; }
 </style>
 <script>
-var CURRENCY = '{{ currency }}';
-var SHIPPING_COMPANIES_DATA = {{ shipping_companies_json|safe }};
+/**
+ * Filter the customer <select> that sits directly below a search box.
+ *
+ * REBUILDS THE OPTION LIST rather than hiding options with CSS. Chrome and
+ * Firefox honour `option { display: none }`; Safari and most mobile browsers
+ * ignore it entirely and render the option anyway, so a filter written that way
+ * silently does nothing on an iPhone — which is where a lot of this gets used.
+ *
+ * The full list is cached on the element the first time it is filtered, so the
+ * options rendered by the template stay the single source of truth and this
+ * needs no separate copy of the customer list.
+ *
+ * The CURRENTLY SELECTED option is always kept, whether or not it matches. A
+ * select whose selected option is removed silently resets to '', so filtering
+ * after choosing someone would clear the choice without a word.
+ */
+function filterCustomerSelect(input) {
+    var select = input.parentElement.querySelector('select');
+    if (!select) return;
+
+    if (!select._allCustomerOptions) {
+        select._allCustomerOptions = Array.prototype.map.call(select.options, function (o) {
+            return { value: o.value, text: o.text };
+        });
+    }
+
+    var term = (input.value || '').trim().toLowerCase();
+    var current = select.value;
+
+    select.innerHTML = '';
+    select._allCustomerOptions.forEach(function (o) {
+        var keep = !term                                   // no filter typed
+            || !o.value                                    // the placeholder row
+            || o.value === current                         // never drop the choice
+            || o.text.toLowerCase().indexOf(term) !== -1;
+        if (!keep) return;
+        var opt = document.createElement('option');
+        opt.value = o.value;
+        opt.text = o.text;
+        select.appendChild(opt);
+    });
+    select.value = current;
+}
+
+/**
+ * Clear a stale filter whenever a modal is opened.
+ *
+ * The edit dialog sets editCustomerSelect.value after opening. Left-over filter
+ * text from a previous open would mean the option it wants is not in the list,
+ * and the assignment would silently do nothing — the dialog would show "Select a
+ * customer..." for an order that has one.
+ */
+document.addEventListener('shown.bs.modal', function (event) {
+    var boxes = event.target.querySelectorAll('.customer-search');
+    Array.prototype.forEach.call(boxes, function (input) {
+        if (!input.value) return;
+        input.value = '';
+        filterCustomerSelect(input);
+    });
+});
+
+var CURRENCY = '{{ settings.currency_symbol }}';
+var SHIPPING_COMPANIES_DATA = {{ shipping_companies_json|script_json }};
 var SHIPPING_RATES = {
     standard: {
         air: parseFloat('{{ air_shipping_rate|default:"0" }}') || 0,
@@ -717,6 +1121,25 @@ function syncCargoType(selectEl) {
     recalcShipmentTotals(block.closest('#editShipmentsContainer') ? 'edit' : 'add');
 }
 
+// Transit-status options for a shipment block, read straight from
+// ShipmentStatus.STATUS_CHOICES via the json_script tag near the top of this
+// template. This list used to be a hand-copied literal, which meant every status
+// added to the model had to be remembered here too — and when it wasn't, the
+// dropdown in the Add/Edit Order modals silently offered a stale set of steps
+// while the rest of the page (rendered server-side from the same choices) showed
+// the real ones.
+var SHIPMENT_STATUS_OPTIONS = JSON.parse(
+    document.getElementById('shipment-status-options').textContent
+).map(function(pair) { return {val: pair[0], label: pair[1]}; });
+
+// Copy the block's chosen transit status into every item row's hidden field, so
+// it rides along with the parallel form arrays on submit.
+function syncShipmentStatus(selectEl) {
+    var block = selectEl.closest('.shipment-block');
+    if (!block) return;
+    block.querySelectorAll('.shipment-status-field').forEach(function(el) { el.value = selectEl.value; });
+}
+
 function syncShipmentVolumetricWeight(inputEl) {
     var block = inputEl.closest('.shipment-block');
     if (!block) return;
@@ -760,7 +1183,7 @@ function addExtraCostRow(prefix, amount, reason) {
     row.className = 'extra-cost-row d-flex gap-2 mb-2 align-items-center';
     row.innerHTML = '<input type="number" name="extra_cost_amount" class="form-control form-control-sm" style="max-width:140px" step="0.01" min="0" value="' + (parseFloat(amount) || 0).toFixed(2) + '" placeholder="0.00" oninput="syncExtraCostTotal(\'' + prefix + '\')">' +
         '<input type="text" name="extra_cost_reason" class="form-control form-control-sm" placeholder="Reason (e.g. Customs, Handling...)" maxlength="255" value="' + ((reason || '').replace(/"/g, '&quot;')) + '">' +
-        '<button type="button" class="btn btn-sm" style="background:#ef4444;color:#fff;border:none;border-radius:6px;padding:4px 9px;flex-shrink:0;" onclick="removeExtraCostRow(this)"><i class="bi bi-x"></i></button>';
+        '<button type="button" class="btn btn-sm" style="background:#B3261E;color:#fff;border:none;border-radius:6px;padding:4px 9px;flex-shrink:0;" onclick="removeExtraCostRow(this)"><i class="bi bi-x"></i></button>';
     container.appendChild(row);
     syncExtraCostTotal(prefix);
 }
@@ -841,7 +1264,7 @@ function updateWeightBadge(hiddenEl) {
     recalcShipmentTotals(prefix);
 }
 
-function createOrderItemRow(shipmentNo, selectedProductId, quantity, isChecked) {
+function createOrderItemRow(shipmentNo, selectedProductId, quantity, isChecked, unitPrice) {
     var selectedLabel = '';
     var selectedData = '';
     var checkedAttr = isChecked ? ' checked' : '';
@@ -873,6 +1296,15 @@ function createOrderItemRow(shipmentNo, selectedProductId, quantity, isChecked) 
         '<label class="form-label" style="font-size:11px">Quantity</label>' +
         '<input type="number" name="quantity" class="form-control" min="1" value="' + (quantity || 1) + '" required oninput="recalcAllShipments()">' +
         '</div>' +
+        // Unit price for THIS order line. Blank = use the catalogue price.
+        // Editing it never touches the product listing: the catalogue is the
+        // list price, this is what one customer agreed once.
+        '<div class="form-group" style="max-width:130px">' +
+        '<label class="form-label" style="font-size:11px">Unit price (' + CURRENCY + ')</label>' +
+        '<input type="number" name="unit_price" class="form-control item-unit-price" step="0.01" min="0" '
+          + 'value="' + (unitPrice != null && unitPrice !== '' ? unitPrice : '') + '" '
+          + 'placeholder="list" title="Leave blank to use the catalogue price" oninput="recalcAllShipments()">' +
+        '</div>' +
         '<input type="hidden" name="shipment_no" value="' + shipmentNo + '">' +
         '<input type="hidden" name="shipment_name" class="shipment-name-field" value="">' +
         '<input type="hidden" name="shipment_method" class="shipment-method-field" value="manual">' +
@@ -882,6 +1314,7 @@ function createOrderItemRow(shipmentNo, selectedProductId, quantity, isChecked) 
         '<input type="hidden" name="shipment_volumetric_weight" class="shipment-vol-weight-field" value="0.000">' +
         '<input type="hidden" name="shipment_company_id" class="shipment-company-field" value="">' +
         '<input type="hidden" name="shipment_shipping_cost" class="shipment-shipping-cost-field" value="0.00">' +
+        '<input type="hidden" name="shipment_status" class="shipment-status-field" value="">' +
         '<button type="button" class="remove-item-btn" onclick="this.closest(\'.order-item-row\').remove();recalcAllShipments();" title="Remove">' +
         '<i class="bi bi-x-circle"></i>' +
         '</button>' +
@@ -910,10 +1343,16 @@ function shipmentTemplate(shipmentNo, productId, quantity, shipmentCbm, prefix, 
     ];
     var methodOpts = methodOptions.map(function(o) { return '<option value="' + o.val + '"' + (o.val === methodValue ? ' selected' : '') + '>' + o.label + '</option>'; }).join('');
     var cargoOpts = cargoOptions.map(function(o) { return '<option value="' + o.val + '"' + (o.val === cargoValue ? ' selected' : '') + '>' + o.label + '</option>'; }).join('');
-    return '<div class="shipment-block glass-card p-3 mb-3" data-shipment-no="' + shipmentNo + '" style="border:1px solid var(--border-color);">' +
-        '<div class="d-flex justify-content-between align-items-center mb-2">' +
+    var statusOpts = '<option value="">— not set —</option>' +
+        SHIPMENT_STATUS_OPTIONS.map(function(o) { return '<option value="' + o.val + '">' + o.label + '</option>'; }).join('');
+    return '<div class="shipment-block p-3 mb-3" data-shipment-no="' + shipmentNo + '">' +
+        '<div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">' +
         '<div style="font-weight:700;color:var(--accent-3);">Shipment #' + shipmentNo + '</div>' +
-        '<button type="button" class="btn-danger btn-sm" onclick="removeShipmentBlock(this)">Remove Shipment</button>' +
+        '<div class="d-flex align-items-center gap-2">' +
+        '<label class="mb-0" style="font-size:11px;color:var(--text-secondary);white-space:nowrap;"><i class="bi bi-truck me-1"></i>Transit status</label>' +
+        '<select class="form-select form-select-sm shipment-status-select" style="width:auto;min-width:140px;" onchange="syncShipmentStatus(this)">' + statusOpts + '</select>' +
+        '<button type="button" class="btn-danger-ghost btn-sm" onclick="removeShipmentBlock(this)"><i class="bi bi-x-lg me-1"></i>Remove</button>' +
+        '</div>' +
         '</div>' +
         '<div class="row g-2 mb-2">' +
         '<div class="col-md-6 mb-1">' +
@@ -1086,23 +1525,69 @@ function recalcShipmentTotals(prefix) {
 }
 
 // ── Product Picker (searchable dropdown) ──────────────────────────
-function buildProductDropdown(dropdown, query, hiddenField) {
-    var q = (query || '').toLowerCase().trim();
-    var matches = PRODUCTS.filter(function(p) { return !q || p.name.toLowerCase().indexOf(q) !== -1 || p.sku.toLowerCase().indexOf(q) !== -1; });
+/* PRODUCTS holds only the first page of the catalogue (see ensureProductsLoaded
+   below), so filtering it alone meant any product past the first 50 by name
+   could never be found here, however exactly it was typed. The local page is
+   shown instantly; the server then searches the whole catalogue and its answer
+   replaces the list. */
+function productMatchesQuery(p, q) {
+    var words = q.split(/\s+/).filter(Boolean);
+    var hay = ((p.name || '') + ' ' + (p.sku || '')).toLowerCase();
+    return words.every(function (w) { return hay.indexOf(w) !== -1; });
+}
+function rememberProducts(products) {
+    var known = {};
+    PRODUCTS.forEach(function (p) { known[String(p.id)] = true; });
+    (products || []).forEach(function (p) {
+        if (!known[String(p.id)]) { PRODUCTS.push(p); known[String(p.id)] = true; }
+    });
+}
+function renderProductDropdown(dropdown, matches, hiddenField, note) {
+    var noteHtml = note ? '<div style="padding:8px 14px;color:var(--text-secondary);font-size:12px;">' + escapeHtml(note) + '</div>' : '';
     if (matches.length === 0) {
-        dropdown.innerHTML = '<div style="padding:10px 14px;color:var(--text-secondary);font-size:13px;">No products found</div>';
+        dropdown.innerHTML = noteHtml || '<div style="padding:10px 14px;color:var(--text-secondary);font-size:13px;">No products found</div>';
     } else {
         dropdown.innerHTML = matches.map(function(p) {
             var label = p.name + (p.sku ? ' [' + p.sku + ']' : '') + ' — ' + CURRENCY + ' ' + p.price + (p.weight ? ' (' + p.weight + ' KG ctn)' : '');
+            var safeLabel = escapeHtml(label).replace(/"/g, '&quot;');
             var selected = hiddenField.value == p.id;
             return '<div class="product-dropdown-item" style="padding:9px 14px;cursor:pointer;font-size:13px;' + (selected ? 'background:var(--accent-3);color:#fff;' : '') + '" ' +
-                'data-id="' + p.id + '" data-label="' + label.replace(/"/g,'&quot;') + '" ' +
+                'data-id="' + p.id + '" data-label="' + safeLabel + '" ' +
                 'data-price="' + p.price + '" data-weight="' + (p.weight||'') + '" data-carton-qty="' + (p.carton_qty||'') + '" ' +
                 'data-carton-length="' + (p.carton_length||'') + '" data-carton-width="' + (p.carton_width||'') + '" data-carton-height="' + (p.carton_height||'') + '" ' +
-                'onmousedown="selectProductItem(this)">' + label + '</div>';
-        }).join('');
+                'onmousedown="selectProductItem(this)">' + safeLabel + '</div>';
+        }).join('') + noteHtml;
     }
     dropdown.style.display = 'block';
+}
+function buildProductDropdown(dropdown, query, hiddenField) {
+    var q = (query || '').toLowerCase().trim();
+    var matches = PRODUCTS.filter(function(p) { return productMatchesQuery(p, q); });
+    renderProductDropdown(dropdown, matches, hiddenField, q && !matches.length ? 'Searching the full catalogue…' : '');
+    if (!q) { return; }
+
+    /* Debounced, and only the newest response for this dropdown is used:
+       a short query sent later often answers before a longer one sent earlier. */
+    clearTimeout(dropdown._searchTimer);
+    var seq = (dropdown._searchSeq || 0) + 1;
+    dropdown._searchSeq = seq;
+    dropdown._searchTimer = setTimeout(function () {
+        fetch('/orders/product-lookup/?q=' + encodeURIComponent(q), {credentials: 'same-origin'})
+            .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+            .then(function (data) {
+                if (dropdown._searchSeq !== seq || dropdown.style.display === 'none') { return; }
+                var found = data.products || [];
+                rememberProducts(found);
+                renderProductDropdown(dropdown, found, hiddenField, data.truncated
+                    ? 'Showing the first ' + found.length + ' of ' + data.total + ' matches — keep typing to narrow it.'
+                    : '');
+            })
+            .catch(function () {
+                if (dropdown._searchSeq !== seq || dropdown.style.display === 'none') { return; }
+                renderProductDropdown(dropdown, matches, hiddenField,
+                    'Could not search the full catalogue — check your connection and try again.');
+            });
+    }, 250);
 }
 function openProductDropdown(inputEl) {
     var picker = inputEl.closest('.product-picker');
@@ -1202,11 +1687,11 @@ function viewOrder(orderId) {
         .then(function(data) {
             var html = '<div class="mb-3"><strong>Customer:</strong> ' + data.customer + '</div>';
             html += '<div class="mb-3"><strong>Date:</strong> ' + data.date + '</div>';
-            html += '<table class="table-glass"><thead><tr><th>Product</th><th>Qty</th><th>Weight(KG)</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>';
+            html += '<div class="table-responsive"><table class="table-glass "><thead><tr><th>Product</th><th>Qty</th><th>Weight(KG)</th><th>Price</th><th>Subtotal</th></tr></thead><tbody>';
             data.items.forEach(function(item) {
                 html += '<tr><td>' + item.product + '</td><td>' + item.quantity + '</td><td>' + (item.weight || '—') + '</td><td>' + item.price + '</td><td style="font-weight:700">' + item.subtotal + '</td></tr>';
             });
-            html += '</tbody></table>';
+            html += '</tbody></table></div>';
             html += '<div class="text-end mt-3" style="font-size:20px;font-weight:800;color:var(--accent-3)">Total: ' + CURRENCY + ' ' + data.total + '</div>';
             if (parseFloat(data.shipping_cost) > 0) {
                 html += '<div class="text-end mt-1" style="font-size:15px;color:var(--text-secondary)"><i class="bi bi-truck"></i> Shipping: ' + CURRENCY + ' ' + data.shipping_cost + '</div>';
@@ -1233,7 +1718,7 @@ function viewOrder(orderId) {
                 html += '<div class="text-end mt-1" style="font-size:13px;color:var(--text-secondary)"><i class="bi bi-bounding-box"></i> Total CBM: ' + data.total_cbm + '</div>';
             }
             // Payment status
-            var payColors = {paid: '#4ade80', partial: '#f59e0b', unpaid: '#f87171'};
+            var payColors = {paid: '#157F4A', partial: '#C2410C', unpaid: '#B3261E'};
             var payLabel = {paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid'};
             var pStatus = data.payment_status || 'unpaid';
             html += '<div class="mt-2" style="font-size:13px;"><span style="color:var(--text-secondary)">Payment: </span><strong style="color:' + payColors[pStatus] + '">' + (payLabel[pStatus] || pStatus) + '</strong></div>';
@@ -1267,6 +1752,42 @@ var PRODUCTS = [
     {id: {{ product.id }}, name: "{{ product.name|escapejs }}", sku: "{{ product.sku|escapejs }}", price: "{{ product.price }}", weight: "{{ product.weight|default:'' }}", carton_qty: "{{ product.carton_qty|default:'' }}", carton_length: "{{ product.carton_length|default:'' }}", carton_width: "{{ product.carton_width|default:'' }}", carton_height: "{{ product.carton_height|default:'' }}"},
   {% endfor %}
 ];
+
+
+/* =============================================================================
+   PRODUCTS is a page, not the catalogue
+   =============================================================================
+   The order list used to embed every product as a JavaScript array. That array
+   is now the first 50 by name, so anything that needs a specific product - the
+   edit modal, mostly - has to ask for it.
+
+   Resolves immediately when everything needed is already present, so the common
+   case costs nothing.
+   ========================================================================== */
+function ensureProductsLoaded(ids) {
+    var known = {};
+    PRODUCTS.forEach(function (p) { known[String(p.id)] = true; });
+
+    var missing = [];
+    (ids || []).forEach(function (id) {
+        if (id == null) { return; }
+        var key = String(id);
+        if (!known[key] && missing.indexOf(key) === -1) { missing.push(key); }
+    });
+
+    if (!missing.length) { return Promise.resolve(); }
+
+    return fetch('/orders/product-lookup/?ids=' + encodeURIComponent(missing.join(',')))
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+            (data.products || []).forEach(function (p) { PRODUCTS.push(p); });
+        })
+        .catch(function () {
+            /* Deliberately swallowed: a failed lookup must not stop the modal
+               opening. The dropdown will be missing that product, which is
+               visible, rather than the modal silently never appearing. */
+        });
+}
 
 function buildProductSelect(selectedId, qty) {
     var opts = '<option value="">Select product...</option>';
@@ -1328,6 +1849,15 @@ function editOrder(orderId) {
     fetch('/orders/edit/' + orderId + '/')
         .then(function(r) { return r.json(); })
         .then(function(data) {
+            /* PRODUCTS holds only the first page of the catalogue, so an order
+               referencing anything outside it would build a dropdown that does
+               not contain its own product - and saving would then change or
+               clear the line. Fetch exactly the ids this order uses and merge
+               them in before any row is built. */
+            return ensureProductsLoaded((data.items || []).map(function (i) { return i.product_id; }))
+                .then(function () { return data; });
+        })
+        .then(function(data) {
             document.getElementById('editCustomerSelect').value = data.customer_id;
             document.getElementById('editOrderStatus').value = data.status;
             document.getElementById('editShipping').value = data.shipping_cost;
@@ -1365,7 +1895,7 @@ function editOrder(orderId) {
                 var itemsWrap = block.querySelector('.shipment-items');
                 itemsWrap.innerHTML = '';
                 (grouped[shipmentNo] || []).forEach(function(item) {
-                    itemsWrap.insertAdjacentHTML('beforeend', createOrderItemRow(parseInt(shipmentNo), item.product_id, item.quantity, item.is_checked));
+                    itemsWrap.insertAdjacentHTML('beforeend', createOrderItemRow(parseInt(shipmentNo), item.product_id, item.quantity, item.is_checked, item.price));
                 });
                 if ((grouped[shipmentNo] || []).length === 0) {
                     itemsWrap.insertAdjacentHTML('beforeend', createOrderItemRow(parseInt(shipmentNo), null, 1));
@@ -1387,6 +1917,12 @@ function editOrder(orderId) {
                 if (cargoSelect && firstItem.cargo_type) {
                     cargoSelect.value = firstItem.cargo_type;
                     syncCargoType(cargoSelect);
+                }
+                // Restore the shipment's saved transit status.
+                var statusSelect = block.querySelector('.shipment-status-select');
+                if (statusSelect) {
+                    statusSelect.value = firstItem.shipment_status || '';
+                    syncShipmentStatus(statusSelect);
                 }
                 // Sync shipment name hidden fields from text input (already set via shipmentTemplate)
                 var nameInput = block.querySelector('.shipment-name-input');
@@ -1423,12 +1959,15 @@ document.getElementById('editOrderForm').addEventListener('submit', function(e) 
     e.preventDefault();
     if (!currentEditOrderId) return;
     var data = new FormData(this);
-    var btn = this.querySelector('[type=submit]');
-    btn.disabled = true;
+    // The submit buttons live in the modal FOOTER (outside <form>), associated via
+    // their form="editOrderForm" attribute — so look them up in the document, not
+    // inside the form, and guard against null so a missing button never aborts save.
+    var btns = document.querySelectorAll('[type=submit][form="editOrderForm"]');
+    btns.forEach(function(b) { b.disabled = true; });
     fetch('/orders/edit/' + currentEditOrderId + '/', { method: 'POST', body: data })
         .then(function(r) { return r.json(); })
         .then(function(res) {
-            btn.disabled = false;
+            btns.forEach(function(b) { b.disabled = false; });
             if (res.success) {
                 showToast(res.message, 'success');
                 bootstrap.Modal.getInstance(document.getElementById('editOrderModal')).hide();
@@ -1437,7 +1976,7 @@ document.getElementById('editOrderForm').addEventListener('submit', function(e) 
                 showToast(res.message || 'Error saving order', 'error');
             }
         }).catch(function() {
-            btn.disabled = false;
+            btns.forEach(function(b) { b.disabled = false; });
             showToast('Network error', 'error');
         });
 });
@@ -1448,37 +1987,177 @@ function getCookie(name) {
 }
 
 // ===== Quotation Sheet =====
-function filterQuotationProducts(query) {
-    var rows = document.querySelectorAll('.quotation-product-row');
-    var q = query.toLowerCase().trim();
-    var visible = 0;
-    rows.forEach(function(row) {
-        var name = row.getAttribute('data-name') || '';
-        var show = !q || name.includes(q);
-        row.style.display = show ? '' : 'none';
-        if (show) visible++;
-    });
-    document.getElementById('quotationNoProducts').style.display = visible === 0 ? '' : 'none';
+/* =============================================================================
+   QUOTATION PRODUCT PICKER - searched on the server
+   =============================================================================
+   This used to filter rows that were already in the page, which meant the page
+   had to contain every product: 169 KB of HTML at 30 products, 810 KB at 500.
+   It also only ever searched what had been rendered, so on a large catalogue
+   the box quietly failed to find things that existed.
+
+   Now the first page is rendered server-side and typing queries the whole
+   catalogue. The hard part is that replacing the list would normally throw away
+   what the user had already ticked, so selections are held in a Set and
+   re-applied on every render - including products no longer in the visible
+   results, which are kept as hidden inputs so they still submit.
+   ========================================================================== */
+
+var QUOTATION_SELECTED = new Set();
+var quotationSearchTimer = null;
+var quotationSearchSeq = 0;
+
+/* Remember a tick before the row it belongs to can be replaced. */
+function rememberQuotationSelection(checkbox) {
+    if (checkbox.checked) { QUOTATION_SELECTED.add(String(checkbox.value)); }
+    else { QUOTATION_SELECTED.delete(String(checkbox.value)); }
+    syncQuotationHiddenInputs();
     updateQuotationCount();
 }
 
+/* Products ticked but not currently on screen still have to reach the server,
+   so each is mirrored into a hidden input. Without this, searching twice and
+   submitting would quote only the products from the last search. */
+function syncQuotationHiddenInputs() {
+    var host = document.getElementById('quotationHiddenSelections');
+    if (!host) { return; }
+    var visible = {};
+    document.querySelectorAll('.quotation-product-cb').forEach(function (cb) {
+        visible[String(cb.value)] = true;
+    });
+    host.innerHTML = '';
+    QUOTATION_SELECTED.forEach(function (id) {
+        if (!visible[id]) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'product_ids';
+            input.value = id;
+            host.appendChild(input);
+        }
+    });
+}
+
+function queueQuotationSearch(query) {
+    if (quotationSearchTimer) { clearTimeout(quotationSearchTimer); }
+    /* 250ms: long enough that typing a word is one request, short enough that
+       the list feels like it is keeping up. */
+    quotationSearchTimer = setTimeout(function () { runQuotationSearch(query); }, 250);
+}
+
+function runQuotationSearch(query) {
+    var list = document.getElementById('quotationProductList');
+    var empty = document.getElementById('quotationNoProducts');
+    var busy = document.getElementById('quotationSearching');
+    var note = document.getElementById('quotationTruncatedNote');
+    if (!list) { return; }
+
+    /* Responses can arrive out of order - a short query started later often
+       returns before a long one started earlier. Only the newest wins. */
+    var seq = ++quotationSearchSeq;
+
+    if (busy) { busy.style.display = ''; }
+    empty.style.display = 'none';
+    list.style.display = 'none';
+
+    fetch('/orders/product-lookup/?q=' + encodeURIComponent(query))
+        .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+        .then(function (data) {
+            if (seq !== quotationSearchSeq) { return; }
+            renderQuotationResults(data.products);
+            if (busy) { busy.style.display = 'none'; }
+            list.style.display = data.products.length ? '' : 'none';
+            empty.style.display = data.products.length ? 'none' : '';
+            if (note) {
+                note.style.display = data.truncated ? '' : 'none';
+                if (data.truncated) {
+                    note.textContent = 'Showing the first ' + data.products.length +
+                        ' of ' + data.total + ' matches - refine your search to narrow it.';
+                }
+            }
+        })
+        .catch(function () {
+            if (seq !== quotationSearchSeq) { return; }
+            if (busy) { busy.style.display = 'none'; }
+            list.style.display = '';
+            /* Say what happened rather than showing an empty list, which reads
+               as "no such product" and is a different, wrong answer. */
+            empty.style.display = '';
+            empty.innerHTML = '<i class="bi bi-exclamation-triangle" style="font-size:20px;"></i>' +
+                '<br>Could not search the catalogue. Check your connection and try again.';
+        });
+}
+
+function renderQuotationResults(products) {
+    var list = document.getElementById('quotationProductList');
+    var symbolEl = document.getElementById('quotationCurrencySymbol');
+    var currency = symbolEl ? symbolEl.value : '';
+    var html = '';
+    products.forEach(function (p) {
+        var checked = QUOTATION_SELECTED.has(String(p.id)) ? ' checked' : '';
+        var thumb = p.image
+            ? '<img src="' + encodeURI(p.image) + '" style="width:38px;height:38px;object-fit:cover;" alt="">'
+            : '<i class="bi bi-image" style="color:var(--text-secondary);font-size:14px;"></i>';
+        html +=
+          '<label class="quotation-product-row d-flex align-items-center gap-3 px-3 py-2"' +
+          ' style="cursor:pointer;border-bottom:1px solid var(--border-color);">' +
+            '<input type="checkbox" name="product_ids" value="' + p.id + '"' +
+              ' class="quotation-product-cb form-check-input"' +
+              ' style="width:16px;height:16px;flex-shrink:0;"' +
+              ' onchange="rememberQuotationSelection(this)"' + checked + '>' +
+            '<div style="width:38px;height:38px;flex-shrink:0;border-radius:4px;overflow:hidden;' +
+              'background:var(--bg-input);display:flex;align-items:center;justify-content:center;">' +
+              thumb +
+            '</div>' +
+            '<span style="flex:1;font-weight:600;font-size:13px">' + escapeHtml(p.name) + '</span>' +
+            '<span style="font-size:12px;color:var(--text-secondary);">' + currency + ' ' + escapeHtml(p.price) + '</span>' +
+            '<span style="font-size:11px;color:var(--text-secondary);min-width:64px;text-align:right">' +
+              escapeHtml(p.sku) + '</span>' +
+          '</label>';
+    });
+    list.innerHTML = html;
+    syncQuotationHiddenInputs();
+    updateQuotationCount();
+}
+
+/* Product names come from suppliers and routinely contain quotes and angle
+   brackets; inserting them raw would break the row or inject markup. */
+function escapeHtml(text) {
+    var div = document.createElement('div');
+    div.textContent = text == null ? '' : String(text);
+    return div.innerHTML;
+}
+
+/* Applies to what is on screen, which after a search is the matches - so this
+   is "select everything I just found", not "select the catalogue". Unticking
+   also drops those ids from the remembered set, otherwise None would appear to
+   do nothing while the hidden inputs still carried them. */
 function selectAllQuotationProducts(checked) {
-    document.querySelectorAll('.quotation-product-cb').forEach(function(cb) {
+    document.querySelectorAll('.quotation-product-cb').forEach(function (cb) {
         var row = cb.closest('.quotation-product-row');
-        if (row && row.style.display !== 'none') cb.checked = checked;
+        if (row && row.style.display === 'none') { return; }
+        cb.checked = checked;
+        if (checked) { QUOTATION_SELECTED.add(String(cb.value)); }
+        else { QUOTATION_SELECTED.delete(String(cb.value)); }
     });
+    syncQuotationHiddenInputs();
     updateQuotationCount();
 }
 
+/* Counts the remembered set, not the visible rows. After a search the visible
+   rows are the matches, so "2 of 8 selected" would be nonsense - the user has
+   not deselected anything, they have just looked at something else. */
 function updateQuotationCount() {
-    var total = document.querySelectorAll('.quotation-product-cb').length;
-    var selected = document.querySelectorAll('.quotation-product-cb:checked').length;
+    var selected = QUOTATION_SELECTED.size;
     var el = document.getElementById('quotationSelectionCount');
-    if (el) el.textContent = selected + ' of ' + total + ' product' + (total !== 1 ? 's' : '') + ' selected';
+    if (!el) { return; }
+    el.textContent = selected === 0
+        ? 'No products selected yet'
+        : selected + ' product' + (selected === 1 ? '' : 's') + ' selected';
 }
 
 function validateQuotationForm() {
-    var checked = document.querySelectorAll('.quotation-product-cb:checked').length;
+    // The set, not the DOM: products chosen before the last search are
+    // still selected even though their rows have been replaced.
+    var checked = QUOTATION_SELECTED.size;
     if (checked === 0) {
         showToast('Please select at least one product.', 'error');
         return false;
@@ -1516,7 +2195,7 @@ function setPaymentStatus(orderId, newStatus) {
         if (!data.success) return;
         var s = data.payment_status;
         var icons  = {paid: 'bi-check-circle-fill', partial: 'bi-dash-circle-fill', unpaid: 'bi-x-circle-fill'};
-        var colors = {paid: '#4ade80', partial: '#f59e0b', unpaid: '#f87171'};
+        var colors = {paid: '#157F4A', partial: '#C2410C', unpaid: '#B3261E'};
         var labels = {paid: 'Paid', partial: 'Partial', unpaid: 'Unpaid'};
         var drop = document.getElementById('pay-drop-' + orderId);
         if (!drop) return;
@@ -1551,7 +2230,7 @@ function togglePlaced(orderId) {
         if (!btn) return;
         var isPlaced = data.is_placed;
         if (isPlaced) {
-            btn.innerHTML = '<span style="color:#4ade80"><i class="bi bi-check-square-fill me-1"></i>Placed</span>';
+            btn.innerHTML = '<span style="color:#157F4A"><i class="bi bi-check-square-fill me-1"></i>Placed</span>';
             btn.title = 'Order placed with supplier';
         } else {
             btn.innerHTML = '<span style="color:var(--text-secondary)"><i class="bi bi-square me-1"></i>Not Placed</span>';
