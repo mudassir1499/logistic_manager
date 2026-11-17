@@ -1,18 +1,98 @@
 {% extends 'base.html' %}
+{% load script_json %}
 
 {% block title %}Settings — Logistic Manager{% endblock %}
 {% block nav_settings %}active{% endblock %}
 {% block page_title %}Settings{% endblock %}
 
 {% block content %}
+<style>
+/* Find-a-setting */
+.settings-search { position: relative; }
+.settings-search-results {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  background: var(--bg-card); border: 1px solid var(--border-color);
+  border-radius: 10px; box-shadow: 0 10px 28px rgba(0,0,0,.12); overflow: hidden;
+}
+.settings-search-item {
+  display: flex; flex-direction: column; align-items: flex-start; width: 100%;
+  padding: 9px 14px; border: 0; background: transparent; text-align: left;
+  border-bottom: 1px solid var(--border-color); cursor: pointer;
+}
+.settings-search-item:last-child { border-bottom: 0; }
+.settings-search-item:hover, .settings-search-item:focus { background: var(--bg-input); }
+.settings-search-label { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.settings-search-where { font-size: 12px; color: var(--text-secondary); }
+.settings-search-empty { padding: 12px 14px; font-size: 13px; color: var(--text-secondary); }
+
+/* A dot on any tab holding an unsaved change */
+.settings-tabs .nav-link.has-changes::after {
+  content: ''; display: inline-block; width: 7px; height: 7px; margin-left: 6px;
+  border-radius: 50%; background: var(--warning); vertical-align: middle;
+}
+
+/* Sticky save bar: always reachable, and says when something is unsaved */
+.settings-savebar {
+  position: sticky; bottom: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  margin: 24px -4px 0; padding: 12px 14px;
+  background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px;
+  box-shadow: 0 -6px 18px rgba(0,0,0,.06);
+}
+.settings-savebar-status { font-size: 13px; color: var(--success); font-weight: 600; }
+.settings-savebar.is-dirty { border-color: var(--warning); }
+.settings-savebar.is-dirty .settings-savebar-status { color: var(--warning); }
+
+/* Brief highlight on the field a search jumped to */
+@keyframes settingsFlash { from { background: var(--warning-bg); } to { background: transparent; } }
+.settings-flash { animation: settingsFlash 1.8s ease-out; border-radius: 8px; }
+
+@media (max-width: 575.98px) {
+  .settings-savebar .btn-glow { width: 100%; }
+}
+</style>
 <div class="row">
   
   <div class="col-lg-7">
 
     
     <div class="glass-card mb-4">
-      <h5 class="mb-4" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-building me-2"></i>Company Information</h5>
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+        <h5 class="mb-0" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-gear me-2"></i>Site &amp; Business Settings</h5>
+      </div>
+      {% comment %}Find any setting by name. About ninety fields sit across six
+         tabs, and knowing which tab holds "WhatsApp number" or "commission" is
+         the hard part - this jumps straight to it.{% endcomment %}
+      <div class="settings-search mb-3">
+        <div class="position-relative">
+          <i class="bi bi-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-secondary);pointer-events:none;"></i>
+          <input type="search" id="settingsSearch" class="form-control" style="padding-left:36px;"
+                 placeholder="Find a setting, e.g. WhatsApp, commission, logo, SMTP…"
+                 autocomplete="off" aria-label="Find a setting" aria-controls="settingsSearchResults">
+        </div>
+        <div id="settingsSearchResults" class="settings-search-results" role="listbox" hidden></div>
+      </div>
+      {% comment %}--------------------------------------------------------------
+         Tabs, not one long scroll.
+
+         This page carries roughly ninety fields now. As a single column it meant
+         hunting past SMTP passwords to reach a shipping rate, and the fields most
+         often changed sat furthest down. Everything still submits together — the
+         form wraps all the panes, and inputs in a hidden pane are hidden with CSS
+         rather than removed, so they post exactly as before.
+         -------------------------------------------------------------{% endcomment %}
+      <ul class="nav nav-tabs settings-tabs mb-4" role="tablist">
+        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-company" type="button"><i class="bi bi-building me-1"></i>Company</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-invoicing" type="button"><i class="bi bi-receipt me-1"></i>Invoicing</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-financial" type="button"><i class="bi bi-currency-exchange me-1"></i>Financial</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-marketing" type="button"><i class="bi bi-megaphone me-1"></i>Marketing</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-email" type="button"><i class="bi bi-envelope-gear me-1"></i>Email</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-operations" type="button"><i class="bi bi-sliders me-1"></i>Operations</button></li>
+      </ul>
+
       <form id="settingsForm">
+      <div class="tab-content">
+      <div class="tab-pane fade show active" id="tab-company" role="tabpanel">
         <div class="mb-3">
           <label class="form-label">Company Name</label>
           <input type="text" name="company_name" class="form-control" value="{{ settings.company_name }}" required>
@@ -22,14 +102,233 @@
           <input type="text" name="company_phone" class="form-control" value="{{ settings.company_phone }}" placeholder="+971 xx xxx xxxx">
         </div>
         <div class="mb-3">
+          <label class="form-label">WhatsApp Number</label>
+          <input type="text" name="whatsapp_number" class="form-control" value="{{ settings.whatsapp_number }}" placeholder="+971 xx xxx xxxx">
+          <div class="form-text">Used by the floating WhatsApp button and order enquiries. Falls back to the phone number above when empty.</div>
+        </div>
+        <div class="mb-3">
           <label class="form-label">Address</label>
           <textarea name="company_address" class="form-control" rows="3" placeholder="Full company address...">{{ settings.company_address }}</textarea>
         </div>
 
         <hr style="border-color:var(--border-color);">
 
-        
-        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-currency-exchange me-2"></i>Currency</h5>
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-share me-2"></i>Product Sharing</h5>
+        <div class="mb-2" style="font-size:12px;color:var(--text-secondary);">
+          What gets copied when someone uses <strong>Share</strong> on a product page. The product name
+          and its link are always included; these two lines go in between.
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tagline</label>
+          <input type="text" name="share_pitch" class="form-control" maxlength="200"
+                 value="{{ settings.share_pitch }}"
+                 placeholder="Available for Amazon UAE, KSA and USA - shipped direct from China">
+          <div class="form-text">Leave blank to share just the product name and the link.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Contact number shown when sharing</label>
+          <input type="text" name="share_contact" class="form-control" maxlength="50"
+                 value="{{ settings.share_contact }}" placeholder="+8617651652712">
+          <div class="form-text">Falls back to the WhatsApp number, then the phone number, when empty.</div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Preview</label>
+          <pre class="form-control" style="white-space:pre-wrap;font-size:13px;line-height:1.5;background:var(--bg-input);">{{ settings.share_preview }}</pre>
+        </div>
+
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-image me-2"></i>Logo &amp; Branding</h5>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label">Company Logo (square)</label>
+            {% if settings.logo %}
+            <div class="mb-2 d-flex align-items-center gap-2">
+              <img src="{{ settings.logo.url }}" alt="Current logo" style="width:56px;height:56px;object-fit:contain;border:1px solid var(--border-color);border-radius:8px;background:#fff;padding:4px;">
+              <span class="form-text text-muted mb-0">Current logo</span>
+            </div>
+            {% endif %}
+            <input type="file" name="logo" class="form-control" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+            <div class="form-text text-muted">
+              <strong>Recommended 512 &times; 512 px</strong> (square), PNG with a transparent background, under 200&nbsp;KB.<br>
+              Appears in the website header and footer, on invoices, and as the logo Google shows
+              beside your search listing. Leave empty to keep the built-in mark.
+            </div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Wide Logo <span class="text-muted">(optional)</span></label>
+            {% if settings.logo_wide %}
+            <div class="mb-2">
+              <img src="{{ settings.logo_wide.url }}" alt="Current wide logo" style="max-height:48px;max-width:200px;object-fit:contain;border:1px solid var(--border-color);border-radius:8px;background:#fff;padding:4px;">
+            </div>
+            {% endif %}
+            <input type="file" name="logo_wide" class="form-control" accept="image/png,image/jpeg,image/webp,image/svg+xml">
+            <div class="form-text text-muted">
+              <strong>Recommended 600 &times; 160 px</strong>, transparent PNG. A horizontal logo-and-name
+              lockup used at the top of invoices. Falls back to the square logo.
+            </div>
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-globe2 me-2"></i>Website Address</h5>
+        <div class="mb-4">
+          <label class="form-label">Public Website URL</label>
+          <input type="url" name="site_url" class="form-control" value="{{ settings.site_url }}" placeholder="https://mudassirllc.com">
+          <div class="form-text text-muted">
+            Include <code>https://</code> and no trailing slash. Used to build canonical links,
+            sitemap entries, social share URLs and the links inside notification emails.
+            <strong>This affects how Google indexes the site</strong>, so change it only when the
+            domain genuinely changes.
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-shop-window me-2"></i>Business Profile</h5>
+        <div class="form-text text-muted mb-3">
+          Published to Google as your business location, opening hours and languages. These used to be
+          fixed in code, so changing your hours had no effect on what Google displayed.
+        </div>
+        <div class="row g-3 mb-3">
+          <div class="col-md-5">
+            <label class="form-label">City</label>
+            <input type="text" name="business_city" class="form-control" value="{{ settings.business_city }}" placeholder="Xuzhou">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Province / State</label>
+            <input type="text" name="business_region" class="form-control" value="{{ settings.business_region }}" placeholder="Jiangsu">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Country</label>
+            <input type="text" name="business_country" class="form-control" value="{{ settings.business_country }}" maxlength="2" placeholder="CN">
+            <div class="form-text text-muted">2-letter</div>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Opens</label>
+            <input type="time" name="opening_time" class="form-control" value="{{ settings.opening_time }}">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Closes</label>
+            <input type="time" name="closing_time" class="form-control" value="{{ settings.closing_time }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Languages Spoken</label>
+            <input type="text" name="languages_spoken" class="form-control" value="{{ settings.languages_spoken }}" placeholder="en,ar,ur,zh">
+            <div class="form-text text-muted">Comma-separated 2-letter codes.</div>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Working Days</label>
+            <input type="text" name="working_days" class="form-control" value="{{ settings.working_days }}" placeholder="Monday,Tuesday,Wednesday,Thursday,Friday,Saturday">
+            <div class="form-text text-muted">Comma-separated English day names &mdash; only these are published.</div>
+          </div>
+        </div>
+        </div>
+        {% comment %}There used to be a third </div> here. It closed .tab-content
+           immediately after the Company pane, so the browser reparented the
+           other five panes out to the <form> as siblings. Bootstrap hides panes
+           with `.tab-content > .tab-pane { display: none }` — a CHILD selector —
+           so those five stopped being hidden and instead stacked up inside the
+           form as full-height transparent blocks. That was the enormous blank
+           gap under the Company tab.
+        {% endcomment %}
+        <div class="tab-pane fade" id="tab-invoicing" role="tabpanel">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-receipt me-2"></i>Tax Details</h5>
+        <div class="alert" style="background:rgba(176,132,33,.08);border:1px solid rgba(176,132,33,.28);color:var(--text-secondary);font-size:13px;">
+          <i class="bi bi-info-circle me-1"></i>
+          A UAE tax invoice must show your TRN for a VAT-registered customer to reclaim input tax.
+          Leave it blank if you are not VAT-registered &mdash; the invoice then says "Invoice" instead
+          of "Tax Invoice" and omits the TRN line entirely.
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-8">
+            <label class="form-label">Tax Registration Number (TRN)</label>
+            <input type="text" name="tax_registration_number" class="form-control" value="{{ settings.tax_registration_number }}" placeholder="100xxxxxxxxxxxx">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">VAT Percentage</label>
+            <div class="input-group">
+              <input type="number" name="vat_percentage" class="form-control" step="0.01" min="0" max="100" value="{{ settings.vat_percentage }}">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">%</span>
+            </div>
+            <div class="form-text text-muted">0 hides VAT entirely.</div>
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-bank me-2"></i>Bank Transfer Details</h5>
+        <div class="form-text text-muted mb-3">
+          Printed at the foot of every invoice. Without these, a customer who wants to pay has to
+          message you and ask &mdash; every single time.
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
+            <label class="form-label">Account Holder Name</label>
+            <input type="text" name="bank_account_name" class="form-control" value="{{ settings.bank_account_name }}">
+            <div class="form-text text-muted">Must match the bank records exactly, or transfers get rejected.</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Bank Name</label>
+            <input type="text" name="bank_name" class="form-control" value="{{ settings.bank_name }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Account Number</label>
+            <input type="text" name="bank_account_number" class="form-control" value="{{ settings.bank_account_number }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">IBAN</label>
+            <input type="text" name="bank_iban" class="form-control" value="{{ settings.bank_iban }}" placeholder="AE000000000000000000000">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">SWIFT / BIC</label>
+            <input type="text" name="bank_swift" class="form-control" value="{{ settings.bank_swift }}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Branch</label>
+            <input type="text" name="bank_branch" class="form-control" value="{{ settings.bank_branch }}">
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-hash me-2"></i>Invoice Numbering &amp; Terms</h5>
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <label class="form-label">Number Prefix</label>
+            <input type="text" name="invoice_prefix" class="form-control" value="{{ settings.invoice_prefix }}" placeholder="INV-">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Next Number</label>
+            <input type="number" name="next_invoice_number" class="form-control" min="1" value="{{ settings.next_invoice_number }}">
+            <div class="form-text text-muted">Can only be moved forward.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Zero Padding</label>
+            <input type="number" name="invoice_number_padding" class="form-control" min="0" max="10" value="{{ settings.invoice_number_padding }}">
+            <div class="form-text text-muted">4 gives INV-0001</div>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Default Payment Terms</label>
+            <select name="default_payment_terms" class="form-select">
+              {% for value, label in settings.PAYMENT_TERMS_CHOICES %}
+              <option value="{{ value }}" {% if settings.default_payment_terms == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text text-muted">Sets the due date on invoices and what counts as overdue on the dashboard.</div>
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Invoice Terms &amp; Notes</label>
+          <textarea name="invoice_terms" class="form-control" rows="4" placeholder="e.g. 30% deposit before production. Balance due before shipment.">{{ settings.invoice_terms }}</textarea>
+          <div class="form-text text-muted">Printed at the foot of every invoice. Leave blank to omit the section.</div>
+        </div>
+        </div>
+        <div class="tab-pane fade" id="tab-financial" role="tabpanel">
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-currency-exchange me-2"></i>Currency</h5>
         <div class="mb-4">
           <label class="form-label">Display Currency</label>
           <select name="currency" class="form-select">
@@ -91,7 +390,7 @@
         <hr style="border-color:var(--border-color);">
 
         
-        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-percent me-2"></i>Commission Settings</h5>
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-percent me-2"></i>Commission Settings</h5>
         <div class="mb-4">
           <label class="form-label">Commission Percentage (%)</label>
           <div class="input-group">
@@ -102,9 +401,115 @@
           <div class="form-text text-muted">Commission is automatically calculated on each new order total.</div>
         </div>
 
+                </div>
+        <div class="tab-pane fade" id="tab-marketing" role="tabpanel">
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-bar-chart me-2"></i>Homepage Figures</h5>
+        <div class="alert" style="background:rgba(234,88,12,.08);border:1px solid rgba(234,88,12,.25);color:var(--text-secondary);font-size:13px;">
+          <i class="bi bi-info-circle me-1"></i>
+          The homepage and About page used to show hardcoded figures — "500+ Products Sourced", "98% Quality Pass Rate",
+          "4.8/5 Client Rating" — that were never based on real data, and which contradicted each other between pages.
+          They have been removed. <strong>Each field below appears on the site only if you fill it in</strong>, so leaving
+          them blank is a perfectly good choice. Only enter numbers you could back up if a client asked.
+        </div>
+        <div class="row g-3 mb-4">
+          <div class="col-md-3">
+            <label class="form-label">Years operating in China</label>
+            <input type="text" name="stat_years_in_china" class="form-control" value="{{ settings.stat_years_in_china }}" placeholder="e.g. 7+">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Factories visited / verified</label>
+            <input type="text" name="stat_verified_suppliers" class="form-control" value="{{ settings.stat_verified_suppliers }}" placeholder="e.g. 200+">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Products sourced</label>
+            <input type="text" name="stat_products_sourced" class="form-control" value="{{ settings.stat_products_sourced }}" placeholder="e.g. 500+">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Active clients</label>
+            <input type="text" name="stat_active_clients" class="form-control" value="{{ settings.stat_active_clients }}" placeholder="e.g. 150+">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label">Quote response time</label>
+            <input type="text" name="stat_response_time" class="form-control" value="{{ settings.stat_response_time }}" placeholder="e.g. 24 hours">
+            <div class="form-text text-muted">A promise you make publicly — keep it one you can keep.</div>
+          </div>
+        </div>
+        <div class="form-text text-muted mb-4">
+          <i class="bi bi-camera me-1"></i>
+          To replace the stock photography with real photos of your team and the factories you visit, go to
+          <a href="/admin/settings_manager/siteimage/" target="_blank">Admin → Site Images</a>. This is the single
+          biggest trust improvement available on the site.
+        </div>
+
         <hr style="border-color:var(--border-color);">
 
-        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-facebook me-2"></i>Meta Ads Tracking</h5>
+        {% comment %}Sign-in status, read from the environment.
+
+           "Continue with Google" is hidden whenever either half of the OAuth
+           client is missing — which is correct, since a visible button that
+           leads to an error page is worse. But the hiding was SILENT: nothing
+           anywhere said the button was missing or why, so the only symptom was
+           "the Google button isn't appearing".
+
+           The credentials live in .env, never in the database, so this reports
+           them rather than editing them: the client secret is a password and
+           belongs in the environment, not in a form field a browser can read.
+        {% endcomment %}
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-box-arrow-in-right me-2"></i>Sign in with Google</h5>
+        <div class="mb-4">
+          {% if google_login_enabled %}
+          <div class="alert alert-success mb-2 py-2">
+            <i class="bi bi-check-circle-fill me-1"></i>
+            <strong>Active.</strong> The &ldquo;Continue with Google&rdquo; button is showing on the login and registration pages.
+          </div>
+          {% else %}
+          <div class="alert alert-warning mb-2 py-2">
+            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+            <strong>Off — the button is hidden.</strong> Both values below must be set in
+            <code>.env</code> before it appears.
+          </div>
+          {% endif %}
+          <div class="pdp-specs" style="columns:1;">
+            <div class="pdp-spec">
+              <span class="pdp-spec__k">GOOGLE_OAUTH_CLIENT_ID</span>
+              <span class="pdp-spec__v">{% if google_client_id_set %}Set{% else %}<span class="text-danger">Not set</span>{% endif %}</span>
+            </div>
+            <div class="pdp-spec">
+              <span class="pdp-spec__k">GOOGLE_OAUTH_CLIENT_SECRET</span>
+              <span class="pdp-spec__v">{% if google_client_secret_set %}Set{% else %}<span class="text-danger">Not set</span>{% endif %}</span>
+            </div>
+          </div>
+          <div class="form-text text-muted mt-2">
+            Set in <code>.env</code> and restart the app. Also register
+            <code>{{ settings.base_url }}/accounts/google/callback/</code> as an authorised redirect URI
+            in the Google Cloud console, and publish the consent screen — while it is in
+            <em>Testing</em> only listed test users can sign in.
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-google me-2"></i>Google Search &amp; Analytics</h5>
+        <div class="mb-3">
+          <label class="form-label">Google Analytics 4 Measurement ID</label>
+          <input type="text" name="google_analytics_id" class="form-control" value="{{ settings.google_analytics_id }}" placeholder="G-ABC1234XYZ">
+          <div class="form-text text-muted">
+            Find it in Google Analytics under <em>Admin → Data Streams → your web stream</em>. Leave blank to turn Google Analytics off completely.
+            Traffic from logged-in staff and admin accounts is excluded automatically so your own visits do not pollute the reports.
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Google Search Console Verification Token</label>
+          <input type="text" name="google_site_verification" class="form-control" value="{{ settings.google_site_verification }}" placeholder="3RkoOTP7mfg0BflX3FkOXH6Hg7yTVnXPqqs2cBqgvzI">
+          <div class="form-text text-muted">
+            From Search Console → <em>HTML tag</em> verification. You can paste the whole <code>&lt;meta&gt;</code> tag — only the token is stored.
+            <strong>Do not clear this field</strong> once the property is verified; removing it un-verifies the site and stops Search Console data.
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-facebook me-2"></i>Meta Ads Tracking</h5>
         <div class="mb-3">
           <label class="form-label">Meta (Facebook) Pixel ID</label>
           <input type="text" name="meta_pixel_id" class="form-control" value="{{ settings.meta_pixel_id }}" placeholder="e.g. 123456789012345">
@@ -123,7 +528,7 @@
 
         <hr style="border-color:var(--border-color);">
 
-        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-share me-2"></i>Social Media Links</h5>
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-share me-2"></i>Social Media Links</h5>
         <div class="row g-3 mb-4">
           <div class="col-md-6">
             <label class="form-label"><i class="bi bi-facebook me-1"></i> Facebook</label>
@@ -155,9 +560,9 @@
           </div>
         </div>
 
-        <hr style="border-color:var(--border-color);">
-
-        <h5 class="mb-3" style="color:var(--accent-3);font-weight:700;"><i class="bi bi-envelope-gear me-2"></i>Email / SMTP Configuration</h5>
+                </div>
+        <div class="tab-pane fade" id="tab-email" role="tabpanel">
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-envelope-gear me-2"></i>Email / SMTP Configuration</h5>
         <div class="mb-2" style="font-size:12px;color:var(--text-secondary);">
           Configure separate sender profiles for order updates, security notifications, and product news.
           Leave host/user/password empty to fall back to Django's default email backend.
@@ -198,7 +603,14 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Password</label>
-              <input type="password" name="email_smtp_password" class="form-control" value="{{ settings.email_smtp_password }}" placeholder="Leave blank to keep current">
+              <input type="password" name="email_smtp_password" class="form-control" autocomplete="new-password"
+                     placeholder="{% if settings.email_smtp_password %}Saved - leave blank to keep it{% else %}Not set{% endif %}">
+              {% if settings.email_smtp_password %}
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="clear_email_smtp_password" id="clear_email_smtp_password" value="1">
+                <label class="form-check-label small" for="clear_email_smtp_password">Remove the saved password</label>
+              </div>
+              {% endif %}
             </div>
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" name="email_use_tls" id="emailUseTls" value="1" {% if settings.email_use_tls %}checked{% endif %}>
@@ -228,7 +640,14 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Password</label>
-              <input type="password" name="security_email_smtp_password" class="form-control" value="{{ settings.security_email_smtp_password }}" placeholder="Leave blank to keep current">
+              <input type="password" name="security_email_smtp_password" class="form-control" autocomplete="new-password"
+                     placeholder="{% if settings.security_email_smtp_password %}Saved - leave blank to keep it{% else %}Not set{% endif %}">
+              {% if settings.security_email_smtp_password %}
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="clear_security_email_smtp_password" id="clear_security_email_smtp_password" value="1">
+                <label class="form-check-label small" for="clear_security_email_smtp_password">Remove the saved password</label>
+              </div>
+              {% endif %}
             </div>
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" name="security_email_use_tls" id="securityEmailUseTls" value="1" {% if settings.security_email_use_tls %}checked{% endif %}>
@@ -258,7 +677,14 @@
             </div>
             <div class="mb-3">
               <label class="form-label">Password</label>
-              <input type="password" name="news_email_smtp_password" class="form-control" value="{{ settings.news_email_smtp_password }}" placeholder="Leave blank to keep current">
+              <input type="password" name="news_email_smtp_password" class="form-control" autocomplete="new-password"
+                     placeholder="{% if settings.news_email_smtp_password %}Saved - leave blank to keep it{% else %}Not set{% endif %}">
+              {% if settings.news_email_smtp_password %}
+              <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="clear_news_email_smtp_password" id="clear_news_email_smtp_password" value="1">
+                <label class="form-check-label small" for="clear_news_email_smtp_password">Remove the saved password</label>
+              </div>
+              {% endif %}
             </div>
             <div class="form-check form-switch mb-2">
               <input class="form-check-input" type="checkbox" name="news_email_use_tls" id="newsEmailUseTls" value="1" {% if settings.news_email_use_tls %}checked{% endif %}>
@@ -267,9 +693,82 @@
           </div>
         </div>
 
+        </div>
+        <div class="tab-pane fade" id="tab-operations" role="tabpanel">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-inbox me-2"></i>Enquiry Alerts</h5>
+        <div class="mb-4">
+          <label class="form-label">Send New Enquiry Alerts To</label>
+          <input type="text" name="lead_notification_email" class="form-control" value="{{ settings.lead_notification_email }}" placeholder="sales@mudassirllc.com, you@mudassirllc.com">
+          <div class="form-text text-muted">
+            Comma-separated. Emailed the moment a website enquiry arrives, with the full message and
+            a reply-to set to the customer &mdash; so pressing Reply answers them directly.
+            Leave blank to fall back to the Security email sender.
+          </div>
+        </div>
+
         <hr style="border-color:var(--border-color);">
 
-        <button type="submit" class="btn-glow w-100"><i class="bi bi-floppy-fill me-1"></i> Save Settings</button>
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-sliders me-2"></i>Order Defaults</h5>
+        <div class="row g-3 mb-4">
+          <div class="col-md-4">
+            <label class="form-label">Quote Validity</label>
+            <div class="input-group">
+              <input type="number" name="quote_validity_days" class="form-control" min="0" max="365" value="{{ settings.quote_validity_days }}">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">days</span>
+            </div>
+            <div class="form-text text-muted">Freight rates move, so an open-ended quote can bind you to old prices.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Default Deposit</label>
+            <div class="input-group">
+              <input type="number" name="default_deposit_percentage" class="form-control" step="0.01" min="0" max="100" value="{{ settings.default_deposit_percentage }}">
+              <span class="input-group-text" style="background:var(--bg-input);border-color:var(--border-color);color:var(--text-secondary);">%</span>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Daily Order Cut-off</label>
+            <input type="time" name="order_cutoff_time" class="form-control" value="{{ settings.order_cutoff_time }}">
+            <div class="form-text text-muted">Blank if you do not work to one.</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Low Stock Threshold</label>
+            <input type="number" name="low_stock_threshold" class="form-control" min="0" value="{{ settings.low_stock_threshold }}">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Flag shipments stuck for (days)</label>
+            <input type="number" name="stale_shipment_days" class="form-control" min="0" max="365" value="{{ settings.stale_shipment_days }}">
+            <div class="form-text text-muted">
+              A shipment whose status has not changed in this many days appears on the
+              dashboard as needing attention. Sea consolidations sit still legitimately,
+              so tune it to how you actually ship. 0 turns the warning off.
+            </div>
+          </div>
+        </div>
+
+        <hr style="border-color:var(--border-color);">
+
+        <h5 class="mb-3" style="color:var(--text-primary);font-weight:700;"><i class="bi bi-chat-dots me-2"></i>Live Chat</h5>
+        <div class="mb-4">
+          <label class="form-label">Tawk.to Widget ID</label>
+          <input type="text" name="tawk_widget_id" class="form-control" value="{{ settings.tawk_widget_id }}" placeholder="6a46bc264b956a1d4cbbc178/1jsi4ttv4">
+          <div class="form-text text-muted">
+            The path from your Tawk.to embed code. <strong>Clearing this removes live chat</strong>
+            &mdash; and its third-party script &mdash; from the public site entirely.
+          </div>
+        </div>
+        </div>
+      </div>{# /.tab-content — closes here, after the LAST pane, not after the first #}
+
+        {% comment %}Sticky save bar. Always on screen, so a change made at the top
+           of a long tab never needs a scroll to save, and it says plainly when
+           something is not saved yet. Every tab saves together.{% endcomment %}
+        <div class="settings-savebar" id="settingsSaveBar">
+          <span class="settings-savebar-status" id="settingsSaveStatus">
+            <i class="bi bi-check2-circle me-1"></i>All changes saved
+          </span>
+          <button type="submit" class="btn-glow"><i class="bi bi-floppy-fill me-1"></i> Save Settings</button>
+        </div>
       </form>
     </div>
 
@@ -294,6 +793,95 @@
           <i class="bi bi-truck me-1"></i> Open Shipping Calculator
         </a>
       </div>
+    </div>
+
+
+    {% comment %}------------------------------------------------------------
+       TEAM MEMBERS
+
+       Outside #settingsForm on purpose. The tab panes above all live inside
+       that one form, and a nested <form> is invalid HTML — the browser drops
+       it and the inner fields end up submitting with the outer form. Team
+       members need their own multipart submit for the photo upload, so the
+       card sits alongside Shipping Companies, which is a collection for the
+       same reason.
+    ---------------------------------------------------------{% endcomment %}
+    <div class="glass-card mt-4">
+      <h6 style="color:var(--accent-3);font-weight:700;margin-bottom:6px;"><i class="bi bi-people me-2"></i>Team Members</h6>
+      <div style="font-size:12px;color:var(--text-secondary);margin-bottom:14px;">
+        Shown in &ldquo;Meet Our Team&rdquo; on the About page. The section is hidden
+        entirely while this list is empty &mdash; better nothing than placeholder people.
+      </div>
+
+      <div id="teamList" class="mb-3">
+        {% for m in team_members %}
+        <div class="d-flex align-items-center gap-2 mb-2 team-row" data-id="{{ m.id }}">
+          {% if m.photo %}
+            <img src="{{ m.photo.url }}" alt="" style="height:36px;width:36px;border-radius:50%;object-fit:cover;flex:0 0 auto;">
+          {% else %}
+            <span style="height:36px;width:36px;border-radius:50%;background:var(--bg-input);display:grid;place-items:center;font-size:12px;font-weight:700;color:var(--text-secondary);flex:0 0 auto;">{{ m.initials }}</span>
+          {% endif %}
+          <div class="flex-grow-1" style="font-size:14px;min-width:0;">
+            <strong>{{ m.name }}</strong>
+            <div style="font-size:12px;color:var(--text-secondary);">{{ m.role }}{% if not m.is_active %} &middot; hidden{% endif %}</div>
+          </div>
+          <button type="button" class="btn-ghost btn-sm px-2" title="Edit"
+                  onclick="editTeamMember({{ m.id }})"><i class="bi bi-pencil"></i></button>
+          <button type="button" class="btn-danger btn-sm px-2" title="Remove"
+                  onclick="deleteTeamMember({{ m.id }}, this)"><i class="bi bi-trash"></i></button>
+        </div>
+        {% empty %}
+        <div id="teamEmptyMsg" style="font-size:13px;color:var(--text-secondary);">
+          No team members yet. The About page is not showing a team section.
+        </div>
+        {% endfor %}
+      </div>
+
+      <hr style="border-color:var(--border-color);">
+      <div id="teamFormTitle" style="font-size:13px;font-weight:600;margin-bottom:8px;color:var(--text-secondary);">Add Team Member</div>
+      <form id="teamForm" onsubmit="submitTeamForm(event)" enctype="multipart/form-data">
+        <input type="hidden" name="member_id" id="teamMemberId" value="">
+        <div class="row g-2">
+          <div class="col-sm-6">
+            <input type="text" name="name" id="teamName" class="form-control form-control-sm" placeholder="Full name *" required maxlength="120">
+          </div>
+          <div class="col-sm-6">
+            <input type="text" name="role" id="teamRole" class="form-control form-control-sm" placeholder="Job title *" required maxlength="120">
+          </div>
+          <div class="col-12">
+            <input type="text" name="bio" id="teamBio" class="form-control form-control-sm" placeholder="One line about them (optional)" maxlength="250">
+          </div>
+          <div class="col-sm-6">
+            <input type="email" name="email" id="teamEmail" class="form-control form-control-sm" placeholder="Email (optional)">
+          </div>
+          <div class="col-sm-6">
+            <input type="url" name="linkedin_url" id="teamLinkedin" class="form-control form-control-sm" placeholder="LinkedIn URL (optional)">
+          </div>
+          <div class="col-sm-8">
+            <label class="form-label" style="font-size:11px;">Photo</label>
+            <input type="file" name="photo" id="teamPhoto" class="form-control form-control-sm" accept="image/*">
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">
+              A real photo. Square, around 600&times;600.
+            </div>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:11px;">Order</label>
+            <input type="number" name="sort_order" id="teamOrder" class="form-control form-control-sm" min="0" value="0">
+          </div>
+          <div class="col-12">
+            <label style="font-size:12px;display:flex;align-items:center;gap:6px;">
+              <input type="checkbox" name="is_active" id="teamActive" value="1" checked>
+              Show on the website
+            </label>
+          </div>
+        </div>
+        <div class="d-flex gap-2 mt-2">
+          <button type="submit" class="btn-glow btn-sm flex-grow-1" id="teamSubmitBtn">
+            <i class="bi bi-plus-lg me-1"></i> Add Member
+          </button>
+          <button type="button" class="btn-ghost btn-sm d-none" id="teamCancelBtn" onclick="resetTeamForm()">Cancel</button>
+        </div>
+      </form>
     </div>
 
     
@@ -381,8 +969,161 @@ function updateExchangePreview() {
 }
 updateExchangePreview();
 
-// Wire up AJAX form submission for the main settings form.
-ajaxSubmit('settingsForm', '/settings/', null);
+// Wire up AJAX form submission for the main settings form. On success the
+// "unsaved changes" state resets, and a password box is emptied again so a
+// second save does not resend it.
+ajaxSubmit('settingsForm', '/settings/', function () {
+    document.querySelectorAll('#settingsForm input[type=password]').forEach(function (i) { i.value = ''; });
+    document.querySelectorAll('#settingsForm input[name^="clear_"]').forEach(function (i) { i.checked = false; });
+    settingsMarkClean();
+});
+
+/* =============================================================================
+   EASIER SETTINGS: unsaved-changes tracking, remembered tab, find-a-setting
+   ========================================================================== */
+var SETTINGS_FORM = document.getElementById('settingsForm');
+var settingsDirty = false;
+
+function settingsTabButton(pane) {
+    return document.querySelector('.settings-tabs [data-bs-target="#' + pane.id + '"]');
+}
+
+function settingsMarkDirty(field) {
+    settingsDirty = true;
+    var bar = document.getElementById('settingsSaveBar');
+    bar.classList.add('is-dirty');
+    document.getElementById('settingsSaveStatus').innerHTML =
+        '<i class="bi bi-exclamation-circle me-1"></i>Unsaved changes';
+    // A dot on the tab that holds the change, so edits made on several tabs
+    // are not forgotten before saving.
+    var pane = field && field.closest('#settingsForm > .tab-content > .tab-pane');
+    var btn = pane && settingsTabButton(pane);
+    if (btn) { btn.classList.add('has-changes'); }
+}
+
+function settingsMarkClean() {
+    settingsDirty = false;
+    document.getElementById('settingsSaveBar').classList.remove('is-dirty');
+    document.getElementById('settingsSaveStatus').innerHTML =
+        '<i class="bi bi-check2-circle me-1"></i>All changes saved';
+    document.querySelectorAll('.settings-tabs .has-changes').forEach(function (b) {
+        b.classList.remove('has-changes');
+    });
+}
+
+SETTINGS_FORM.addEventListener('input', function (e) { settingsMarkDirty(e.target); });
+SETTINGS_FORM.addEventListener('change', function (e) { settingsMarkDirty(e.target); });
+
+window.addEventListener('beforeunload', function (e) {
+    if (!settingsDirty) { return; }
+    e.preventDefault();
+    e.returnValue = '';
+});
+
+// Remember the open tab in the address (#tab-email), so a reload, a shared link
+// or the back button returns to the same tab instead of always to Company.
+document.querySelectorAll('.settings-tabs [data-bs-toggle="tab"]').forEach(function (btn) {
+    btn.addEventListener('shown.bs.tab', function () {
+        try { history.replaceState(null, '', btn.getAttribute('data-bs-target')); }
+        catch (e) { /* not allowed on some embedded/preview origins - harmless */ }
+    });
+});
+(function restoreTab() {
+    var hash = window.location.hash;
+    if (!hash || !/^#tab-[a-z]+$/.test(hash)) { return; }
+    var btn = document.querySelector('.settings-tabs [data-bs-target="' + hash + '"]');
+    if (btn && window.bootstrap) { bootstrap.Tab.getOrCreateInstance(btn).show(); }
+})();
+
+// ── Find a setting ──────────────────────────────────────────────────────────
+// Indexes every labelled field once: its label, its help text, the section
+// heading above it and the tab it lives on.
+var SETTINGS_INDEX = (function buildIndex() {
+    var items = [];
+    document.querySelectorAll('#settingsForm > .tab-content > .tab-pane').forEach(function (pane) {
+        var btn = settingsTabButton(pane);
+        var tabName = btn ? btn.textContent.trim() : '';
+        var section = '';
+        pane.querySelectorAll('h5, h6, label.form-label, .form-check-label').forEach(function (el) {
+            if (el.matches('h5, h6')) { section = el.textContent.trim(); return; }
+            var block = el.closest('.mb-3, .mb-4, .mb-2, [class*="col-"]') || el.parentElement;
+            var field = block.querySelector('input:not([type=hidden]), select, textarea');
+            if (!field) { return; }
+            var help = block.querySelector('.form-text');
+            var label = el.textContent.replace(/\s+/g, ' ').replace(/\*$/, '').trim();
+            // The SMTP sub-tabs repeat the same labels, so say which profile.
+            var subPane = el.closest('.tab-pane:not(#' + pane.id + ')');
+            var subBtn = subPane && document.querySelector('[data-bs-target="#' + subPane.id + '"]');
+            items.push({
+                label: label,
+                where: [tabName, section, subBtn ? subBtn.textContent.trim() : ''].filter(Boolean).join(' › '),
+                haystack: (label + ' ' + section + ' ' + tabName + ' ' + (field.name || '') + ' ' +
+                           (help ? help.textContent : '')).toLowerCase(),
+                pane: pane, subBtn: subBtn, field: field
+            });
+        });
+    });
+    return items;
+})();
+
+function settingsJumpTo(item) {
+    var btn = settingsTabButton(item.pane);
+    if (btn && window.bootstrap) { bootstrap.Tab.getOrCreateInstance(btn).show(); }
+    if (item.subBtn && window.bootstrap) { bootstrap.Tab.getOrCreateInstance(item.subBtn).show(); }
+    // After the tab's fade-in, so the field is visible and focusable.
+    setTimeout(function () {
+        item.field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        item.field.focus({ preventScroll: true });
+        var block = item.field.closest('.mb-3, .mb-4, .mb-2, [class*="col-"]') || item.field;
+        block.classList.remove('settings-flash');
+        void block.offsetWidth;            // restart the highlight animation
+        block.classList.add('settings-flash');
+    }, 200);
+    document.getElementById('settingsSearchResults').hidden = true;
+}
+
+(function wireSearch() {
+    var input = document.getElementById('settingsSearch');
+    var box = document.getElementById('settingsSearchResults');
+    var current = [];
+
+    function render(query) {
+        var words = query.toLowerCase().split(/\s+/).filter(Boolean);
+        if (!words.length) { box.hidden = true; return; }
+        current = SETTINGS_INDEX.filter(function (it) {
+            return words.every(function (w) { return it.haystack.indexOf(w) !== -1; });
+        }).slice(0, 8);
+        box.innerHTML = current.length
+            ? current.map(function (it, i) {
+                return '<button type="button" class="settings-search-item" role="option" data-i="' + i + '">' +
+                       '<span class="settings-search-label">' + escapeText(it.label) + '</span>' +
+                       '<span class="settings-search-where">' + escapeText(it.where) + '</span></button>';
+              }).join('')
+            : '<div class="settings-search-empty">No setting matches “' + escapeText(query) + '”.</div>';
+        box.hidden = false;
+    }
+
+    function escapeText(t) {
+        var d = document.createElement('div');
+        d.textContent = t;
+        return d.innerHTML;
+    }
+
+    input.addEventListener('input', function () { render(input.value); });
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();             // never submit the settings form from here
+            if (current.length) { settingsJumpTo(current[0]); }
+        } else if (e.key === 'Escape') {
+            box.hidden = true;
+        }
+    });
+    box.addEventListener('mousedown', function (e) {
+        var item = e.target.closest('.settings-search-item');
+        if (item) { e.preventDefault(); settingsJumpTo(current[+item.getAttribute('data-i')]); }
+    });
+    input.addEventListener('blur', function () { setTimeout(function () { box.hidden = true; }, 150); });
+})();
 
 // ── Shipping Companies CRUD (Create, Read, Update, Delete) ────────────────────
 function renderSCRow(id, name, website) {
@@ -493,5 +1234,97 @@ function deleteSC(id, btn) {
             }
         });
 }
+
+// ── Team Members CRUD ────────────────────────────────────────────────────────
+// The people in "Meet Our Team" on the About page. Photos mean multipart, so
+// this posts a FormData rather than JSON.
+
+var TEAM_MEMBERS = {{ team_members_json|script_json }};
+
+function resetTeamForm() {
+    var f = document.getElementById('teamForm');
+    f.reset();
+    document.getElementById('teamMemberId').value = '';
+    document.getElementById('teamActive').checked = true;
+    document.getElementById('teamFormTitle').textContent = 'Add Team Member';
+    document.getElementById('teamSubmitBtn').innerHTML = '<i class="bi bi-plus-lg me-1"></i> Add Member';
+    document.getElementById('teamCancelBtn').classList.add('d-none');
+}
+
+function editTeamMember(id) {
+    var m = TEAM_MEMBERS.filter(function (x) { return x.id === id; })[0];
+    if (!m) return;
+    document.getElementById('teamMemberId').value = m.id;
+    document.getElementById('teamName').value = m.name;
+    document.getElementById('teamRole').value = m.role;
+    document.getElementById('teamBio').value = m.bio || '';
+    document.getElementById('teamEmail').value = m.email || '';
+    document.getElementById('teamLinkedin').value = m.linkedin_url || '';
+    document.getElementById('teamOrder').value = m.sort_order;
+    document.getElementById('teamActive').checked = !!m.is_active;
+    // The file input is deliberately left empty: leaving it blank keeps the
+    // existing photo, so editing a job title cannot wipe someone's picture.
+    document.getElementById('teamPhoto').value = '';
+    document.getElementById('teamFormTitle').textContent = 'Editing ' + m.name;
+    document.getElementById('teamSubmitBtn').innerHTML = '<i class="bi bi-check-lg me-1"></i> Save Changes';
+    document.getElementById('teamCancelBtn').classList.remove('d-none');
+    document.getElementById('teamForm').scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function submitTeamForm(e) {
+    e.preventDefault();
+    var form = document.getElementById('teamForm');
+    var id = document.getElementById('teamMemberId').value;
+    var btn = document.getElementById('teamSubmitBtn');
+    var original = btn.innerHTML;
+
+    var fd = new FormData(form);
+    // An unchecked checkbox sends nothing at all, which the view would read as
+    // "no value" rather than "false". Say it explicitly.
+    if (!document.getElementById('teamActive').checked) fd.set('is_active', '0');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Saving...';
+
+    var url = id ? '/settings/team/' + id + '/save/' : '/settings/team/add/';
+    fetch(url, { method: 'POST', body: fd, headers: { 'X-CSRFToken': getCookie('csrftoken') } })
+        .then(function (r) {
+            return r.text().then(function (body) {
+                try { return JSON.parse(body); }
+                catch (err) { return { success: false, message: 'Server error ' + r.status + '.' }; }
+            });
+        })
+        .then(function (res) {
+            showToast(res.message || (res.success ? 'Saved' : 'Could not save'),
+                      res.success ? 'success' : 'error');
+            if (res.success) { setTimeout(function () { window.location.reload(); }, 700); }
+        })
+        .catch(function () { showToast('Could not reach the server', 'error'); })
+        .then(function () { btn.disabled = false; btn.innerHTML = original; });
+}
+
+function deleteTeamMember(id, btn) {
+    var row = btn.closest('.team-row');
+    var name = row ? row.querySelector('strong').textContent : 'this person';
+    if (!confirm('Remove ' + name + ' from the website?')) return;
+
+    fetch('/settings/team/' + id + '/delete/', {
+        method: 'POST', headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+        .then(function (r) { return r.json(); })
+        .then(function (res) {
+            showToast(res.message || 'Removed', res.success ? 'success' : 'error');
+            if (res.success && row) {
+                row.remove();
+                if (!document.querySelectorAll('.team-row').length) {
+                    document.getElementById('teamList').innerHTML =
+                        '<div style="font-size:13px;color:var(--text-secondary);">' +
+                        'No team members yet. The About page is not showing a team section.</div>';
+                }
+            }
+        })
+        .catch(function () { showToast('Could not reach the server', 'error'); });
+}
+
 </script>
 {% endblock %}

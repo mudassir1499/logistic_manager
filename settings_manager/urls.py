@@ -129,4 +129,33 @@ urlpatterns = [
     # Usually requires confirmation to prevent accidental deletion.
     # -------------------------------------------------------------------------
     path('shipping-companies/<int:company_id>/delete/', views.shipping_company_delete, name='shipping_company_delete'),
+
+    # -------------------------------------------------------------------------
+    # RATE REQUEST SHEETS
+    # -------------------------------------------------------------------------
+    # The workbook a freight forwarder fills in: one per company per method, one
+    # tab per destination country, one row per cargo type. `?method=air|sea`
+    # selects which - they are separate documents because forwarders quote them
+    # separately, weeks apart, and the columns differ.
+    # -------------------------------------------------------------------------
+    path('shipping-companies/<int:company_id>/rate-request/',
+         views.rate_request_download, name='rate_request_download'),
+    path('shipping-companies/<int:company_id>/rate-request/import/',
+         views.rate_request_upload, name='rate_request_upload'),
+
+    # Everything configured, as one table — "do we have a sea rate for beauty
+    # products to Saudi?" is no longer answerable by looking at a single form.
+    path('rate-matrix/', views.rate_matrix, name='rate_matrix'),
+
+    # -------------------------------------------------------------------------
+    # TEAM MEMBERS
+    # -------------------------------------------------------------------------
+    # The people in "Meet Our Team" on the About page. Managed from Settings so
+    # the owner can put their real colleagues on the site — the section used to
+    # be three names hardcoded into the template with stock photographs.
+    # -------------------------------------------------------------------------
+    path('team/', views.team_member_list, name='team_member_list'),
+    path('team/add/', views.team_member_save, name='team_member_add'),
+    path('team/<int:member_id>/save/', views.team_member_save, name='team_member_save'),
+    path('team/<int:member_id>/delete/', views.team_member_delete, name='team_member_delete'),
 ]

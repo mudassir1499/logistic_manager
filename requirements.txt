@@ -1,10 +1,22 @@
+# Anthropic SDK — powers the server-side extraction mode of the 1688
+# browser extension (utils/llm.py). Optional at runtime: the extension's
+# DOM-only and Ollama modes never import it.
+anthropic==0.120.2
 asgiref==3.11.1
 brotli==1.2.0
 cffi==2.0.0
 charset-normalizer==3.4.7
 cssselect2==0.9.0
+# Django itself was missing from this file. Every one of its dependencies was
+# pinned here (asgiref, sqlparse) but not the framework, so a clean
+# `pip install -r requirements.txt` produced a virtualenv that could not start
+# the project. Pinned to the version this project is developed and tested against.
 Django==4.2.30
-django-unfold==0.98.0
+# django-unfold removed: it is not in INSTALLED_APPS and is imported nowhere
+# in this project, and version 0.98.0 requires django>=5.2 while this
+# project pins Django 4.2.30. Listing it made `pip install -r
+# requirements.txt` fail outright with ResolutionImpossible - so a clean
+# deploy could not install its dependencies at all.
 et_xmlfile==2.0.0
 flake8==7.3.0
 fonttools==4.62.1
@@ -27,3 +39,13 @@ weasyprint==68.1
 webencodings==0.5.1
 whitenoise==6.12.0
 zopfli==0.4.1
+
+# --- REST API (/api/v1/) -----------------------------------------------------
+# All three are pure Python with no C extensions, so they install on cPanel
+# without a compiler. djangorestframework is the API itself; django-filter backs
+# the ?field= query filtering; drf-spectacular generates the OpenAPI schema and
+# the /api/v1/docs/ page from the code, so the documentation cannot drift away
+# from the endpoints the way a hand-written page does.
+djangorestframework==3.16.1
+django-filter==24.3
+drf-spectacular==0.28.0

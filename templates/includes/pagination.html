@@ -1,11 +1,17 @@
+{% comment %}Shared pager.
 
+    Every query parameter except `page` is carried onto the links. It used to
+    name q/status/assignment explicitly, which meant any filter added later
+    silently reset itself the moment somebody turned the page — the products
+    list's category and per_page controls were about to do exactly that.
+{% endcomment %}
 {% if page_obj and page_obj.paginator.num_pages > 1 %}
 <nav aria-label="Page navigation" class="d-flex justify-content-center mt-4">
     <ul class="pagination pagination-sm">
-        
+
         {% if page_obj.has_previous %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}" aria-label="Previous page" role="button" tabindex="0">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key|urlencode }}={{ value|urlencode }}{% endif %}{% endfor %}" aria-label="Previous page" role="button" tabindex="0">
                 <i class="bi bi-chevron-left"></i>
             </a>
         </li>
@@ -15,7 +21,7 @@
         </li>
         {% endif %}
 
-        
+
         {% for num in page_obj.paginator.page_range %}
             {% if num == page_obj.number %}
             <li class="page-item active" aria-current="page">
@@ -23,15 +29,15 @@
             </li>
             {% elif num > page_obj.number|add:-3 and num < page_obj.number|add:3 %}
             <li class="page-item">
-                <a class="page-link" href="?page={{ num }}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}" aria-label="Go to page {{ num }}" role="button" tabindex="0">{{ num }}</a>
+                <a class="page-link" href="?page={{ num }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key|urlencode }}={{ value|urlencode }}{% endif %}{% endfor %}" aria-label="Go to page {{ num }}" role="button" tabindex="0">{{ num }}</a>
             </li>
             {% endif %}
         {% endfor %}
 
-        
+
         {% if page_obj.has_next %}
         <li class="page-item">
-            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}{% if request.GET.status %}&status={{ request.GET.status|urlencode }}{% endif %}" aria-label="Next page" role="button" tabindex="0">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in request.GET.items %}{% if key != 'page' %}&amp;{{ key|urlencode }}={{ value|urlencode }}{% endif %}{% endfor %}" aria-label="Next page" role="button" tabindex="0">
                 <i class="bi bi-chevron-right"></i>
             </a>
         </li>

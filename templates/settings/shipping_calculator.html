@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load script_json %}
 
 {% block title %}Shipping Calculator — Logistic Manager{% endblock %}
 {% block nav_shipping %}active{% endblock %}
@@ -102,6 +103,30 @@
             </div>
           </div>
         </div>
+        <hr style="border-color:var(--border-color);margin:10px 0;">
+
+        {% comment %}The rates above are per KG and per CBM. These three decide
+           WHICH kilograms and cubic metres get charged, so they belong on the
+           same form — a forwarder quoting 22/kg on a 5000 divisor is dearer than
+           one quoting 26/kg on 6000 for the same carton, and comparing the rate
+           columns alone would pick the wrong one.{% endcomment %}
+        <div class="row g-2 mb-3">
+          <div class="col-12"><div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;">Volumetric Rule &amp; Minimums</div></div>
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:11px;">Volumetric Divisor</label>
+            <input type="number" name="volumetric_divisor" class="form-control form-control-sm" step="1" min="0" value="{{ sc.volumetric_divisor }}" placeholder="0 = default">
+            <div style="font-size:10px;color:var(--text-secondary);margin-top:2px;">6000 = IATA, 5000 = express</div>
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:11px;">Min Air Weight (KG)</label>
+            <input type="number" name="min_chargeable_kg" class="form-control form-control-sm" step="0.01" min="0" value="{{ sc.min_chargeable_kg }}" placeholder="0 = default">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label" style="font-size:11px;">Min Sea Volume (CBM)</label>
+            <input type="number" name="min_cbm" class="form-control form-control-sm" step="0.001" min="0" value="{{ sc.min_cbm }}" placeholder="0 = default">
+          </div>
+        </div>
+
         <div class="d-flex gap-2 mt-2">
           <button type="submit" class="btn-glow btn-sm flex-grow-1"><i class="bi bi-floppy-fill me-1"></i> Save Rates for {{ sc.name }}</button>
           <button type="button" class="btn-ghost btn-sm" onclick="downloadSheet({{ sc.id }}, '{{ sc.name|escapejs }}')"><i class="bi bi-file-earmark-excel me-1"></i> Excel</button>
@@ -111,6 +136,60 @@
           </label>
         </div>
       </form>
+
+      {% comment %}------------------------------------------------------------
+         RATE REQUEST SHEETS
+
+         The form above edits the eight legacy fields, which between them cover
+         two countries and two cargo types. These buttons produce the document
+         you actually send a forwarder: one tab per destination country, one row
+         per cargo type, and the volumetric divisor and minimums asked for
+         explicitly rather than assumed.
+
+         Air and sea are separate files because forwarders quote them
+         separately, usually weeks apart and often from different desks.
+         ---------------------------------------------------------{% endcomment %}
+      <hr style="border-color:var(--border-color);margin:14px 0 10px;">
+      <div style="font-size:11px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;">
+        Rate Request Sheets
+      </div>
+      <div style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;">
+        Send these to {{ sc.name }} to fill in. Every destination and cargo type,
+        with rates already on file pre-filled.
+      </div>
+
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="d-flex gap-1">
+            <a class="btn-ghost btn-sm flex-grow-1 text-center"
+               href="{% url 'rate_request_download' sc.id %}?method=air"
+               style="text-decoration:none;">
+              <i class="bi bi-airplane me-1"></i> Air sheet
+            </a>
+            <label class="btn-ghost btn-sm mb-0" style="cursor:pointer;" title="Import a completed air rate sheet">
+              <i class="bi bi-box-arrow-in-down"></i>
+              <input type="file" accept=".xlsx,.xlsm" hidden
+                     onchange="importRateRequest({{ sc.id }}, 'air', this)">
+            </label>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="d-flex gap-1">
+            <a class="btn-ghost btn-sm flex-grow-1 text-center"
+               href="{% url 'rate_request_download' sc.id %}?method=sea"
+               style="text-decoration:none;">
+              <i class="bi bi-water me-1"></i> Sea sheet
+            </a>
+            <label class="btn-ghost btn-sm mb-0" style="cursor:pointer;" title="Import a completed sea rate sheet">
+              <i class="bi bi-box-arrow-in-down"></i>
+              <input type="file" accept=".xlsx,.xlsm" hidden
+                     onchange="importRateRequest({{ sc.id }}, 'sea', this)">
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="rate-import-result" data-company="{{ sc.id }}"
+           style="font-size:11px;margin-top:8px;display:none;"></div>
     </div>
   </div>
   {% endfor %}
@@ -216,7 +295,7 @@
 <script>
 // CALC_COMPANIES is a JavaScript array of company objects with their rate data.
 // It's passed from Django using the |safe filter (prevents HTML escaping of JSON).
-var CALC_COMPANIES = {{ shipping_companies_json|safe }};
+var CALC_COMPANIES = {{ shipping_companies_json|script_json }};
 var CALC_CURRENCY = '{{ settings.currency }}';
 
 // Get the rates for the currently selected company in the calculator.
@@ -436,5 +515,73 @@ document.querySelectorAll('.company-rates-form').forEach(function(form) {
             });
     });
 });
+
+/* ---------------------------------------------------------------------------
+   RATE REQUEST IMPORT
+
+   Reads a completed rate sheet back into the rate table. Unlike the older
+   sheet import above, this reports WHAT changed rather than just succeeding:
+   the useful outcome of an import is the rows that did not land, and a plain
+   "imported!" hides exactly that.
+   ------------------------------------------------------------------------ */
+function importRateRequest(companyId, method, input) {
+    if (!input.files || !input.files[0]) return;
+
+    var panel = document.querySelector('.rate-import-result[data-company="' + companyId + '"]');
+    var fd = new FormData();
+    fd.append('sheet', input.files[0]);
+    fd.append('method', method);
+
+    if (panel) {
+        panel.style.display = 'block';
+        panel.innerHTML = '<span style="color:var(--text-secondary);">Reading ' + method + ' sheet…</span>';
+    }
+
+    fetch('/settings/shipping-companies/' + companyId + '/rate-request/import/', {
+        method: 'POST',
+        body: fd,
+        headers: { 'X-CSRFToken': getCookie('csrftoken') }
+    })
+        /* Read as text and parse by hand: a 413 or a 500 arrives as an HTML
+           error page, and calling .json() on that throws a parse error that
+           surfaces as "Network error" - sending someone to check their wifi
+           over a server-side problem. */
+        .then(function (r) {
+            return r.text().then(function (body) {
+                try { return JSON.parse(body); }
+                catch (e) { return { success: false, message: 'Server error ' + r.status + '. The file was not imported.' }; }
+            });
+        })
+        .then(function (res) {
+            showToast(res.message || (res.success ? 'Imported' : 'Import failed'),
+                      res.success ? 'success' : 'error');
+            if (panel) { panel.innerHTML = renderImportReport(res); }
+            /* Reload so the rate fields above show what was just imported.
+               Leaving stale numbers on screen after an import is how someone
+               concludes it did not work and uploads the file again. */
+            if (res.success) { setTimeout(function () { window.location.reload(); }, 1800); }
+        })
+        .catch(function () {
+            showToast('Could not reach the server', 'error');
+            if (panel) { panel.innerHTML = '<span style="color:#c0392b;">Could not reach the server.</span>'; }
+        })
+        .then(function () { input.value = ''; });
+}
+
+/* Turn the import report into something readable. Unmatched rows are listed in
+   full - they are the only part that needs anyone to do something. */
+function renderImportReport(res) {
+    if (!res.success) {
+        return '<span style="color:#c0392b;">' + (res.message || 'Import failed.') + '</span>';
+    }
+    var d = res.detail || {};
+    var html = '<span style="color:#1e8449;">' + (res.message || 'Imported.') + '</span>';
+    if (d.unmatched && d.unmatched.length) {
+        html += '<div style="color:#b8860b;margin-top:4px;">Not matched: '
+             + d.unmatched.join('; ') + '</div>';
+    }
+    return html;
+}
+
 </script>
 {% endblock %}

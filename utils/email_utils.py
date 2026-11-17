@@ -13,7 +13,9 @@ EMAIL_BACKEND (console in development, SMTP in production) so the site keeps
 working during setup.
 """
 
-from django.core.mail import send_mail, get_connection
+# EmailMultiAlternatives is used only when a reply_to is requested; send_mail()
+# does not expose that header.
+from django.core.mail import send_mail, get_connection, EmailMultiAlternatives
 from django.conf import settings as django_settings
 
 from settings_manager.models import CompanySettings
@@ -55,7 +57,7 @@ def get_email_connection(email_type='order_status'):
 
 
 def send_typed_email(email_type, subject, message, recipient_list, html_message=None,
-                     from_email=None, fail_silently=True):
+                     from_email=None, fail_silently=True, reply_to=None):
     """
     Send an email using the SMTP profile matching the requested type.
 
@@ -68,6 +70,11 @@ def send_typed_email(email_type, subject, message, recipient_list, html_message=
         from_email (str, optional): Override the profile's from address.
         fail_silently (bool): If True, suppress email errors. Default True to avoid
                               breaking order flows when SMTP is misconfigured.
+        reply_to (list, optional): Addresses that receive replies instead of
+                              `from_email`. Used by the new-lead alert so that
+                              pressing Reply answers the customer directly rather
+                              than the company's own inbox — which turns a
+                              three-step follow-up into one.
 
     Returns:
         int: Number of messages sent (0 or more).
@@ -82,6 +89,23 @@ def send_typed_email(email_type, subject, message, recipient_list, html_message=
 
     try:
         connection = get_email_connection(email_type)
+
+        # send_mail() has no reply_to parameter, so the richer EmailMultiAlternatives
+        # is used only when one is supplied. Existing callers keep the exact code
+        # path they had before.
+        if reply_to:
+            email = EmailMultiAlternatives(
+                subject=subject,
+                body=message,
+                from_email=from_email,
+                to=recipient_list,
+                reply_to=reply_to,
+                connection=connection,
+            )
+            if html_message:
+                email.attach_alternative(html_message, 'text/html')
+            return email.send(fail_silently=fail_silently)
+
         return send_mail(
             subject=subject,
             message=message,

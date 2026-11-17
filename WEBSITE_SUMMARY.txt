@@ -1,0 +1,200 @@
+================================================================================
+MUDASSIR LLC - PLATFORM SUMMARY
+mudassirllc.com | Django 4.2.30 | MySQL/MariaDB | cPanel
+Generated 10 August 2026
+================================================================================
+
+1. WHAT THIS IS
+--------------------------------------------------------------------------------
+A China sourcing and logistics platform for UAE and Gulf buyers. It does four
+jobs that are usually four separate systems:
+
+  * A public, search-indexable product catalogue that wins customers.
+  * A customer portal where those customers order, track and pay.
+  * A back office where staff run products, orders, shipping and accounts.
+  * A browser extension that pulls products off 1688.com straight into the
+    catalogue.
+
+Prices are held in RMB. Sourcing happens in China; selling happens in the Gulf.
+
+
+2. SIZE
+--------------------------------------------------------------------------------
+  Django apps               9
+  Database models          34
+  URL routes              420
+  Python files            234
+  HTML templates          100
+  Extension JS files       13
+  REST API endpoints       45
+
+  Live data (local MySQL copy, 10 Aug 2026):
+    127 products (721 variants) across 10 categories
+    8 customers, 11 orders, 40 ledger entries, 11 user accounts
+
+
+3. THE NINE APPS
+--------------------------------------------------------------------------------
+accounts     Profile, AuditLog, ApiToken
+             Unified login for everyone. A Profile gives each User a role
+             (admin / staff / support / customer) plus per-module permissions.
+             One rule runs through the whole system: an API token never grants
+             more than the person it belongs to already has.
+
+products     Category, SubCategory, Product, ProductImage, ProductVariant,
+             ProductAttribute, PriceAdjustment
+             The catalogue. Products carry variants (colour, size), free-form
+             attributes, images (uploaded or CDN-linked), and a supplier URL
+             that customers must never see. Bulk price adjustments are logged.
+
+customers    Customer, CustomerProduct
+             The business record behind a login, plus products assigned
+             privately to one customer.
+
+orders       Order, OrderItem, OrderExtraCost, OrderNote, Notification,
+             ShipmentStatus
+             Orders start as drafts so staff can price freight. Each line
+             freezes the price it was bought at, so a later catalogue price
+             change cannot rewrite an order already placed.
+
+khata        LedgerEntry
+             The account book ("khata"). Multi-currency credits and debits per
+             customer with running balances, PDF statements and CSV import
+             and export.
+
+portal       CartItem, ProductRequest, BlogPost, BlogCategory, PortfolioItem,
+             ContactMessage, PasswordResetRequest, ProductRequestImage
+             The public site and customer portal: catalogue, cart, checkout,
+             blog, portfolio, "please source this for me" requests.
+
+support      Ticket, TicketMessage, TicketAttachment
+             Support desk. Internal notes are invisible to customers.
+
+settings_manager  CompanySettings, ShippingCompany, SiteImage
+             Company details, three separate SMTP profiles (order status,
+             security, news), freight rate cards, site imagery.
+
+noon_labels  LabelBatch
+             Label generation for Noon marketplace shipments.
+
+
+4. WHAT THE SITE DOES
+--------------------------------------------------------------------------------
+PUBLIC
+  Catalogue browsable and indexable without an account (schema.org JSON-LD,
+  Open Graph, sitemaps, canonical URLs). Login is required only to order.
+  Product detail pages with variants, specifications and social sharing.
+  Blog, portfolio, contact form. Arabic pages alongside English.
+
+CUSTOMERS
+  Register with email and password, or "Continue with Google".
+  Cart and checkout; commission is added on top of the goods subtotal.
+  Order history and shipment tracking; ledger balance per currency;
+  support tickets; product sourcing requests; notifications.
+  Placing an order generates a WhatsApp click-to-chat link to the admin.
+
+STAFF
+  Products: create, edit, bulk-select across a whole filter (not just the
+  page on screen), bulk category assignment, bulk percentage price
+  adjustments up or down, CSV import and export, catalogue export by
+  category, price-change history.
+  Orders: statuses, payments, shipments, invoices, packing lists, quotations.
+  Khata: entries, per-currency balances, PDF statements, CSV import/export.
+  Customers, users and roles, settings, freight calculators, Noon labels.
+  On the public catalogue, staff also see a "Supplier" button linking to the
+  1688 listing. The URL is never written into the page for anyone else.
+
+
+5. THE 1688 BROWSER EXTENSION
+--------------------------------------------------------------------------------
+Chrome Manifest V3. Runs on 1688.com product pages and pushes into the site
+over a bearer token.
+
+  Reads the product data 1688 embeds as JSON in the page rather than scraping
+  rendered HTML, which survives layout changes and captures weight and carton
+  dimensions the page never displays.
+  Captures variants, specifications and images; optional AI title translation.
+  Creates categories on the site from the panel; caches the taxonomy so it
+  works offline.
+  Pushes in batches of 10, so a failure costs one batch and pressing the
+  button again resumes rather than starting over.
+  Duplicate detection matches the LISTING URL, not the product name - the
+  same offer scraped twice under a translated title is now recognised.
+
+  Exports: Excel, CSV, SQL.
+
+
+6. THE REST API (/api/v1/)
+--------------------------------------------------------------------------------
+45 endpoints. Interactive docs at /api/v1/docs/, OpenAPI schema at
+/api/v1/schema/. Authenticate with:  Authorization: Bearer <token>
+
+  Auth        register, login, logout, password reset, password change
+  Catalogue   products, categories (public read; staff write)
+  Commerce    cart, cart summary, checkout, orders, shipments
+  Accounts    me, customers, ledger, tickets, product requests, notifications
+  Content     blog, portfolio, company info, contact
+  Staff       order updates, price adjustments, audit log, label batches,
+              shipping companies
+
+Design rules:
+  Scoping is by ROWS, not fields. A customer asking for another customer's
+  order gets 404, not 403 - a 403 would confirm the record exists.
+  Deny by default: an endpoint added without a permission line is locked.
+  Money serialises as strings, never floats.
+  Ownership always comes from the token, never from the request body.
+  Orders are read-only through the API; checkout goes through the same code
+  the website uses, so the two can never drift apart.
+
+
+7. SECURITY POSTURE
+--------------------------------------------------------------------------------
+  Role-based permissions shared by the web UI and the API - one source of
+  truth, so they cannot disagree.
+  API tokens stored as SHA-256 hashes; individually named and revocable.
+  Supplier URLs are gated server-side, never hidden with CSS.
+  Rate limiting on the API (600/min read, 120/min write, 20/min auth).
+  CSRF protection on all state-changing browser requests.
+  SSRF guards on server-side image downloads: CDN allowlist plus a
+  resolved-IP check.
+  HTTPS enforced in production with secure cookies and HSTS.
+  X-Frame-Options DENY; CORS off by default and allowlist-only.
+  Google sign-in restricted to customer accounts; staff keep password + OTP.
+
+
+8. DEPLOYMENT STATUS - IMPORTANT
+--------------------------------------------------------------------------------
+RUNNING LOCALLY on MySQL/MariaDB with real data. Verified end to end.
+
+NOT YET DEPLOYED. Nothing in this work has been committed to git, and the
+live site at mudassirllc.com is still running the previous version.
+
+  29 migrations have never been applied to production.
+  requirements.txt gained three packages, so production needs
+    pip install -r requirements.txt  (the first release that needs it).
+  Static files must be re-collected; they are hash-named, so without it
+    browsers keep serving the old JavaScript.
+  The production database still needs the collation fix, which is what
+    breaks CSV product uploads there.
+
+Still outstanding, and only you can do these:
+  Add the Google OAuth client secret to the server .env.
+  Publish the Google consent screen - it is in Testing, so only listed
+    test users can sign in.
+  Replace the placeholder WhatsApp number in Settings.
+
+Full step-by-step instructions are in DEPLOY.md, Part A.
+
+
+9. KNOWN GAPS
+--------------------------------------------------------------------------------
+  No automated test suite in the repository. Everything has been verified,
+  but nothing stops a future change silently breaking a permission rule.
+  This is the highest-value next piece of work for a system handling money.
+
+  The API has never run against production MySQL, only local.
+
+  File uploads are not part of API checkout; label PDFs are attached through
+  the website.
+
+================================================================================

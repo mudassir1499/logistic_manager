@@ -106,9 +106,19 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', '').strip()
 # Always set DEBUG=False before deploying to a live server.
 # -------------------------------------------------------------------------
 # Read from the DJANGO_DEBUG environment variable so production can disable it
-# without a code change. Defaults to True for local development.
-# Set DJANGO_DEBUG=0 on the production server (see .env.example).
-DEBUG = env_bool('DJANGO_DEBUG', True)
+# without a code change. Set DJANGO_DEBUG=1 in your local .env for development.
+#
+# This used to read `DEBUG = True`, hard-coded, directly under a comment claiming
+# it came from the environment. The server's .env has said DJANGO_DEBUG=0 the
+# whole time and was being ignored, so production ran in debug mode: full stack
+# traces and SQL on any error page, ALLOWED_HOSTS unenforced, and — because the
+# three flags further down derive from `not DEBUG` — the secure-cookie and
+# SSL-redirect settings all silently off.
+#
+# The default is False, not True. A missing or misspelled environment variable
+# should fail safe (a developer notices a missing debug page immediately; nobody
+# notices a production site quietly running in debug).
+DEBUG = env_bool('DJANGO_DEBUG', False)
 
 # -------------------------------------------------------------------------
 # SECRET_KEY enforcement
@@ -177,13 +187,6 @@ INSTALLED_APPS = [
     # -------------------------------------------------------------------------
     # DJANGO BUILT-IN APPS (required for core functionality)
     # -------------------------------------------------------------------------
-    # admin      - The Django admin panel at /admin/ for managing database records
-    # auth       - User authentication: login, logout, password management, groups
-    # contenttypes - Content type framework that allows generic relationships
-    # sessions   - Session management (stores user session data server-side)
-    # messages   - One-time flash messages ("Order saved successfully!")
-    # staticfiles - Collects static files (CSS, JS, images) into one folder
-    # -------------------------------------------------------------------------
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -195,19 +198,19 @@ INSTALLED_APPS = [
     'django.contrib.humanize',   # Template filters like intcomma for money formatting
 
     # -------------------------------------------------------------------------
+    # THIRD-PARTY
+    # -------------------------------------------------------------------------
+    # Django REST Framework powers /api/v1/. It is listed before the project
+    # apps because its app registry supplies the templates for the browsable
+    # API, and a project template of the same name should win over it.
+    'rest_framework',
+    'django_filters',
+    'drf_spectacular',
+
+    # -------------------------------------------------------------------------
     # PROJECT CUSTOM APPS (our business logic)
     # -------------------------------------------------------------------------
-    # Each app handles one domain of the logistics business:
-    # products        - Product catalog, supplier quotes, bulk uploads
-    # customers       - Customer directory, assignments, quotations
-    # orders          - Order creation, invoices, packing lists, payments
-    # khata           - Ledger/accounting system ("Khata" = account book in Urdu/Hindi)
-    # noon_labels     - Shipping label generation for Noon marketplace
-    # settings_manager - Company settings, shipping calculators, shipping companies
-    # portal          - Public website pages + customer login portal
-    # accounts        - Unified auth: roles (admin/staff/support/customer) + module permissions
-    # support         - Support-ticket system (customer requests + support-desk queue)
-    # -------------------------------------------------------------------------
+    'api',
     'accounts',
     'products',
     'customers',
@@ -217,32 +220,37 @@ INSTALLED_APPS = [
     'settings_manager',
     'portal',
     'support',
+    'quotes',
 ]
 
 # =============================================================================
-# MIDDLEWARE
+# SITES FRAMEWORK
 # =============================================================================
-# Middleware is a pipeline of processing hooks that Django runs for EVERY
-# request and response. Each middleware class can modify the request on the way
-# IN to the view, and modify the response on the way OUT. They run in order
-# for requests, and in REVERSE order for responses.
+# django.contrib.sites is installed above, but SITE_ID was never set. Without it
+# Django resolves the current Site from the request's Host header — so a request
+# arriving with a hostname that has no matching Site row (e.g. www.mudassirllc.com
+# when only mudassirllc.com is registered, or a health check hitting the server IP)
+# raises Site.DoesNotExist and returns a 500 from /sitemap.xml. Google retries a
+# failing sitemap only a limited number of times before it stops trusting it.
 #
-# SecurityMiddleware      - Adds HTTPS redirects, HSTS headers, XSS filters
-# SessionMiddleware       - Attaches session data to every request (via cookie)
-# CommonMiddleware        - URL rewriting, appending slashes, handling ETags
-# CsrfViewMiddleware      - Validates CSRF tokens on POST/PUT/DELETE requests
-# AuthenticationMiddleware - Attaches the user object to the request
-# MessageMiddleware       - Adds flash messages to the response context
-# XFrameOptionsMiddleware - Prevents clickjacking by setting X-Frame-Options
+# Pinning SITE_ID to the single configured row (mudassirllc.com) makes sitemap
+# generation deterministic and host-independent.
+# =============================================================================
+SITE_ID = 1
+
+# =============================================================================
+# MIDDLEWARE
 # =============================================================================
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # WhiteNoise serves collected static files directly from the Python app with
     # correct caching headers. It must sit immediately after SecurityMiddleware.
-    # This is a safety net: Apache normally serves /static/ from public_html via
-    # .htaccess, but if that rewrite is wrong the CSS still loads instead of 404ing.
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    # Sits high so a CORS preflight is answered before CommonMiddleware can
+    # redirect it (APPEND_SLASH turns a preflight into a 301, which a browser
+    # reports as a CORS failure) and before any view can 405 it.
+    'api.middleware.ApiCorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -253,50 +261,31 @@ MIDDLEWARE = [
 # =============================================================================
 # URL CONFIGURATION
 # =============================================================================
-# ROOT_URLCONF tells Django where to find the root URL routing table.
-# When a request comes in, Django loads this module and looks for the
-# `urlpatterns` list inside it. The value is a Python module path string.
-# =============================================================================
 ROOT_URLCONF = 'logistic_manager.urls'
 
 # =============================================================================
 # TEMPLATE CONFIGURATION
 # =============================================================================
-# Django uses a template engine to render HTML files with dynamic data.
-# The context dictionary from views is injected into the template, and
-# template tags (like {{ variable }} or {% for item in list %}) produce
-# the final HTML. DjangoTemplates is the built-in engine (Jinja2-like syntax).
-# =============================================================================
 TEMPLATES = [
     {
-        # BACKEND: Which template engine to use. DjangoTemplates is the default.
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-
-        # DIRS: List of directories where Django looks for templates, OUTSIDE of apps.
-        # BASE_DIR / 'templates' means: look in the project_root/templates/ folder.
-        # App-level templates are found automatically because APP_DIRS=True.
         'DIRS': [BASE_DIR / 'templates'],
-
-        # APP_DIRS: If True, Django also looks inside each app's templates/ folder.
-        # This lets each app bundle its own templates (e.g., products/templates/)
         'APP_DIRS': True,
-
-        # OPTIONS: Extra configuration for the template engine.
         'OPTIONS': {
-            # context_processors are functions that automatically add data to
-            # every template's context. They save you from repeating common data
-            # in every view function.
             'context_processors': [
-                # request processor: makes the HttpRequest object available in templates
                 'django.template.context_processors.request',
-                # auth processor: makes user, is_authenticated, etc. available in templates
                 'django.contrib.auth.context_processors.auth',
-                # messages processor: makes flash messages available in templates
                 'django.contrib.messages.context_processors.messages',
-                # role/permission processor: exposes the current user's role and
-                # per-module permission flags (nav_perms) so the back-office nav
-                # can show only the sections a user is allowed to use.
                 'accounts.context_processors.role_permissions',
+                # Makes the singleton CompanySettings row available as `settings`
+                # in every template. base.html builds the whole SEO head (meta
+                # tags, JSON-LD, GA4 tag, Search Console verification) from it,
+                # so it must never be missing. Lazily evaluated — no query unless
+                # a template actually uses it.
+                'portal.context_processors.site_settings',
+                # Owner-uploaded photographs, keyed by page slot. Templates fall
+                # back to bundled stock imagery for any slot not yet filled.
+                'portal.context_processors.site_images',
             ],
         },
     },
@@ -305,59 +294,26 @@ TEMPLATES = [
 # =============================================================================
 # WSGI APPLICATION ENTRY POINT
 # =============================================================================
-# WSGI (Web Server Gateway Interface) is the Python standard for connecting
-# web servers to Python web applications. When a web server (Apache, Nginx,
-# Gunicorn) receives an HTTP request, it passes it to the WSGI application.
-# This setting points to the module that exposes the `application` callable.
-# See logistic_manager/wsgi.py for the actual implementation.
-# =============================================================================
 WSGI_APPLICATION = 'logistic_manager.wsgi.application'
 
 
 # =============================================================================
 # DATABASE CONFIGURATION
 # =============================================================================
-# Django supports multiple database backends: SQLite, PostgreSQL, MySQL, Oracle.
-# For production on cPanel, we use MySQL because it is robust, scalable,
-# and supported by cPanel hosting providers.
-#
-# ENGINE: The Django database backend module to use.
-# NAME:    The database name created in cPanel MySQL.
-# USER:    The MySQL username.
-# PASSWORD: The MySQL password (should ideally come from environment variables).
-# HOST:    'localhost' means the database runs on the same server as the app.
-# PORT:    '3306' is the standard MySQL port.
-# OPTIONS: Extra MySQL-specific settings.
-# =============================================================================
-# If DB_NAME is set we connect to MySQL (production on cPanel); otherwise we fall
-# back to the local SQLite file so development needs no configuration at all.
 DB_NAME = os.environ.get('DB_NAME', '').strip()
 
 if DB_NAME:
     DATABASES = {
         'default': {
-            # PyMySQL is installed as MySQLdb at the top of this file, so Django's
-            # standard mysql backend works without the mysqlclient C extension
-            # (which frequently fails to build on cPanel shared hosting).
             'ENGINE': 'django.db.backends.mysql',
             'NAME': DB_NAME,
             'USER': os.environ.get('DB_USER', '').strip(),
             'PASSWORD': os.environ.get('DB_PASSWORD', ''),
-            # Some cPanel hosts route 'localhost' through a unix socket that the
-            # Python app cannot see; if connections fail, try '127.0.0.1'.
             'HOST': os.environ.get('DB_HOST', 'localhost').strip(),
             'PORT': os.environ.get('DB_PORT', '3306').strip(),
             'CONN_MAX_AGE': int(os.environ.get('DB_CONN_MAX_AGE', '60')),
             'OPTIONS': {
-                # utf8mb4 is REQUIRED, not optional, for this project. MySQL's
-                # legacy 'utf8' is only 3 bytes per character and cannot store
-                # 4-byte characters. Ledger descriptions in this system contain
-                # Chinese text and emoji pasted from WhatsApp; on a 3-byte utf8
-                # column those raise an error or are silently truncated.
-                # The database and its tables must also be utf8mb4 — see DEPLOY.md.
                 'charset': 'utf8mb4',
-                # STRICT_TRANS_TABLES makes MySQL reject bad values instead of
-                # silently coercing them (e.g. truncating an over-long field).
                 'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
             },
             'TEST': {
@@ -369,23 +325,14 @@ if DB_NAME:
 else:
     DATABASES = {
         'default': {
-            'ENGINE': 'django.db.backends.sqlite3',   # Local development default
-            'NAME': BASE_DIR / 'db.sqlite3',          # Local SQLite database file
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
         }
     }
 
 
 # =============================================================================
 # PASSWORD VALIDATION
-# =============================================================================
-# These validators run when a user sets or changes their password. Django
-# checks the password against ALL validators in this list. They protect against
-# weak passwords that attackers could guess or brute-force.
-#
-# UserAttributeSimilarityValidator - Prevents passwords similar to username/email
-# MinimumLengthValidator           - Requires at least 8 characters
-# CommonPasswordValidator          - Rejects commonly used passwords (e.g., "password123")
-# NumericPasswordValidator         - Rejects purely numeric passwords (e.g., "12345678")
 # =============================================================================
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -406,56 +353,56 @@ AUTH_PASSWORD_VALIDATORS = [
 # =============================================================================
 # INTERNATIONALIZATION (i18n) SETTINGS
 # =============================================================================
-# Django can translate content into multiple languages. These settings control
-# the default language, timezone, and whether translation is enabled.
-# =============================================================================
-
-# LANGUAGE_CODE: The default language for the project. 'en-us' = US English.
-# Django uses this for automatic translations, date formats, and number formatting.
 LANGUAGE_CODE = 'en-us'
-
-# TIME_ZONE: The default timezone for date/time display. 'UTC' is the safest
-# default because it avoids daylight saving time confusion. In production,
-# you might set this to the company's local timezone (e.g., 'Asia/Dubai').
 TIME_ZONE = 'UTC'
-
-# USE_I18N: Enable Django's internationalization framework. If True, Django
-# will look for translation files (.po/.mo) and can serve content in different
-# languages based on user preferences.
 USE_I18N = True
-
-# USE_TZ: Enable timezone-aware datetime handling. If True, Django stores all
-# datetimes in UTC in the database and converts them to the local timezone
-# when displaying. This is the modern, recommended approach.
 USE_TZ = True
 
 
 # =============================================================================
 # STATIC FILES (CSS, JavaScript, Images)
 # =============================================================================
-# Static files are files that don't change per request: CSS stylesheets,
-# JavaScript files, images, fonts. Django collects them from all apps and
-# puts them into a single folder for efficient serving.
-#
-# STATIC_URL: The URL prefix that browsers use to request static files.
-#             Example: /static/css/style.css maps to the filesystem.
-# STATICFILES_DIRS: Additional directories to search for static files, besides
-#                   each app's static/ folder. Here we add the project-level static/.
-# STATIC_ROOT: The absolute filesystem path where `python manage.py collectstatic`
-#              copies all static files. For cPanel, this points to public_html/static
-#              so the web server can serve them directly.
-# =============================================================================
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']     # Project-level static folder
 
-# Where `collectstatic` writes. On cPanel this points into public_html so Apache
-# can serve the files directly; override with DJANGO_STATIC_ROOT if your host
-# uses a different document root.
-STATIC_ROOT = Path(os.environ.get('DJANGO_STATIC_ROOT', BASE_DIR / 'public_html/static'))
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
-# WhiteNoise storage: appends a content hash to each filename and compresses it,
-# so browsers cache aggressively but pick up changes immediately after a deploy.
-# Plain StorageClass in DEBUG to avoid needing collectstatic during development.
+# -------------------------------------------------------------------------
+# STATIC_ROOT — where `collectstatic` writes the built files.
+# -------------------------------------------------------------------------
+# This MUST point at the directory Apache actually serves /static/ from, which
+# on this cPanel account is the document root:
+#
+#     DJANGO_STATIC_ROOT=/home/mudassirllc/public_html/static
+#
+# That matters because public_html/.htaccess serves any file that exists on disk
+# directly, before the request ever reaches Django:
+#
+#     RewriteCond %{REQUEST_FILENAME} !-f
+#     RewriteRule ^(.*)$ /passenger_wsgi.py/$1 [L]
+#
+# So /static/style.css is answered by public_html/static/style.css and never
+# touches Django or WhiteNoise. This line previously read:
+#
+#     STATIC_ROOT = BASE_DIR / 'staticfiles'   # "bypass the cPanel env variable"
+#
+# which sent collectstatic to ~/logistic_manager/staticfiles — a directory Apache
+# never reads. The result was that public_html/static kept whatever build was
+# copied there by hand, and no amount of collectstatic could update the live CSS.
+# Three stale generations had accumulated there.
+#
+# The default below is only for local development, where nothing serves the
+# directory and the value is unimportant.
+STATIC_ROOT = Path(os.environ.get('DJANGO_STATIC_ROOT', BASE_DIR / 'staticfiles'))
+
+_resolved_static_dirs = [Path(p).resolve() for p in STATICFILES_DIRS]
+for _dir in _resolved_static_dirs:
+    if STATIC_ROOT == _dir or STATIC_ROOT in _dir.parents or _dir in STATIC_ROOT.parents:
+        raise ImproperlyConfigured(
+            f"STATIC_ROOT ({STATIC_ROOT}) overlaps with a STATICFILES_DIRS "
+            f"entry ({_dir}). They must point to completely separate "
+            f"directories."
+        )
+
 if not DEBUG:
     STORAGES = {
         'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
@@ -465,109 +412,48 @@ if not DEBUG:
 # =============================================================================
 # MEDIA FILES (User Uploads)
 # =============================================================================
-# Media files are user-uploaded content: product images, PDFs, invoices.
-# Unlike static files, these are uploaded at runtime and stored on disk.
-# They should NEVER be inside the project code folder.
-#
-# MEDIA_URL: The URL prefix for uploaded files. In templates, you use
-#             {{ object.image.url }} to get a URL like /media/products/photo.jpg.
-# MEDIA_ROOT: The absolute filesystem path where uploaded files are stored.
-#             For cPanel, this is in public_html so the web server can serve them.
-# =============================================================================
 MEDIA_URL = '/media/'
-# Product images and uploaded labels. On cPanel point this at public_html/media
-# via DJANGO_MEDIA_ROOT so Apache serves uploads without going through Django.
 MEDIA_ROOT = Path(os.environ.get('DJANGO_MEDIA_ROOT', BASE_DIR / 'media'))
 
 
 # =============================================================================
 # SECURITY SETTINGS FOR PRODUCTION
 # =============================================================================
-# These settings harden the application against common web attacks.
-# They are essential when DEBUG=False and the site is publicly accessible.
-# =============================================================================
-
-# -------------------------------------------------------------------------
-# HTTPS / COOKIE SECURITY
-# -------------------------------------------------------------------------
-# These switch on automatically once DEBUG is False, so a production deploy is
-# secure by default rather than depending on someone remembering to uncomment
-# lines. If SSL is not active on the domain yet, set DJANGO_SECURE_SSL=0 in .env
-# to postpone the HTTPS redirect — but turn it back on as soon as the
-# certificate is installed.
-# -------------------------------------------------------------------------
 USE_HTTPS = env_bool('DJANGO_SECURE_SSL', not DEBUG)
 
-# Only transmit session and CSRF cookies over HTTPS.
 SESSION_COOKIE_SECURE = USE_HTTPS
 CSRF_COOKIE_SECURE = USE_HTTPS
-
-# Redirect any plain-HTTP request to HTTPS.
 SECURE_SSL_REDIRECT = USE_HTTPS
 
-# cPanel/Apache terminates SSL and forwards the original scheme in this header.
-# Without it Django sees plain HTTP behind the proxy and would redirect forever.
 if USE_HTTPS:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    # HSTS tells browsers to only ever use HTTPS for this domain. Start with a
-    # short max-age; raise it once you are confident SSL is stable, because
-    # browsers cache this and it cannot be easily undone.
     SECURE_HSTS_SECONDS = int(os.environ.get('DJANGO_HSTS_SECONDS', '3600'))
     SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool('DJANGO_HSTS_SUBDOMAINS', False)
     SECURE_HSTS_PRELOAD = False
 
-# Block JavaScript from reading the session cookie (defends against XSS theft).
 SESSION_COOKIE_HTTPONLY = True
-
-# Don't send the full URL as a referrer to other sites.
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
-
-# SECURE_BROWSER_XSS_FILTER: Adds the X-XSS-Protection header to tell browsers
-# to enable their built-in XSS filter. This is a defense-in-depth measure.
 SECURE_BROWSER_XSS_FILTER = True
-
-# SECURE_CONTENT_TYPE_NOSNIFF: Adds the X-Content-Type-Options: nosniff header.
-# This prevents browsers from MIME-sniffing a response away from the declared
-# content type. For example, it stops a browser from treating a JS file as HTML.
 SECURE_CONTENT_TYPE_NOSNIFF = True
-
-# X_FRAME_OPTIONS: Controls whether this site can be displayed inside an iframe.
-# 'DENY' means the site CANNOT be embedded in ANY iframe. This prevents
-# clickjacking attacks where a malicious site tricks users into clicking
-# hidden elements on your page.
 X_FRAME_OPTIONS = 'DENY'
 
 # =============================================================================
 # CACHING CONFIGURATION
 # =============================================================================
-# Django's caching framework stores expensive-to-compute data in fast temporary
-# storage so it doesn't need to be recalculated on every request. This improves
-# page load times and reduces database load.
-#
-# We use the database cache backend because it works on all hosting environments
-# (including cPanel shared hosting) without requiring Redis or Memcached daemons.
-# The cache table is created with: python manage.py createcachetable
-# =============================================================================
 CACHES = {
     'default': {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'django_cache_table',
-        'TIMEOUT': 300,  # Default cache expiration: 5 minutes (300 seconds)
+        'TIMEOUT': 300,  
         'OPTIONS': {
-            'MAX_ENTRIES': 1000,  # Maximum number of cache entries before pruning
-            'CULL_FREQUENCY': 3,  # When pruning, remove 1/3 of the oldest entries
+            'MAX_ENTRIES': 1000, 
+            'CULL_FREQUENCY': 3, 
         },
     }
 }
 
 # =============================================================================
 # DEFAULT PRIMARY KEY FIELD TYPE
-# =============================================================================
-# All existing tables were created with the classic 32-bit AutoField primary
-# key. Declaring it explicitly silences Django's models.W042 warnings and
-# prevents makemigrations from generating unwanted BigAutoField migrations
-# for every model. New projects would normally use BigAutoField, but changing
-# it here would require migrating every existing table.
 # =============================================================================
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
@@ -578,43 +464,138 @@ DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 # access a protected page without being logged in. It points at the single
 # unified login (accounts app), which then redirects each user to the right home
 # based on their role (admin/staff → dashboard, support → queue, customer → portal).
-# LOGIN_REDIRECT_URL / LOGOUT_REDIRECT_URL are fallbacks; the login view computes
-# a role-aware destination itself.
 # =============================================================================
 LOGIN_URL = '/accounts/login/'
-LOGIN_REDIRECT_URL = '/dashboard/'
-LOGOUT_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/'
+
 
 # =============================================================================
-# SITES FRAMEWORK
+# REQUEST BODY SIZE
 # =============================================================================
-# SITE_ID is used by django.contrib.sites to identify the current site.
-# The sitemap framework uses this to generate absolute URLs.
-# =============================================================================
-SITE_ID = 1
-
-# =============================================================================
-# EMAIL CONFIGURATION
-# =============================================================================
-# Django supports multiple email backends: console (development), SMTP (production),
-# file-based (testing), and third-party services. The backend is loaded dynamically
-# from the CompanySettings model at runtime so the admin can configure it without
-# editing code or restarting the server.
+# Django's default is 2.5 MB, and it applies to the whole JSON body — this is
+# not the file-upload limit, which is separate.
 #
-# For local development, the console backend prints emails to the terminal instead
-# of sending them over the network. This is safe and requires no external setup.
-# For production, the admin sets the SMTP host, port, username, and password in
-# the Settings page, and the system switches to the SMTP backend automatically.
+# The extension's import endpoint posts product photos as base64 INSIDE the JSON
+# body, so 2.5 MB is exceeded by a handful of listings and the batch is rejected
+# with RequestDataTooBig before any of the import code runs.
+#
+# The extension downscales every photo to at most 1400px before sending, which
+# keeps a typical batch comfortably inside this. The ceiling is raised, not
+# removed: an unbounded body on shared hosting is a memory-exhaustion button,
+# and every endpoint that accepts one here is behind a bearer token.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 20 * 1024 * 1024      # 20 MB
+
+# Unrelated to the above but easy to confuse with it: this is the point at which
+# an uploaded FILE stops being held in memory and is streamed to a temp file.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024       # 5 MB
+
+
 # =============================================================================
+# REST API (/api/v1/)
+# =============================================================================
+REST_FRAMEWORK = {
+    # Bearer tokens first, because that is what a script or mobile app sends.
+    # SessionAuthentication is kept second so a staff user who is already logged
+    # into the site gets the browsable API without minting a token - it is a
+    # genuinely useful way to explore the endpoints. It is second, not first, so
+    # a request carrying BOTH a session cookie and a bearer token is judged by
+    # the token, which is the narrower credential.
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'api.authentication.ApiTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    # Deny by default. Every endpoint then opts into being more open, so a view
+    # added later without a permission_classes line is locked rather than public
+    # - the failure mode is a support request, not a data leak.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'api.pagination.StandardPagination',
+    'PAGE_SIZE': 25,
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Rate limiting. The API is reachable from anywhere with a token, and the
+    # import endpoints do real work per call (image downloads, price rewrites).
+    # These are deliberately generous - they exist to stop a runaway script, not
+    # to ration normal use.
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.ScopedRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'read': '600/min',
+        'write': '120/min',
+        'auth': '20/min',
+    },
+    # ISO-8601 in, ISO-8601 out. Locale-dependent formats in an API are a
+    # standing bug: 03/04/2026 means two different days depending on the reader.
+    'DATETIME_FORMAT': 'iso-8601',
+    'DATE_FORMAT': 'iso-8601',
+}
 
-# Default email backend: console for development, safe fallback.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Mudassir LLC API',
+    'DESCRIPTION': (
+        'JSON API for the sourcing and logistics platform: catalogue, orders, '
+        'customers, ledger and support. Authenticate with '
+        '`Authorization: Bearer <token>`; tokens are issued at /accounts/api-tokens/ '
+        'and carry exactly the permissions of the account that owns them.'
+    ),
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SORT_OPERATIONS': False,
+    # Four different models have a "status" field with four different choice
+    # sets. Left to resolve the collision itself, the generator invents names
+    # like "StatusAceEnum" - and client code generated from this schema inherits
+    # them as type names, which nobody can read. Naming them explicitly here is
+    # what makes the generated SDK legible.
+    'ENUM_NAME_OVERRIDES': {
+        'OrderStatusEnum': 'orders.models.Order.STATUS_CHOICES',
+        'ShipmentStatusEnum': 'orders.models.ShipmentStatus.STATUS_CHOICES',
+        'TicketStatusEnum': 'support.models.Ticket.STATUS_CHOICES',
+        'ProductRequestStatusEnum': 'portal.models.ProductRequest.STATUS_CHOICES',
+    },
+}
 
-# Default "From" email address. If the admin hasn't configured a from address
-# in CompanySettings, this fallback is used.
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'orders@mudassirllc.com')
 
-# Email timeout in seconds. Prevents the application from hanging if the SMTP
-# server is slow or unreachable.
-EMAIL_TIMEOUT = 15
+# =============================================================================
+# GOOGLE SIGN-IN
+# =============================================================================
+# Credentials for the OAuth 2.0 client created in the Google Cloud console.
+#
+# These live in the environment, never in this file. The client secret is a
+# password: anything holding it can mint sign-ins as this application, and a
+# secret committed to git has to be treated as burned even after it is removed,
+# because the history keeps it.
+#
+# Leave them unset and Google sign-in simply does not appear - the button is
+# hidden and password login is unaffected. That is what makes it safe to deploy
+# this code before the console side is configured.
+#
+# The authorised redirect URI to register in the console is:
+#     https://<your domain>/accounts/google/callback/
+# It must match exactly, including the trailing slash.
+# =============================================================================
+# Browser origins allowed to call /api/v1/ cross-origin. Empty by default:
+# a native mobile app does not need this, and turning it on should be a
+# deliberate act naming a specific site. See api/middleware.py.
+API_CORS_ORIGINS = env_list('DJANGO_API_CORS_ORIGINS', [])
 
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get('GOOGLE_OAUTH_CLIENT_ID', '').strip()
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET', '').strip()
+
+
+# Django tags an error message 'error', and every template here renders alerts
+# as `alert-{{ m.tags }}` - but Bootstrap's class is .alert-danger, so
+# `alert-error` matched no rule and errors rendered as unstyled text while
+# success and warning looked correct. Mapping the tag fixes every one of those
+# templates at once rather than editing the class in each.
+from django.contrib.messages import constants as _message_constants
+
+MESSAGE_TAGS = {
+    _message_constants.ERROR: 'danger',
+}

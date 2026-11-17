@@ -24,18 +24,18 @@
     <meta property="og:title" content="{% block og_title %}LogiManager Admin{% endblock %}">
     <meta property="og:description" content="Internal China sourcing management dashboard for products, orders, customers, and suppliers.">
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://mudassirllc.com{{ request.path }}">
-    <meta property="og:image" content="https://mudassirllc.com/static/images/og-default.png">
+    <meta property="og:url" content="{{ settings.base_url }}{{ request.path }}">
+    <meta property="og:image" content="{{ settings.base_url }}/static/images/og-default.png">
     <meta property="og:site_name" content="LogiManager">
 
     
     <meta name="twitter:card" content="summary">
     <meta name="twitter:title" content="{% block twitter_title %}LogiManager Admin{% endblock %}">
     <meta name="twitter:description" content="Internal China sourcing management dashboard for products, orders, customers, and suppliers.">
-    <meta name="twitter:image" content="https://mudassirllc.com/static/images/og-default.png">
+    <meta name="twitter:image" content="{{ settings.base_url }}/static/images/og-default.png">
 
     
-    <link rel="canonical" href="https://mudassirllc.com{{ request.path }}">
+    <link rel="canonical" href="{{ settings.base_url }}{{ request.path }}">
 
     
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -49,7 +49,40 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
     
-    <link rel="stylesheet" href="{% static 'style.css' %}?v=warm">
+    {% comment %}The ?v= query is a cache-buster: browsers keep a stylesheet until
+       its URL changes, so returning users would otherwise sit on the old indigo
+       theme indefinitely. Bump this string whenever the palette changes.{% endcomment %}
+    <link rel="stylesheet" href="{% static 'style.css' %}?v=admin-layout-1">
+
+    {% comment %}Brand palette for canvas-drawn charts. This MUST stay in <head>:
+       the Chart.js blocks on the dashboard and reports pages are inline partway
+       down the document, above the bottom-of-body main.js, so a palette defined
+       any later would be undefined when those charts build.{% endcomment %}
+    <script src="{% static 'brand.js' %}?v=mono-gold"></script>
+
+    {% comment %}
+      INSTALLABLE BACK OFFICE
+      -----------------------
+      These four tags are the whole difference between a website and something
+      that sits on the home screen with its own icon and no browser chrome.
+      Android's install prompt requires a manifest with a 192px and a 512px
+      icon, a start_url, display:standalone, and a registered service worker —
+      all of which are here.
+
+      Linked from the STAFF shell only. The customer portal has its own base
+      template and is left alone: "install our shop" and "install our internal
+      tool" are different offers, and one manifest cannot make both.
+    {% endcomment %}
+    {% comment %}manifest.json, not manifest.webmanifest. The .webmanifest
+       extension is what the spec prefers, but WhiteNoise serves it as
+       application/octet-stream and Safari then refuses the manifest outright,
+       so "Add to Home Screen" never appears. .json is served as
+       application/json, which every browser accepts for a manifest.{% endcomment %}
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#0A0A0A">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
 </head>
 <body>
     
@@ -61,9 +94,18 @@
     
     <aside class="sidebar" id="sidebar">
         
+        {% comment %}The brand mark used to be a 📦 emoji beside the hard-coded name
+           "LogiManager". An emoji renders as a different glyph on every OS, and the
+           placeholder name contradicted the company name shown everywhere else on
+           the site. Both now come from the real brand: the star mark from the logo,
+           and the company name from CompanySettings, exactly as the public portal
+           header does. width/height are fixed so the sidebar cannot shift while the
+           image loads.{% endcomment %}
         <div class="sidebar-brand">
-            <div class="brand-icon">📦</div>  
-            <span class="brand-text">LogiManager</span>  
+            <img src="{% if settings.logo %}{{ settings.logo.url }}{% else %}{% static 'images/icon-192.png' %}{% endif %}"
+                 alt="" width="30" height="30" class="brand-icon"
+                 style="border-radius:8px;object-fit:contain;" loading="eager" decoding="async">
+            <span class="brand-text">{{ settings.company_name|default:"LogiManager" }}</span>
         </div>
         
         
@@ -79,45 +121,37 @@
         
         <nav class="sidebar-nav" id="sidebarNav">
             
-            <div class="nav-section-title">Main</div>
+            {% comment %}Grouped by the job, not by the app the view lives in.
+
+               The section names deliberately mirror Profile.MODULES, the same
+               list that grants access — so somebody with only the `orders`
+               module sees one whole coherent section instead of pieces of four.
+            {% endcomment %}
+
+            <div class="nav-section-title">Overview</div>
             <a href="/dashboard/" class="sidebar-link {% block nav_dashboard %}{% endblock %}" id="nav-dashboard">
-                <i class="bi bi-grid-1x2-fill"></i>  
+                <i class="bi bi-grid-1x2-fill"></i>
                 <span class="link-text">Dashboard</span>
             </a>
-
-
-            {# Each management group is shown only if the logged-in user's role
-               grants the matching module (see accounts.context_processors). #}
-            {% if nav_perms.products or nav_perms.customers or nav_perms.orders or nav_perms.khata %}
-            <div class="nav-section-title">Management</div>
-            {% endif %}
-
-            {% if nav_perms.products %}
-            <a href="/products/" class="sidebar-link {% block nav_products %}{% endblock %}" id="nav-products">
-                <i class="bi bi-box-seam-fill"></i>
-                <span class="link-text">Products</span>
+            {% if nav_perms.orders %}
+            <a href="/orders/reports/" class="sidebar-link {% block nav_reports %}{% endblock %}" id="nav-reports">
+                <i class="bi bi-bar-chart-fill"></i>
+                <span class="link-text">Reports</span>
             </a>
             {% endif %}
 
-            {% if nav_perms.customers %}
-            <a href="/customers/" class="sidebar-link {% block nav_customers %}{% endblock %}" id="nav-customers">
-                <i class="bi bi-people-fill"></i>
-                <span class="link-text">Customers</span>
-            </a>
-            <a href="/portal/admin/customers/" class="sidebar-link {% block nav_customer_mgmt %}{% endblock %}" id="nav-customer-mgmt">
-                <i class="bi bi-person-gear"></i>
-                <span class="link-text">Customer Accounts</span>
-            </a>
-            <a href="/portal/admin/requests/" class="sidebar-link {% block nav_requests %}{% endblock %}" id="nav-requests">
-                <i class="bi bi-clipboard-check"></i>
-                <span class="link-text">Product Requests</span>
-            </a>
-            <a href="/portal/admin/portfolio/" class="sidebar-link {% block nav_portfolio %}{% endblock %}" id="nav-portfolio">
-                <i class="bi bi-collection-play"></i>
-                <span class="link-text">Portfolio</span>
+            {% comment %}Fulfilment: everything between a placed order and goods
+               leaving. Noon labels belong here rather than under "Tools" — it is
+               a step in shipping an order, not a utility.{% endcomment %}
+            {% if nav_perms.orders or nav_perms.quotes or nav_perms.noon_labels %}
+            <div class="nav-section-title">Orders &amp; Fulfilment</div>
+            {% endif %}
+            {% if nav_perms.quotes %}
+            <a href="/quotes/" class="sidebar-link {% block nav_quotes %}{% endblock %}" id="nav-quotes">
+                <i class="bi bi-file-earmark-text-fill"></i>
+                <span class="link-text">Quotations</span>
             </a>
             {% endif %}
-
             {% if nav_perms.orders %}
             <a href="/orders/" class="sidebar-link {% block nav_orders %}{% endblock %}" id="nav-orders">
                 <i class="bi bi-cart-check-fill"></i>
@@ -127,36 +161,15 @@
                 <i class="bi bi-shop"></i>
                 <span class="link-text">Amazon Orders</span>
             </a>
-            <a href="/orders/reports/" class="sidebar-link {% block nav_reports %}{% endblock %}" id="nav-reports">
-                <i class="bi bi-bar-chart-fill"></i>
-                <span class="link-text">Reports</span>
+            <a href="/orders/logistics/" class="sidebar-link {% block nav_logistics %}{% endblock %}" id="nav-logistics">
+                <i class="bi bi-truck"></i>
+                <span class="link-text">Logistics Orders</span>
             </a>
             <a href="/orders/packing-list/" class="sidebar-link {% block nav_packing %}{% endblock %}" id="nav-packing">
                 <i class="bi bi-clipboard2-check-fill"></i>
                 <span class="link-text">Packing List</span>
             </a>
             {% endif %}
-
-            {% if nav_perms.khata %}
-            <a href="/khata/" class="sidebar-link {% block nav_khata %}{% endblock %}" id="nav-khata">
-                <i class="bi bi-journal-text"></i>
-                <span class="link-text">Khata (Ledger)</span>
-            </a>
-            {% endif %}
-
-            {% if nav_perms.support %}
-            <a href="/support/" class="sidebar-link {% block nav_support %}{% endblock %}" id="nav-support">
-                <i class="bi bi-life-preserver"></i>
-                <span class="link-text">Support Tickets</span>
-                {% if open_ticket_count %}<span class="badge bg-danger ms-auto">{{ open_ticket_count }}</span>{% endif %}
-            </a>
-            {% endif %}
-
-
-            {% if nav_perms.noon_labels or nav_perms.settings %}
-            <div class="nav-section-title">Tools</div>
-            {% endif %}
-
             {% if nav_perms.noon_labels %}
             <a href="/noon-labels/" class="sidebar-link {% block nav_noon %}{% endblock %}" id="nav-noon">
                 <i class="bi bi-printer-fill"></i>
@@ -164,13 +177,86 @@
             </a>
             {% endif %}
 
+            {% if nav_perms.products %}
+            <div class="nav-section-title">Catalogue</div>
+            <a href="/products/" class="sidebar-link {% block nav_products %}{% endblock %}" id="nav-products">
+                <i class="bi bi-box-seam-fill"></i>
+                <span class="link-text">Products</span>
+            </a>
+            {% comment %}The advertising catalogue. Sits under Catalogue rather
+               than Website because what it contains is decided by product data
+               - a missing photo is why an item is not being advertised, and the
+               fix is on the product, not on the marketing pages.{% endcomment %}
+            <a href="/products/feed-health/" class="sidebar-link {% block nav_feed %}{% endblock %}" id="nav-feed">
+                <i class="bi bi-megaphone-fill"></i>
+                <span class="link-text">Ad Feed</span>
+            </a>
+            {% endif %}
+
+            {% if nav_perms.customers %}
+            <div class="nav-section-title">Customers &amp; Leads</div>
+            <a href="/customers/" class="sidebar-link {% block nav_customers %}{% endblock %}" id="nav-customers">
+                <i class="bi bi-people-fill"></i>
+                <span class="link-text">Customers</span>
+            </a>
+            <a href="/portal/admin/customers/" class="sidebar-link {% block nav_customer_mgmt %}{% endblock %}" id="nav-customer-mgmt">
+                <i class="bi bi-person-gear"></i>
+                <span class="link-text">Customer Accounts</span>
+            </a>
+            {% comment %}Website leads sit directly above Product Requests because the
+               two are the same job — inbound demand waiting on a reply. The badge is
+               populated by the same 60-second poll that feeds the header bell, so an
+               unanswered enquiry is visible from any page in the back-office rather
+               than only to whoever thinks to open Django's stock admin.{% endcomment %}
+            <a href="/portal/admin/leads/" class="sidebar-link {% block nav_leads %}{% endblock %}" id="nav-leads">
+                <i class="bi bi-inbox"></i>
+                <span class="link-text">Website Leads</span>
+                <span class="sidebar-badge" id="leadsBadge" hidden></span>
+            </a>
+            <a href="/portal/admin/requests/" class="sidebar-link {% block nav_requests %}{% endblock %}" id="nav-requests">
+                <i class="bi bi-clipboard-check"></i>
+                <span class="link-text">Product Requests</span>
+                <span class="sidebar-badge" id="requestsBadge" hidden></span>
+            </a>
+            {% endif %}
+
+            {% if nav_perms.khata %}
+            <div class="nav-section-title">Finance</div>
+            <a href="/khata/" class="sidebar-link {% block nav_khata %}{% endblock %}" id="nav-khata">
+                <i class="bi bi-journal-text"></i>
+                <span class="link-text">Khata (Ledger)</span>
+            </a>
+            {% endif %}
+
+            {% if nav_perms.support %}
+            <div class="nav-section-title">Support</div>
+            <a href="/support/" class="sidebar-link {% block nav_support %}{% endblock %}" id="nav-support">
+                <i class="bi bi-life-preserver"></i>
+                <span class="link-text">Support Tickets</span>
+                {% if open_ticket_count %}<span class="badge bg-danger ms-auto">{{ open_ticket_count }}</span>{% endif %}
+            </a>
+            {% endif %}
+
+            {% comment %}Public-site content. Portfolio is what visitors see on the
+               marketing pages, not customer-desk work — it only sits behind the
+               customers permission because that is where the view was written.
+            {% endcomment %}
+            {% if nav_perms.customers %}
+            <div class="nav-section-title">Website</div>
+            <a href="/portal/admin/portfolio/" class="sidebar-link {% block nav_portfolio %}{% endblock %}" id="nav-portfolio">
+                <i class="bi bi-collection-play"></i>
+                <span class="link-text">Portfolio</span>
+            </a>
+            {% endif %}
+
             {% if nav_perms.settings %}
+            <div class="nav-section-title">Setup</div>
             <a href="/settings/" class="sidebar-link {% block nav_settings %}{% endblock %}" id="nav-settings">
                 <i class="bi bi-gear-fill"></i>
                 <span class="link-text">Settings</span>
             </a>
             <a href="/settings/shipping-calculator/" class="sidebar-link {% block nav_shipping %}{% endblock %}" id="nav-shipping">
-                <i class="bi bi-truck"></i>
+                <i class="bi bi-calculator"></i>
                 <span class="link-text">Shipping Calculator</span>
             </a>
             {% endif %}
@@ -180,6 +266,10 @@
             <a href="{% url 'user_list' %}" class="sidebar-link {% block nav_users %}{% endblock %}" id="nav-users">
                 <i class="bi bi-person-badge"></i>
                 <span class="link-text">Team &amp; Roles</span>
+            </a>
+            <a href="{% url 'audit_log' %}" class="sidebar-link {% block nav_audit %}{% endblock %}" id="nav-audit">
+                <i class="bi bi-clipboard-data"></i>
+                <span class="link-text">Audit Log</span>
             </a>
             {% endif %}
 
@@ -192,7 +282,12 @@
                 <i class="bi bi-person-circle"></i>
                 <span class="link-text">{{ user.username }}{% if portal_role %} <small class="text-secondary">({{ current_profile.get_role_display }})</small>{% endif %}</span>
             </div>
-            
+
+            <a href="{% url 'my_account' %}" class="sidebar-link {% block nav_account %}{% endblock %}" id="nav-account">
+                <i class="bi bi-person-gear"></i>
+                <span class="link-text">My Account</span>
+            </a>
+
             <form action="{% url 'admin_logout' %}" method="post" class="m-0 p-0">
                 {% csrf_token %}
                 <button type="submit" class="sidebar-link border-0 bg-transparent w-100 text-start" id="nav-logout" style="cursor: pointer;" aria-label="Log out">
@@ -263,6 +358,32 @@
 
         
         <main class="content-area fade-in">
+            {% block breadcrumbs %}{% endblock %}
+
+            {% comment %}Django messages, which this shell never rendered.
+
+               94 messages.success/warning/error calls exist across the project;
+               the public and account templates show theirs, but every view
+               behind THIS base - orders, products, customers - was posting
+               feedback into a template that dropped it. "No orders were
+               selected", "Deleted 31 spam messages", and every export that
+               declines to run with a reason, all silently discarded.
+
+               Rendered above the page body, which is where an action's result
+               belongs: the operator has just been redirected here and is
+               looking at the top of the page.
+            {% endcomment %}
+            {% if messages %}
+            <div class="admin-messages">
+                {% for m in messages %}
+                <div class="alert alert-{{ m.tags|default:'info' }} alert-dismissible fade show py-2" role="alert">
+                    {{ m }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
             {% block content %}{% endblock %}
         </main>
     </div>
@@ -274,7 +395,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 
     
-    <script src="{% static 'main.js' %}"></script>
+    <script src="{% static 'main.js' %}?v=admin-layout-1"></script>
 
     
     {% block extra_js %}{% endblock %}
@@ -307,5 +428,25 @@
         <i class="bi bi-arrow-up"></i>
     </button>
 
+
+{% comment %}Service worker registration.
+
+   Registered from a template rather than main.js because the scope of a worker
+   is the directory it is SERVED from: /static/sw.js would only ever control
+   /static/, which is useless. The Service-Worker-Allowed header set on the view
+   in logistic_manager/urls.py is what lets a file under /static/ claim the
+   whole site.
+
+   Failure is silent on purpose. A worker that will not register costs the
+   install prompt and nothing else - the site itself works exactly as before,
+   and an error toast on every page load would be noise staff cannot act on.
+{% endcomment %}
+<script>
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+    });
+}
+</script>
 </body>
 </html>

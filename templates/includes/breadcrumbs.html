@@ -1,0 +1,21 @@
+{% comment %}
+Reusable breadcrumb trail. A page fills the `breadcrumbs` block in base.html with:
+  {% block breadcrumbs %}
+    {% include 'includes/breadcrumbs.html' with crumbs=trail %}
+  {% endblock %}
+where `trail` is a list of {'label': ..., 'url': ...} dicts (last item = current page,
+url optional). Kept tiny and dependency-free.
+{% endcomment %}
+{% if crumbs %}
+<nav aria-label="breadcrumb" class="mb-2">
+  <ol class="breadcrumb mb-0 small">
+    {% for c in crumbs %}
+      {% if c.url and not forloop.last %}
+        <li class="breadcrumb-item"><a href="{{ c.url }}" class="text-decoration-none">{{ c.label }}</a></li>
+      {% else %}
+        <li class="breadcrumb-item active" aria-current="page">{{ c.label }}</li>
+      {% endif %}
+    {% endfor %}
+  </ol>
+</nav>
+{% endif %}
